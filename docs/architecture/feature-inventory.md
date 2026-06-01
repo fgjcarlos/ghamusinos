@@ -66,19 +66,19 @@ Cada funcionalidad lleva:
 | Zonas de FC desde Strava + cálculo de distribución | `ghamusinos_/__` | `internal/metrics`, `internal/strava` | backend Go | 1.2 | portar |
 | Manejo de rate limits + reintentos | `ghamusinos_/__` | `internal/strava/client.go` | backend Go | 1.2 | reimplementar |
 
-> **Decisión abierta** (ver ADR): credenciales Strava **por usuario** (modelo legacy "bring your own") vs. **app global**. Para un producto por invitación, la app global simplifica el onboarding.
+> **Decidido** (ADR 0001): **app Strava global**. El usuario solo pulsa "Conectar con Strava" y autoriza por OAuth (estilo Intervals.icu); nunca ve tokens ni credenciales. El modelo legacy "bring your own credentials" se descarta por UX.
 
 ## 6. Laboratorio GPX (diferenciador del producto)
 
-> El laboratorio vive principalmente **client-side** (React, corre en el navegador) reutilizando `old_ghamusinos`. El parsing y análisis pesado puede ofrecerse también server-side en Go para persistir resultados de tracks importados. **El parsing de fichero GPX no existía en los backends NestJS**: solo `old_ghamusinos` lo hacía.
+> **Decidido:** el análisis GPX vive en el **backend (Go)**. El cliente sube el fichero, el backend parsea y calcula todas las métricas, y el frontend React solo **renderiza** (mapa MapLibre, perfil de elevación, tarjetas). Así la lógica de cálculo existe una sola vez (en `internal/gpx`), se persiste y es testeable. De `old_ghamusinos` se reutiliza la **capa de visualización** (componentes React + MapLibre) y se **porta a Go** la lógica de `utils.ts` (~25 funciones). El parsing de fichero GPX no existía en los backends NestJS.
 
 ### 6.1 Carga y parsing
 
 | Funcionalidad | Origen | Módulo objetivo | Capa | Fase | Esfuerzo |
 |---|---|---|---|---|---|
-| Subida de fichero `.gpx`/`.json` (GeoJSON) | `old_ghamusinos` | `web/src/features/lab` | client-side | 1.3 | reusar |
-| Parsing GPX → geometría/elevación/timestamps | `old_ghamusinos` | `web/.../lab` + `internal/gpx/parser.go` | client-side + backend Go | 1.3 | reusar + portar |
-| Validación de fichero (tamaño, esquema, Zod) | `old_ghamusinos` | `web/.../lab` | client-side | 1.3 | reusar |
+| Subida de fichero `.gpx`/`.json` (GeoJSON) | `old_ghamusinos` | `web/src/features/lab` | client (UI) | 1.3 | reusar |
+| Parsing GPX → geometría/elevación/timestamps | `old_ghamusinos` | `internal/gpx/parser.go` | backend Go | 1.3 | portar |
+| Validación de fichero (tamaño, esquema) | `old_ghamusinos` | `internal/gpx` (+ pre-check cliente) | backend Go | 1.3 | portar |
 | Hash de fichero para deduplicación | nuevo (doc en stack) | `internal/gpx` | backend Go | 1.3 | nuevo |
 | Persistencia del análisis de track | nuevo | `internal/gpx`, `internal/db` | backend Go | 1.3 | nuevo |
 
@@ -88,29 +88,29 @@ Todas provienen de `old_ghamusinos/src/lib/utils.ts` (~25 funciones puras, 112 t
 
 | Métrica / cálculo | Módulo objetivo | Capa | Fase |
 |---|---|---|---|
-| Distancia (Haversine) y distancia de ruta | `internal/gpx/analysis.go` | backend Go + client | 1.3 |
-| D+ / D− con umbral de ruido | `internal/gpx/analysis.go` | backend Go + client | 1.3 |
-| Pendiente y segmentos de gradiente (heatmap) | `internal/gpx/analysis.go` | backend Go + client | 1.3 |
-| Effort Index (km-esfuerzo) | `internal/gpx/analysis.go` | backend Go + client | 1.3 |
-| ITRA points | `internal/gpx/analysis.go` | backend Go + client | 1.3 |
-| Leg-Breaker Index (variabilidad de pendiente) | `internal/gpx/analysis.go` | backend Go + client | 1.3 |
-| VAM estimada | `internal/gpx/analysis.go` | backend Go + client | 1.3 |
-| Velocidad ajustada por pendiente + tiempo estimado | `internal/gpx/analysis.go` | backend Go + client | 1.3 |
-| Score de dificultad (beginner→pro) | `internal/gpx/analysis.go` | backend Go + client | 1.3 |
-| Runnability Index (% corrible) | `internal/gpx/analysis.go` | backend Go + client | 1.3 |
+| Distancia (Haversine) y distancia de ruta | `internal/gpx/analysis.go` | backend Go | 1.3 |
+| D+ / D− con umbral de ruido | `internal/gpx/analysis.go` | backend Go | 1.3 |
+| Pendiente y segmentos de gradiente (heatmap) | `internal/gpx/analysis.go` | backend Go | 1.3 |
+| Effort Index (km-esfuerzo) | `internal/gpx/analysis.go` | backend Go | 1.3 |
+| ITRA points | `internal/gpx/analysis.go` | backend Go | 1.3 |
+| Leg-Breaker Index (variabilidad de pendiente) | `internal/gpx/analysis.go` | backend Go | 1.3 |
+| VAM estimada | `internal/gpx/analysis.go` | backend Go | 1.3 |
+| Velocidad ajustada por pendiente + tiempo estimado | `internal/gpx/analysis.go` | backend Go | 1.3 |
+| Score de dificultad (beginner→pro) | `internal/gpx/analysis.go` | backend Go | 1.3 |
+| Runnability Index (% corrible) | `internal/gpx/analysis.go` | backend Go | 1.3 |
 | Perfil de elevación | `web/.../charts` | client-side | 1.3 |
 
 ### 6.3 Detección de features del track
 
 | Funcionalidad | Origen | Capa | Fase |
 |---|---|---|---|
-| Detección de todas las subidas (tolerancia a jitter GPS) | `old_ghamusinos` | backend Go + client | 1.3 |
-| Subida más vertical (Kadane) | `old_ghamusinos` | backend Go + client | 1.3 |
-| King Climb (subida dominante: VAM, muros, táctica) | `old_ghamusinos` | backend Go + client | 1.3 |
-| Muros (>20% durante >50 m) | `old_ghamusinos` | backend Go + client | 1.3 |
-| Recovery zones (llanos tras subidas) | `old_ghamusinos` | backend Go + client | 1.3 |
-| Zonas de riesgo (steep, técnica, exposición) | `old_ghamusinos` | backend Go + client | 1.3 |
-| Tipo de track (circular vs punto-a-punto) | `old_ghamusinos` | backend Go + client | 1.3 |
+| Detección de todas las subidas (tolerancia a jitter GPS) | `old_ghamusinos` | backend Go | 1.3 |
+| **Km Vertical: tramo de subida sostenida continua** (Kadane sobre desnivel) | `old_ghamusinos` | backend Go | 1.3 |
+| King Climb (subida dominante: VAM, muros, táctica) | `old_ghamusinos` | backend Go | 1.3 |
+| Muros (>20% durante >50 m) | `old_ghamusinos` | backend Go | 1.3 |
+| Recovery zones (llanos tras subidas) | `old_ghamusinos` | backend Go | 1.3 |
+| Zonas de riesgo (steep, técnica, exposición) | `old_ghamusinos` | backend Go | 1.3 |
+| Tipo de track (circular vs punto-a-punto) | `old_ghamusinos` | backend Go | 1.3 |
 
 ### 6.4 Modos avanzados del laboratorio (client-side)
 
@@ -161,7 +161,7 @@ Todas provienen de `old_ghamusinos/src/lib/utils.ts` (~25 funciones puras, 112 t
 
 | Funcionalidad | Origen | Módulo objetivo | Capa | Fase | Esfuerzo |
 |---|---|---|---|---|---|
-| Cliente IA + feature flag global y por usuario (opt-in) | `ghamusinos_/__` | `internal/ai/claude.go` | backend Go | 1.5 | reimplementar |
+| Interfaz IA multi-proveedor (OpenAI → Claude → OpenRouter) + feature flag global y opt-in | `ghamusinos_/__` | `internal/ai` | backend Go | 1.5 | reimplementar |
 | Análisis por actividad (score, fortalezas, recomendaciones) | `ghamusinos_/__` | `internal/ai`, `internal/jobs` | job | 1.5 | reimplementar |
 | Análisis semanal agregado | `ghamusinos_/__` | `internal/ai`, `internal/jobs` | job | 1.5 | reimplementar |
 | Análisis de carga (CTL/ATL/TSB) con tono e insights | `ghamusinos_/__` | `internal/ai` | job | 1.5 | reimplementar |
@@ -169,7 +169,7 @@ Todas provienen de `old_ghamusinos/src/lib/utils.ts` (~25 funciones puras, 112 t
 | Reintentos con backoff + no bloquear flujos críticos | `ghamusinos_/__` | `internal/ai`, `internal/jobs` | job | 1.5 | reimplementar |
 | Persistencia de resultados (`ai_analysis`) | `ghamusinos_/__` | `internal/db` | backend Go | 1.5 | reimplementar |
 
-> **Decisión abierta** (ver ADR): **Claude API directa** (principio del PRD) vs. **OpenRouter** (camino legacy probado, multi-modelo, menor coste). El PRD pide IA opcional con Claude; OpenRouter sigue siendo válido como capa de abstracción.
+> **Decidido** (ADR 0002): IA **multi-proveedor** tras una interfaz común. Orden de implementación: **OpenAI** (1º), **Claude** (2º), **OpenRouter** (3º). El proveedor activo se elige por configuración; el dominio no conoce el proveedor.
 
 ## 10. Planificación (V2)
 

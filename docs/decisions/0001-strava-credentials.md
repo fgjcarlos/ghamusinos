@@ -1,28 +1,32 @@
 # ADR 0001 — Modelo de credenciales de Strava
 
-- **Estado:** propuesto (pendiente de decisión)
+- **Estado:** aceptado
 - **Fecha:** 2026-06-01
 - **Contexto:** V1, integración Strava (fase 1.2)
 
-## Decisión a tomar
+## Decisión
 
-Cómo se obtienen las credenciales de la aplicación Strava (`client_id` / `client_secret`) que el sistema usa para OAuth, webhooks y backfill.
+**Una sola app Strava global del proyecto.** El usuario nunca ve ni gestiona `client_id`, `client_secret` ni tokens. El flujo es el estándar de la industria (como Intervals.icu o Connect): el usuario pulsa **"Conectar con Strava"**, Strava muestra su pantalla de consentimiento, autoriza a Ghamusinos a leer sus actividades, y vuelve. Nada más.
 
-## Opciones
+## Por qué
 
-| Opción | Cómo funciona | Pro | Contra |
+El modelo del código legacy era "bring your own credentials": cada usuario debía crear su propia app en Strava e introducir `client_id`/`client_secret` cifrados en la DB. Eso resolvía el aislamiento de rate limit, pero a un coste de UX inaceptable:
+
+> El usuario medio no tiene ni idea de qué es un token o una app OAuth. En cuanto ve esos campos, abandona el proceso.
+
+Ghamusinos es por invitación y de uso acotado: la cuota global de Strava es más que suficiente y el onboarding debe ser de un clic.
+
+## Opciones consideradas
+
+| Opción | UX | Rate limit | Veredicto |
 |---|---|---|---|
-| **A. App global** | Una sola app Strava del proyecto; credenciales en variables de entorno del servidor | Onboarding sin fricción; el usuario solo pulsa "Conectar" | Cuota de rate limit compartida entre todos los usuarios; un único webhook |
-| **B. Por usuario (legacy)** | Cada usuario registra su propia app Strava; credenciales cifradas en DB (AES-256-GCM) | Rate limit aislado por usuario; multi-tenant real | Fricción alta de onboarding; el usuario debe crear una app en Strava |
-
-## Recomendación
-
-**Opción A (app global)** para V1. Ghamusinos es por invitación y de uso personal/acotado: la cuota global de Strava es suficiente y el onboarding debe ser de un clic. El modelo por usuario del código legacy resolvía un problema de escala que V1 no tiene.
-
-Mantener la columna cifrada de credenciales en el modelo de datos permite migrar a la opción B más adelante sin rediseño.
+| **A. App global** | Un clic, sin configuración | Compartido (suficiente para el volumen previsto) | **Elegida** |
+| B. Por usuario (legacy) | Alta fricción, requiere crear app en Strava | Aislado por usuario | Descartada por UX |
 
 ## Consecuencias
 
-- `STRAVA_CLIENT_ID` / `STRAVA_CLIENT_SECRET` viven en config del servidor.
+- `STRAVA_CLIENT_ID` / `STRAVA_CLIENT_SECRET` viven en config del servidor, nunca en la UI.
+- El usuario solo ve un botón "Conectar con Strava" y la pantalla de consentimiento oficial.
 - Un único webhook de suscripción para toda la app.
-- Si se alcanza el límite de rate de Strava, reevaluar hacia la opción B.
+- Los tokens **del usuario** (access/refresh) sí se guardan cifrados (AES-256-GCM) tras el consentimiento, pero son invisibles para él.
+- Si algún día se alcanza el límite de rate de Strava, reevaluar hacia la opción B sin rediseño (el modelo de datos lo permite).

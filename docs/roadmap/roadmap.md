@@ -35,7 +35,7 @@ Criterio de cierre: el histórico reciente del usuario aparece deduplicado y los
 
 **Objetivo:** convertir tracks GPX en análisis trail útil. Diferenciador central.
 
-Entregables: subida y parsing GPX (cliente + `internal/gpx` en Go), métricas de ruta (distancia, D+/D−, pendiente, Effort Index, VAM, ITRA, Leg-Breaker, Runnability, dificultad), detección de subidas/King Climb/muros/recovery/risk zones, mapa 3D MapLibre con heatmap de pendientes y perfil de elevación, comparador de rutas, persistencia y hash de fichero.
+Entregables: parsing y análisis GPX en el **backend Go** (`internal/gpx`; el cliente sube el fichero y solo renderiza), métricas de ruta (distancia, D+/D−, pendiente, Effort Index, VAM, ITRA, Leg-Breaker, Runnability, dificultad), detección de subidas, **Km Vertical (tramo de subida sostenida)**, King Climb/muros/recovery/risk zones, mapa 3D MapLibre con heatmap de pendientes y perfil de elevación, comparador de rutas, persistencia y hash de fichero.
 
 Criterio de cierre: subir un GPX produce un análisis completo, visualizado en mapa 3D y persistido.
 
@@ -47,11 +47,11 @@ Entregables: métricas portadas a Go (TSS, IF, GAP, EF, cardiac drift, CTL/ATL/T
 
 Criterio de cierre: con actividades importadas, el dashboard muestra tendencias y carga/fatiga coherentes.
 
-### Fase 1.5 — IA opcional con Claude
+### Fase 1.5 — IA opcional (multi-proveedor)
 
 **Objetivo:** enriquecer la interpretación sin hacerla obligatoria.
 
-Entregables: cliente IA con feature flag global y opt-in por usuario, análisis por actividad / semanal / de carga, payload builder controlado, schema de salida validado, reintentos con backoff, ejecución en jobs (no bloquea el core) y persistencia (`ai_analysis`).
+Entregables: interfaz IA multi-proveedor (OpenAI → Claude → OpenRouter) con feature flag global y opt-in por usuario, análisis por actividad / semanal / de carga, payload builder controlado, schema de salida validado e idéntico entre proveedores, reintentos con backoff, ejecución en jobs (no bloquea el core) y persistencia (`ai_analysis`).
 
 Criterio de cierre: con IA activada, el usuario obtiene resúmenes; con IA desactivada o caída, el producto funciona igual.
 

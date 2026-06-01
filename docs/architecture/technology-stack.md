@@ -20,7 +20,7 @@ Ghamusinos debe construirse como un producto de análisis deportivo con backend 
 | Jobs/background | River sobre PostgreSQL |
 | Auth | Clerk inicialmente |
 | Integración deportiva | Strava OAuth + webhooks + backfill + deduplicación |
-| IA | Claude API opcional |
+| IA | Multi-proveedor opcional (OpenAI → Claude → OpenRouter) |
 | Mapas | MapLibre |
 | Gráficas | ECharts |
 | Deploy | Binario único + PostgreSQL/TimescaleDB |
@@ -397,7 +397,7 @@ Para V1, una opción pragmática es:
 
 ### IA
 
-Claude API será opcional.
+La IA será **opcional y multi-proveedor**, tras una interfaz común en `internal/ai`. Orden de implementación: OpenAI → Claude → OpenRouter (ver `docs/decisions/0002-ai-provider.md`).
 
 Casos de uso:
 
@@ -411,10 +411,12 @@ La IA no debe ser fuente de verdad. Debe consumir métricas calculadas por el si
 
 Reglas:
 
-- No bloquear flujos críticos si Claude falla.
+- El dominio no conoce el proveedor; se elige por configuración (`AI_PROVIDER`, `AI_MODEL`).
+- No bloquear flujos críticos si el proveedor de IA falla.
 - Ejecutar generación en jobs.
+- Schema de salida validado e idéntico para todos los proveedores.
 - Guardar prompts/versiones si afectan resultados visibles.
-- Permitir desactivar IA por configuración.
+- Permitir desactivar IA por configuración (flag global + opt-in por usuario).
 
 ### Mapas
 
@@ -672,8 +674,8 @@ PostgreSQL + TimescaleDB
 SQLC + Goose
 River para jobs
 Clerk para auth inicial
-Strava como integración deportiva principal
-Claude API opcional
+Strava como integración deportiva principal (app global, OAuth de un clic)
+IA opcional multi-proveedor (OpenAI → Claude → OpenRouter)
 MapLibre + ECharts para experiencia visual
 Deploy como binario único + base de datos
 ```

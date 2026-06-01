@@ -11,7 +11,7 @@ Plataforma personal de **análisis y planificación para trail running**. No sol
 | **Laboratorio GPX** | Analiza rutas de trail: dificultad, D+/D−, VAM, subidas clave, mapa 3D, race-day, meteo y exposición solar |
 | **Ingesta Strava** | Importa el histórico deportivo vía OAuth, webhooks y backfill, sin duplicar el registro |
 | **Rendimiento y fatiga** | Calcula carga y forma (TSS, CTL, ATL, TSB, GAP, VAM) con fórmulas conocidas y transparentes |
-| **IA opcional** | Interpreta métricas y actividades con Claude — opt-in, nunca obligatoria |
+| **IA opcional** | Interpreta métricas y actividades con IA (OpenAI / Claude / OpenRouter) — opt-in, nunca obligatoria |
 
 ## Stack
 
@@ -26,7 +26,7 @@ Aplicación **Go-first de binario único** con frontend React embebido.
 | Jobs | River (sobre PostgreSQL) |
 | Auth | Clerk |
 | Mapas / Gráficas | MapLibre / ECharts |
-| IA | Claude API (opcional) |
+| IA | Opcional, multi-proveedor (OpenAI → Claude → OpenRouter) |
 
 El razonamiento detrás de cada decisión está en [`docs/architecture/technology-stack.md`](docs/architecture/technology-stack.md).
 

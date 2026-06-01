@@ -136,7 +136,7 @@ Objetivo: convertir tracks GPX en análisis trail útil. Es el **diferenciador c
 - Parsing de geometría, elevación y timestamps si existen.
 - Cálculo de distancia, D+/D−, pendiente y segmentos de gradiente.
 - Métricas trail: Effort Index, VAM, ITRA, Leg-Breaker, Runnability.
-- Detección de subidas, King Climb, muros, recovery zones y zonas de riesgo.
+- Detección de subidas, **Km Vertical (tramo de subida sostenida continua)**, King Climb, muros, recovery zones y zonas de riesgo.
 - Mapa 3D interactivo (MapLibre) con heatmap de pendientes y perfil de elevación.
 - Comparador de rutas (hasta 3).
 - Score de dificultad y esfuerzo.
@@ -264,7 +264,7 @@ La arquitectura objetivo es **Go-first con binario único**. El detalle y los tr
 | Jobs/background | River (sobre PostgreSQL) |
 | Autenticación | Clerk |
 | Proveedor deportivo | Strava |
-| IA | Claude (opcional) |
+| IA | OpenAI / Claude / OpenRouter (opcional, multi-proveedor) |
 | Mapas | MapLibre |
 | Gráficas | ECharts |
 
@@ -318,6 +318,9 @@ La arquitectura objetivo es **Go-first con binario único**. El detalle y los tr
 - Si se guarda el archivo GPX original o solo datos procesados.
 - Modelo inicial del score de dificultad.
 - Qué datos exactos se enviarán a Claude cuando IA esté activada.
-- **Proveedor de IA**: Claude API directa vs. OpenRouter como capa multi-modelo (ver `docs/decisions/0002-ai-provider.md`).
-- **Credenciales Strava**: por usuario vs. app global (ver `docs/decisions/0001-strava-credentials.md`).
+### Decisiones ya cerradas
+
+- **Análisis GPX**: se ejecuta en el **backend (Go)**; el frontend solo renderiza.
+- **Credenciales Strava**: **app global**; el usuario solo pulsa "Conectar con Strava" (sin tokens visibles). Ver `docs/decisions/0001-strava-credentials.md`.
+- **Proveedor de IA**: **multi-proveedor** tras interfaz común; orden OpenAI → Claude → OpenRouter. Ver `docs/decisions/0002-ai-provider.md`.
 - Nivel de detalle del dashboard V1.
