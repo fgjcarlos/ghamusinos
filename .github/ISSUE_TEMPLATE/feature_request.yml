@@ -1,0 +1,41 @@
+name: Feature / Tarea
+description: Proponer una funcionalidad o tarea de implementación
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problema / objetivo
+      description: Qué necesidad resuelve esta tarea.
+    validations:
+      required: true
+  - type: textarea
+    id: solution
+    attributes:
+      label: Propuesta
+      description: Qué se va a construir y cómo, desde la perspectiva del usuario o del sistema.
+    validations:
+      required: true
+  - type: input
+    id: phase
+    attributes:
+      label: Fase del roadmap
+      description: "Ej.: 1.1, 1.2, 1.3…"
+    validations:
+      required: false
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Criterios de aceptación
+      description: Lista verificable de lo que debe cumplirse para cerrar la issue.
+      value: |
+        - [ ]
+    validations:
+      required: true
+  - type: textarea
+    id: context
+    attributes:
+      label: Contexto / referencias
+      description: Enlaces a docs, código legacy de referencia, ADRs, etc.
+    validations:
+      required: false

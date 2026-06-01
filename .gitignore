@@ -1,0 +1,34 @@
+# Go
+/bin/
+*.exe
+*.out
+*.test
+vendor/
+
+# Build output del frontend embebido
+web/dist/
+internal/frontend/dist/
+
+# Node / frontend
+node_modules/
+web/node_modules/
+.pnp.*
+*.tsbuildinfo
+
+# Entorno y secretos
+.env
+.env.*
+!.env.example
+
+# Datos / cobertura
+coverage/
+*.coverprofile
+
+# Editores / SO
+.DS_Store
+.idea/
+.vscode/
+*.swp
+
+# Herramientas del agente
+.atl/
