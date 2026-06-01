@@ -1,0 +1,20 @@
+services:
+  db:
+    image: timescale/timescaledb:latest-pg16
+    environment:
+      POSTGRES_USER: ghamusinos
+      POSTGRES_PASSWORD: ghamusinos
+      POSTGRES_DB: ghamusinos
+    ports:
+      - "5432:5432"
+    volumes:
+      - ghamusinos_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ghamusinos -d ghamusinos"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+volumes:
+  ghamusinos_pgdata:
