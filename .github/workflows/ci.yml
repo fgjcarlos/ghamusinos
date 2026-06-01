@@ -1,0 +1,85 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# El entorno de desarrollo usa Go 1.22 y no descarga otras toolchains.
+# Lo fijamos también en CI para que las dependencias no fuercen un upgrade.
+env:
+  GOTOOLCHAIN: local
+
+jobs:
+  backend:
+    name: Backend (lint + test + build + migrate)
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: ghamusinos
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.22"
+          cache: true
+
+      - name: gofmt
+        run: |
+          unformatted=$(gofmt -l .)
+          if [ -n "$unformatted" ]; then
+            echo "Ficheros sin formatear:"; echo "$unformatted"; exit 1
+          fi
+
+      - name: go vet
+        run: go vet ./...
+
+      - name: go test
+        run: go test ./...
+
+      - name: go build
+        run: go build -o bin/ghamusinos ./cmd/ghamusinos
+
+      - name: migraciones (smoke)
+        env:
+          DATABASE_URL: postgres://postgres:postgres@localhost:5432/ghamusinos?sslmode=disable
+        run: |
+          go run ./cmd/migrate up
+          go run ./cmd/migrate status
+
+  frontend:
+    name: Frontend (build)
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: pnpm
+          cache-dependency-path: web/pnpm-lock.yaml
+
+      - name: install
+        run: pnpm --dir web install --frozen-lockfile
+
+      - name: build
+        run: pnpm --dir web build
