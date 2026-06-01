@@ -24,7 +24,10 @@ func Run() error {
 	srv := &http.Server{
 		Addr:              addr,
 		Handler:           apphttp.NewRouter(),
-		ReadHeaderTimeout: 10 * time.Second,
+		ReadHeaderTimeout: 5 * time.Second,
+		ReadTimeout:       15 * time.Second,
+		WriteTimeout:      15 * time.Second,
+		IdleTimeout:       60 * time.Second,
 	}
 
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
@@ -33,9 +36,12 @@ func Run() error {
 	errCh := make(chan error, 1)
 	go func() {
 		slog.Info("servidor escuchando", "addr", addr)
-		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+		err := srv.ListenAndServe()
+		if err != nil && !errors.Is(err, http.ErrServerClosed) {
 			errCh <- err
+			return
 		}
+		close(errCh)
 	}()
 
 	select {
@@ -45,7 +51,13 @@ func Run() error {
 		slog.Info("apagando servidor")
 		shutdownCtx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
 		defer cancel()
-		return srv.Shutdown(shutdownCtx)
+		if err := srv.Shutdown(shutdownCtx); err != nil {
+			return err
+		}
+		// Espera a que la goroutine de ListenAndServe termine limpiamente
+		// antes de salir (evita data races en arranques/paradas repetidos).
+		<-errCh
+		return nil
 	}
 }
 

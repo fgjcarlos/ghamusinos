@@ -21,6 +21,9 @@ func NewRouter() http.Handler {
 	r := chi.NewRouter()
 
 	r.Use(middleware.RequestID)
+	// RealIP confía en X-Forwarded-For / X-Real-IP. Asume que el binario se
+	// despliega DETRÁS de un reverse proxy de confianza (plataforma o Nginx).
+	// Si en algún momento se expone directo a internet, restringir o quitar.
 	r.Use(middleware.RealIP)
 	r.Use(middleware.Logger)
 	r.Use(middleware.Recoverer)
