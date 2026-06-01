@@ -6,11 +6,12 @@ import (
 	"errors"
 	"log/slog"
 	"net/http"
-	"os"
 	"os/signal"
 	"syscall"
 	"time"
 
+	"github.com/fgjcarlos/ghamusinos/internal/config"
+	"github.com/fgjcarlos/ghamusinos/internal/db"
 	apphttp "github.com/fgjcarlos/ghamusinos/internal/http"
 )
 
@@ -19,8 +20,23 @@ const shutdownTimeout = 10 * time.Second
 // Run arranca el servidor HTTP y bloquea hasta que se recibe una señal de
 // apagado (SIGINT/SIGTERM), momento en el que hace un shutdown ordenado.
 func Run() error {
-	addr := ":" + port()
+	cfg, err := config.Load()
+	if err != nil {
+		return err
+	}
 
+	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	defer stop()
+
+	pool, err := db.Connect(ctx, cfg.DatabaseURL)
+	if err != nil {
+		return err
+	}
+	defer pool.Close()
+
+	slog.Info("conexión a base de datos establecida")
+
+	addr := ":" + cfg.Port
 	srv := &http.Server{
 		Addr:              addr,
 		Handler:           apphttp.NewRouter(),
@@ -29,9 +45,6 @@ func Run() error {
 		WriteTimeout:      15 * time.Second,
 		IdleTimeout:       60 * time.Second,
 	}
-
-	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
-	defer stop()
 
 	errCh := make(chan error, 1)
 	go func() {
@@ -59,14 +72,4 @@ func Run() error {
 		<-errCh
 		return nil
 	}
-}
-
-// port devuelve el puerto de escucha. La configuración central se formaliza en
-// una issue posterior; de momento se lee PORT del entorno con un valor por
-// defecto.
-func port() string {
-	if p := os.Getenv("PORT"); p != "" {
-		return p
-	}
-	return "8080"
 }
