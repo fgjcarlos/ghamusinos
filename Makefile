@@ -1,12 +1,18 @@
 BINARY := bin/ghamusinos
 
-.PHONY: help build run test tidy fmt vet check
+.PHONY: help build run test tidy fmt vet check web-install web-build
 
 help: ## Muestra esta ayuda
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | \
 		awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-12s\033[0m %s\n", $$1, $$2}'
 
-build: ## Compila el binario en bin/ghamusinos
+web-install: ## Instala dependencias del frontend (pnpm)
+	pnpm -C web install
+
+web-build: ## Compila el frontend y deposita assets en internal/frontend/dist
+	pnpm -C web build
+
+build: web-build ## Compila el binario en bin/ghamusinos (incluye build del frontend)
 	go build -o $(BINARY) ./cmd/ghamusinos
 
 run: ## Ejecuta la aplicación
