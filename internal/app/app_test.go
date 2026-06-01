@@ -4,16 +4,10 @@ import (
 	"testing"
 )
 
-func TestPortDefault(t *testing.T) {
-	t.Setenv("PORT", "")
-	if got := port(); got != "8080" {
-		t.Fatalf("port() = %q, quería %q", got, "8080")
-	}
-}
-
-func TestPortFromEnv(t *testing.T) {
-	t.Setenv("PORT", "9090")
-	if got := port(); got != "9090" {
-		t.Fatalf("port() = %q, quería %q", got, "9090")
-	}
+// Los tests de configuración de puerto se han movido a internal/config.
+// Este fichero se mantiene como placeholder para futuros tests de app.Run().
+func TestAppPackageCompiles(t *testing.T) {
+	// Verifica que el package compila correctamente.
+	// Tests de integración de Run() requieren una BD real.
+	t.Log("package app compilado correctamente")
 }
