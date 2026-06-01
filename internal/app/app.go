@@ -1,15 +1,60 @@
 // Package app conecta configuración, servidor HTTP y dependencias del binario.
-//
-// En la fase 1.1 Run irá creciendo para arrancar el servidor HTTP (Chi), la
-// conexión a base de datos y el frontend embebido. De momento es un esqueleto
-// que compila y permite establecer la estructura del proyecto.
 package app
 
-import "fmt"
+import (
+	"context"
+	"errors"
+	"log/slog"
+	"net/http"
+	"os"
+	"os/signal"
+	"syscall"
+	"time"
 
-// Run es el punto de entrada de la aplicación. Devuelve un error en lugar de
-// terminar el proceso para que el caller (main) decida cómo reportarlo.
+	apphttp "github.com/fgjcarlos/ghamusinos/internal/http"
+)
+
+const shutdownTimeout = 10 * time.Second
+
+// Run arranca el servidor HTTP y bloquea hasta que se recibe una señal de
+// apagado (SIGINT/SIGTERM), momento en el que hace un shutdown ordenado.
 func Run() error {
-	fmt.Println("ghamusinos: esqueleto fase 1.1 — servidor pendiente")
-	return nil
+	addr := ":" + port()
+
+	srv := &http.Server{
+		Addr:              addr,
+		Handler:           apphttp.NewRouter(),
+		ReadHeaderTimeout: 10 * time.Second,
+	}
+
+	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	defer stop()
+
+	errCh := make(chan error, 1)
+	go func() {
+		slog.Info("servidor escuchando", "addr", addr)
+		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			errCh <- err
+		}
+	}()
+
+	select {
+	case err := <-errCh:
+		return err
+	case <-ctx.Done():
+		slog.Info("apagando servidor")
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
+		defer cancel()
+		return srv.Shutdown(shutdownCtx)
+	}
+}
+
+// port devuelve el puerto de escucha. La configuración central se formaliza en
+// una issue posterior; de momento se lee PORT del entorno con un valor por
+// defecto.
+func port() string {
+	if p := os.Getenv("PORT"); p != "" {
+		return p
+	}
+	return "8080"
 }

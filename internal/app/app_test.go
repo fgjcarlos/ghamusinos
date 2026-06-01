@@ -1,11 +1,19 @@
 package app
 
-import "testing"
+import (
+	"testing"
+)
 
-// TestRun comprueba que el esqueleto arranca sin error. Sirve además para
-// establecer el harness de tests del proyecto (go test ./...).
-func TestRun(t *testing.T) {
-	if err := Run(); err != nil {
-		t.Fatalf("Run() devolvió error inesperado: %v", err)
+func TestPortDefault(t *testing.T) {
+	t.Setenv("PORT", "")
+	if got := port(); got != "8080" {
+		t.Fatalf("port() = %q, quería %q", got, "8080")
+	}
+}
+
+func TestPortFromEnv(t *testing.T) {
+	t.Setenv("PORT", "9090")
+	if got := port(); got != "9090" {
+		t.Fatalf("port() = %q, quería %q", got, "9090")
 	}
 }
