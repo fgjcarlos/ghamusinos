@@ -2,7 +2,7 @@
 
 Plataforma personal de **análisis y planificación para trail running**. No solo guarda actividades: convierte rutas GPX, actividades de Strava y métricas de rendimiento en información accionable para decidir mejor cómo está el corredor, cuánta fatiga acumula, cómo progresa y cómo preparar próximas rutas y carreras.
 
-> **Estado:** fase de diseño. El repositorio contiene la documentación completa del producto y la arquitectura; la implementación arranca por la fase 1.1 (ver roadmap).
+> **Estado:** Fase 1.1 en curso (base, datos y, próximamente, autenticación). Para levantarlo en local, ver [`docs/development.md`](docs/development.md).
 
 ## Qué hace
 
@@ -40,6 +40,7 @@ El razonamiento detrás de cada decisión está en [`docs/architecture/technolog
 | [`docs/roadmap/roadmap.md`](docs/roadmap/roadmap.md) | Plan por fases (V1 1.1→1.6, V2 2.1→2.5) |
 | [`docs/roadmap/v1-phase-1-plan.md`](docs/roadmap/v1-phase-1-plan.md) | Plan detallado de la fase 1.1 |
 | [`docs/decisions/`](docs/decisions/) | ADRs (decisiones de arquitectura) |
+| [`docs/development.md`](docs/development.md) | Guía de desarrollo local (setup, comandos, CI) |
 
 ## Principios de producto
 
