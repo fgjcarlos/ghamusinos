@@ -39,7 +39,7 @@ func Run() error {
 	addr := ":" + cfg.Port
 	srv := &http.Server{
 		Addr:              addr,
-		Handler:           apphttp.NewRouter(),
+		Handler:           apphttp.NewServer(pool).Router(),
 		ReadHeaderTimeout: 5 * time.Second,
 		ReadTimeout:       15 * time.Second,
 		WriteTimeout:      15 * time.Second,
