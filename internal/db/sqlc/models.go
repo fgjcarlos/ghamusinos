@@ -25,6 +25,12 @@ type User struct {
 	Email        string              `json:"email"`
 	DisplayName  pgtype.Text         `json:"display_name"`
 	InviteStatus status.InviteStatus `json:"invite_status"`
+	HrMax        pgtype.Int2         `json:"hr_max"`
+	Lthr         pgtype.Int2         `json:"lthr"`
+	Ftp          pgtype.Int2         `json:"ftp"`
+	Level        pgtype.Text         `json:"level"`
+	Timezone     string              `json:"timezone"`
+	AiEnabled    bool                `json:"ai_enabled"`
 	CreatedAt    pgtype.Timestamptz  `json:"created_at"`
 	UpdatedAt    pgtype.Timestamptz  `json:"updated_at"`
 }
