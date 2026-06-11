@@ -8,6 +8,7 @@ package sqlc
 import (
 	"context"
 
+	"github.com/fgjcarlos/ghamusinos/internal/db/status"
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
@@ -18,10 +19,10 @@ RETURNING id, clerk_user_id, email, display_name, invite_status, created_at, upd
 `
 
 type CreateUserParams struct {
-	ClerkUserID  string      `json:"clerk_user_id"`
-	Email        string      `json:"email"`
-	DisplayName  pgtype.Text `json:"display_name"`
-	InviteStatus string      `json:"invite_status"`
+	ClerkUserID  string              `json:"clerk_user_id"`
+	Email        string              `json:"email"`
+	DisplayName  pgtype.Text         `json:"display_name"`
+	InviteStatus status.InviteStatus `json:"invite_status"`
 }
 
 func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, error) {
