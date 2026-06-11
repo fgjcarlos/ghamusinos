@@ -12,14 +12,27 @@ import (
 	"github.com/fgjcarlos/ghamusinos/internal/http/handlers"
 )
 
-// NewRouter crea el router con el middleware base y las rutas iniciales.
+// Server agrupa las dependencias inyectadas necesarias para construir el router.
+// Se amplía con nuevas dependencias (queries SQLC, etc.) sin modificar la firma
+// de construcción de cada handler.
+type Server struct {
+	pool handlers.DBPinger
+}
+
+// NewServer crea un Server con el pool de base de datos proporcionado.
+// pool puede ser nil en tests sin base de datos; /readyz responderá 503 en ese caso.
+func NewServer(pool handlers.DBPinger) *Server {
+	return &Server{pool: pool}
+}
+
+// Router construye el handler HTTP con el middleware base y todas las rutas.
 //
 // Middleware base:
 //   - RequestID: identificador de correlación por petición.
 //   - RealIP:    IP real del cliente tras proxies.
 //   - Logger:    log de cada petición.
 //   - Recoverer: recupera ante panics y devuelve 500 sin tumbar el servidor.
-func NewRouter() http.Handler {
+func (s *Server) Router() http.Handler {
 	r := chi.NewRouter()
 
 	r.Use(middleware.RequestID)
@@ -30,8 +43,11 @@ func NewRouter() http.Handler {
 	r.Use(middleware.Logger)
 	r.Use(middleware.Recoverer)
 
-	// Ruta pública de healthcheck (exacta, sin trailing slash).
+	// Liveness: responde sin tocar la base de datos.
 	r.Get("/healthz", handlers.Health)
+
+	// Readiness: refleja el estado real de la base de datos.
+	r.Get("/readyz", handlers.Readyz(s.pool))
 
 	// Grupo de API. Las rutas privadas (protegidas por auth) se añaden en la
 	// fase de autenticación. Tiene su propio NotFound para que /api/inexistente
