@@ -1,6 +1,21 @@
 -- +goose Up
 -- +goose StatementBegin
 
+-- Guardia: si ya existen emails duplicados (p. ej. por webhooks reintentados
+-- antes de esta migración), aborta con un mensaje accionable en lugar del
+-- error críptico del CREATE UNIQUE INDEX. Deduplicar manualmente y reintentar.
+DO $$
+DECLARE
+    duplicados integer;
+BEGIN
+    SELECT count(*) INTO duplicados FROM (
+        SELECT email FROM users GROUP BY email HAVING count(*) > 1
+    ) d;
+    IF duplicados > 0 THEN
+        RAISE EXCEPTION 'users tiene % emails duplicados; deduplica antes de migrar (SELECT email, count(*) FROM users GROUP BY email HAVING count(*) > 1)', duplicados;
+    END IF;
+END $$;
+
 -- Reemplaza el índice normal en users(email) por un índice único.
 -- Garantiza que no pueda existir más de un usuario con el mismo email,
 -- incluso si un webhook de Clerk se reintenta.
