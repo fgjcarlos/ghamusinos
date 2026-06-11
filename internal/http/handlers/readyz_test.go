@@ -1,16 +1,11 @@
 package handlers
 
 import (
-	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 )
-
-// pingFunc define la función que Readyz usa para comprobar la disponibilidad
-// de la base de datos. Facilita el testeo sin depender de un pool real.
-type pingFunc func(ctx context.Context) error
 
 // TestReadyz_poolNil verifica que con pool nil se devuelve 503 degraded.
 func TestReadyz_poolNil(t *testing.T) {
@@ -63,6 +58,14 @@ func TestReadyz_pingFalla(t *testing.T) {
 	}
 	if body["status"] != "degraded" {
 		t.Fatalf(`status = %q, quería "degraded"`, body["status"])
+	}
+	if body["db"] != "down" {
+		t.Fatalf(`db = %q, quería "down"`, body["db"])
+	}
+
+	ct := rec.Header().Get("Content-Type")
+	if ct != "application/json" {
+		t.Fatalf("Content-Type = %q, quería application/json", ct)
 	}
 }
 
