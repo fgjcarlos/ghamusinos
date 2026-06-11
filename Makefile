@@ -59,4 +59,4 @@ migrate-status: ## Muestra el estado de las migraciones
 # ─── Generación de código ────────────────────────────────────────────────────
 
 generate: ## Genera código Go con SQLC (requiere Docker)
-	docker run --rm -v "$(PWD):/src" -w /src sqlc/sqlc generate
+	docker run --rm -v "$(PWD):/src" -w /src sqlc/sqlc:1.31.1 generate
