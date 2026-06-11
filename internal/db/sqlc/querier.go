@@ -13,6 +13,13 @@ import (
 type Querier interface {
 	CreateInvite(ctx context.Context, arg CreateInviteParams) (Invite, error)
 	CreateUser(ctx context.Context, arg CreateUserParams) (User, error)
+	// Devuelve la invitación vigente para un email dado.
+	// "Vigente" significa: status pending o accepted, y no expirada
+	// (expires_at es NULL o está en el futuro).
+	// Usado en el flujo de bloqueo por invitación (v1-phase-1-plan.md §4.7).
+	// Puede haber varias vigentes a la vez (una accepted histórica + una pending
+	// reenviada): se devuelve la más reciente de forma determinista.
+	GetActiveInviteByEmail(ctx context.Context, email string) (GetActiveInviteByEmailRow, error)
 	GetInviteByTokenHash(ctx context.Context, tokenHash string) (Invite, error)
 	GetUserByClerkID(ctx context.Context, clerkUserID string) (User, error)
 	MarkInviteAccepted(ctx context.Context, id pgtype.UUID) error
