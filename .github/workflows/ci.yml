@@ -53,8 +53,10 @@ jobs:
         run: go vet ./...
 
       - name: govulncheck
+        # Pineado a v1.1.4: las versiones posteriores exigen go >= 1.25 y este
+        # repo fija Go 1.22 con GOTOOLCHAIN=local. Subirlo junto a la toolchain.
         run: |
-          go install golang.org/x/vuln/cmd/govulncheck@latest
+          go install golang.org/x/vuln/cmd/govulncheck@v1.1.4
           govulncheck ./...
 
       - name: go test
