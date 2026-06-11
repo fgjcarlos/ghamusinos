@@ -9,6 +9,15 @@ CREATE TABLE users (
     display_name    TEXT,
     invite_status   TEXT        NOT NULL DEFAULT 'pending'
                                 CHECK (invite_status IN ('pending', 'active', 'blocked')),
+    -- Preferencias iniciales del usuario (fase 1.1). Métricas fisiológicas
+    -- opcionales (consumidas desde la fase 1.4); ai_enabled gobierna la IA.
+    hr_max          SMALLINT    CONSTRAINT users_hr_max_valido CHECK (hr_max IS NULL OR (hr_max > 0 AND hr_max <= 260)),
+    lthr            SMALLINT    CONSTRAINT users_lthr_valido   CHECK (lthr   IS NULL OR (lthr   > 0 AND lthr   <= 260)),
+    ftp             SMALLINT    CONSTRAINT users_ftp_valido    CHECK (ftp    IS NULL OR (ftp    > 0 AND ftp    <= 2000)),
+    level           TEXT        CONSTRAINT users_level_valido  CHECK (level  IS NULL OR level IN ('beginner', 'intermediate', 'advanced')),
+    timezone        TEXT        NOT NULL DEFAULT 'UTC'
+                                CONSTRAINT users_timezone_valido CHECK (timezone <> ''),
+    ai_enabled      BOOLEAN     NOT NULL DEFAULT true,
     created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at      TIMESTAMPTZ NOT NULL DEFAULT now()
 );
