@@ -12,7 +12,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"log"
+	"log/slog"
 	"os"
 
 	_ "github.com/jackc/pgx/v5/stdlib" // driver database/sql para pgx
@@ -24,7 +24,8 @@ import (
 func main() {
 	databaseURL := os.Getenv("DATABASE_URL")
 	if databaseURL == "" {
-		log.Fatal("migrate: DATABASE_URL es obligatoria y está vacía")
+		slog.Error("migrate: DATABASE_URL es obligatoria y está vacía")
+		os.Exit(1)
 	}
 
 	command := "up"
@@ -33,7 +34,8 @@ func main() {
 	}
 
 	if err := run(databaseURL, command); err != nil {
-		log.Fatalf("migrate: %v", err)
+		slog.Error("migrate: error fatal", "err", err)
+		os.Exit(1)
 	}
 }
 
@@ -42,7 +44,7 @@ func run(databaseURL, command string) error {
 	if err != nil {
 		return fmt.Errorf("error al abrir la conexión SQL: %w", err)
 	}
-	defer sqlDB.Close()
+	defer func() { _ = sqlDB.Close() }()
 
 	if err := sqlDB.PingContext(context.Background()); err != nil {
 		return fmt.Errorf("error al verificar la conexión: %w", err)
