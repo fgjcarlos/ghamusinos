@@ -13,6 +13,7 @@ import (
 	"github.com/fgjcarlos/ghamusinos/internal/config"
 	"github.com/fgjcarlos/ghamusinos/internal/db"
 	apphttp "github.com/fgjcarlos/ghamusinos/internal/http"
+	"github.com/fgjcarlos/ghamusinos/internal/logging"
 )
 
 const shutdownTimeout = 10 * time.Second
@@ -24,6 +25,11 @@ func Run() error {
 	if err != nil {
 		return err
 	}
+
+	// Configura el handler de slog ANTES de cualquier otro log.
+	// A partir de aquí todo slog.Info/Error sale en JSON o texto según
+	// el entorno.
+	logging.Setup(cfg.Env)
 
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
