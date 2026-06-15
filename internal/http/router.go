@@ -27,21 +27,47 @@ func NewServer(pool handlers.DBPinger) *Server {
 
 // Router construye el handler HTTP con el middleware base y todas las rutas.
 //
-// Middleware base:
-//   - RequestID: identificador de correlación por petición.
-//   - RealIP:    IP real del cliente tras proxies.
-//   - Logger:    log de cada petición.
-//   - Recoverer: recupera ante panics y devuelve 500 sin tumbar el servidor.
+<<<<<<< HEAD
+// Middleware base (en orden de aplicación):
+//   - RequestID (chi): genera o respeta el request_id, lo guarda en el
+//     contexto. NO escribe el header de respuesta (lo hace RequestIDHeader
+//     a continuación).
+//   - RequestIDHeader: propaga el request_id al header X-Request-Id de
+//     la respuesta para que el cliente pueda ver su correlation ID.
+//   - RealIP (chi): IP real del cliente tras proxies.
+//   - Recoverer (chi): recupera ante panics y devuelve 500 sin tumbar
+//     el servidor.
+//   - RequestLogger: log estructurado (slog) con request_id, method,
+//     path, status y latency_ms. Nivel según status (5xx→ERROR,
+//     4xx→WARN, resto→INFO). Se aplica ÚLTIMO para que la latencia y
+//     el status reflejen lo que el cliente recibió.
 func (s *Server) Router() http.Handler {
+=======
+// Middleware base (en orden de aplicación):
+//   - RequestID (chi): genera o respeta el request_id, lo guarda en el
+//     contexto. NO escribe el header de respuesta (lo hace RequestIDHeader
+//     a continuación).
+//   - RequestIDHeader: propaga el request_id al header X-Request-Id de
+//     la respuesta para que el cliente pueda ver su correlation ID.
+//   - RealIP (chi): IP real del cliente tras proxies.
+//   - Recoverer (chi): recupera ante panics y devuelve 500 sin tumbar
+//     el servidor.
+//   - RequestLogger: log estructurado (slog) con request_id, method,
+//     path, status y latency_ms. Nivel según status (5xx→ERROR,
+//     4xx→WARN, resto→INFO). Se aplica ÚLTIMO para que la latencia y
+//     el status reflejen lo que el cliente recibió.
+func NewRouter() http.Handler {
+>>>>>>> d3eff79 (feat: logging estructurado unificado con slog (JSON) y X-Request-Id (#32))
 	r := chi.NewRouter()
 
 	r.Use(middleware.RequestID)
+	r.Use(RequestIDHeader)
 	// RealIP confía en X-Forwarded-For / X-Real-IP. Asume que el binario se
 	// despliega DETRÁS de un reverse proxy de confianza (plataforma o Nginx).
 	// Si en algún momento se expone directo a internet, restringir o quitar.
 	r.Use(middleware.RealIP)
-	r.Use(middleware.Logger)
 	r.Use(middleware.Recoverer)
+	r.Use(RequestLogger)
 
 	// Liveness: responde sin tocar la base de datos.
 	r.Get("/healthz", handlers.Health)

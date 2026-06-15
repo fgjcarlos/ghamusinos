@@ -3,13 +3,18 @@
 package main
 
 import (
-	"log"
+	"log/slog"
+	"os"
 
 	"github.com/fgjcarlos/ghamusinos/internal/app"
 )
 
 func main() {
 	if err := app.Run(); err != nil {
-		log.Fatalf("ghamusinos: %v", err)
+		// Logging todavía no está configurado (app.Run falla antes
+		// si config.Load falla), así que usamos slog.Default con el
+		// handler por defecto de Go (texto a stderr).
+		slog.Error("ghamusinos: error fatal", "err", err)
+		os.Exit(1)
 	}
 }
