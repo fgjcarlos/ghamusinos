@@ -1,12 +1,18 @@
 package config
 
 import (
+	"strings"
 	"testing"
+	"time"
+
+	"github.com/fgjcarlos/ghamusinos/internal/db"
 )
 
 func TestLoad_FailsWithoutDatabaseURL(t *testing.T) {
 	t.Setenv("DATABASE_URL", "")
 	t.Setenv("ENV", "production") // evita que cargue .env en disco
+	// Limpiamos también las vars del pool para que no contaminen este test.
+	unsetPoolEnv(t)
 
 	_, err := Load()
 	if err == nil {
@@ -18,6 +24,7 @@ func TestLoad_DefaultValues(t *testing.T) {
 	t.Setenv("DATABASE_URL", "postgres://test:test@localhost/test")
 	t.Setenv("ENV", "production")
 	t.Setenv("PORT", "")
+	unsetPoolEnv(t)
 
 	cfg, err := Load()
 	if err != nil {
@@ -36,6 +43,7 @@ func TestLoad_RespectsEnvValues(t *testing.T) {
 	t.Setenv("DATABASE_URL", "postgres://user:pass@host:5432/db")
 	t.Setenv("ENV", "production")
 	t.Setenv("PORT", "9090")
+	unsetPoolEnv(t)
 
 	cfg, err := Load()
 	if err != nil {
@@ -56,12 +64,172 @@ func TestLoad_RespectsEnvValues(t *testing.T) {
 func TestLoad_EnvDefaultIsDevelopment(t *testing.T) {
 	t.Setenv("DATABASE_URL", "postgres://test:test@localhost/test")
 	t.Setenv("ENV", "")
-	// No importa si carga .env; el resultado debe ser "development"
+	unsetPoolEnv(t)
+
 	cfg, err := Load()
 	if err != nil {
 		t.Fatalf("Load() error inesperado: %v", err)
 	}
 	if cfg.Env != "development" {
 		t.Errorf("Env default = %q, quería %q", cfg.Env, "development")
+	}
+}
+
+// TestLoad_PoolDefaults comprueba que sin variables de entorno
+// relacionadas al pool, Load devuelve DefaultPoolConfig.
+func TestLoad_PoolDefaults(t *testing.T) {
+	t.Setenv("DATABASE_URL", "postgres://test:test@localhost/test")
+	t.Setenv("ENV", "production")
+	unsetPoolEnv(t)
+
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("Load() error inesperado: %v", err)
+	}
+
+	want := db.DefaultPoolConfig()
+	if cfg.Pool != want {
+		t.Errorf("Pool = %+v, quería %+v", cfg.Pool, want)
+	}
+}
+
+// TestLoad_PoolEnvOverrides comprueba que las 6 vars del pool se leen
+// correctamente y se exponen en Config.Pool.
+func TestLoad_PoolEnvOverrides(t *testing.T) {
+	t.Setenv("DATABASE_URL", "postgres://test:test@localhost/test")
+	t.Setenv("ENV", "production")
+	unsetPoolEnv(t)
+
+	t.Setenv("DB_POOL_MAX_CONNS", "50")
+	t.Setenv("DB_POOL_MIN_CONNS", "5")
+	t.Setenv("DB_POOL_MAX_CONN_LIFETIME", "2h")
+	t.Setenv("DB_POOL_MAX_CONN_IDLE_TIME", "15m")
+	t.Setenv("DB_POOL_CONNECT_TIMEOUT", "10s")
+	t.Setenv("DB_POOL_HEALTH_CHECK_PERIOD", "30s")
+
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("Load() error inesperado: %v", err)
+	}
+
+	want := db.PoolConfig{
+		MaxConns:          50,
+		MinConns:          5,
+		MaxConnLifetime:   2 * time.Hour,
+		MaxConnIdleTime:   15 * time.Minute,
+		ConnectTimeout:    10 * time.Second,
+		HealthCheckPeriod: 30 * time.Second,
+	}
+	if cfg.Pool != want {
+		t.Errorf("Pool = %+v, quería %+v", cfg.Pool, want)
+	}
+}
+
+// TestLoad_PoolInvalidInt verifica que un valor no-entero en
+// DB_POOL_MAX_CONNS produce un error claro, en lugar de aplicar el
+// default silenciosamente.
+func TestLoad_PoolInvalidInt(t *testing.T) {
+	t.Setenv("DATABASE_URL", "postgres://test:test@localhost/test")
+	t.Setenv("ENV", "production")
+	unsetPoolEnv(t)
+
+	t.Setenv("DB_POOL_MAX_CONNS", "twenty")
+
+	_, err := Load()
+	if err == nil {
+		t.Fatal("Load() debería fallar con DB_POOL_MAX_CONNS=twenty")
+	}
+	if !strings.Contains(err.Error(), "DB_POOL_MAX_CONNS") {
+		t.Errorf("error = %q, debería mencionar la variable", err)
+	}
+}
+
+// TestLoad_PoolInvalidDuration verifica que un valor no-duración en
+// DB_POOL_CONNECT_TIMEOUT produce un error claro.
+func TestLoad_PoolInvalidDuration(t *testing.T) {
+	t.Setenv("DATABASE_URL", "postgres://test:test@localhost/test")
+	t.Setenv("ENV", "production")
+	unsetPoolEnv(t)
+
+	t.Setenv("DB_POOL_CONNECT_TIMEOUT", "5 minutos")
+
+	_, err := Load()
+	if err == nil {
+		t.Fatal("Load() debería fallar con DB_POOL_CONNECT_TIMEOUT=\"5 minutos\"")
+	}
+	if !strings.Contains(err.Error(), "DB_POOL_CONNECT_TIMEOUT") {
+		t.Errorf("error = %q, debería mencionar la variable", err)
+	}
+}
+
+// TestLoad_PoolInvalidMaxConns verifica que un MaxConns=0 (o negativo)
+// es rechazado.
+func TestLoad_PoolInvalidMaxConns(t *testing.T) {
+	t.Setenv("DATABASE_URL", "postgres://test:test@localhost/test")
+	t.Setenv("ENV", "production")
+	unsetPoolEnv(t)
+
+	t.Setenv("DB_POOL_MAX_CONNS", "0")
+
+	_, err := Load()
+	if err == nil {
+		t.Fatal("Load() debería fallar con DB_POOL_MAX_CONNS=0")
+	}
+	if !strings.Contains(err.Error(), "DB_POOL_MAX_CONNS") {
+		t.Errorf("error = %q, debería mencionar la variable", err)
+	}
+}
+
+// TestLoad_PoolMinGreaterThanMax verifica que MinConns > MaxConns
+// es rechazado.
+func TestLoad_PoolMinGreaterThanMax(t *testing.T) {
+	t.Setenv("DATABASE_URL", "postgres://test:test@localhost/test")
+	t.Setenv("ENV", "production")
+	unsetPoolEnv(t)
+
+	t.Setenv("DB_POOL_MAX_CONNS", "5")
+	t.Setenv("DB_POOL_MIN_CONNS", "10")
+
+	_, err := Load()
+	if err == nil {
+		t.Fatal("Load() debería fallar con MinConns > MaxConns")
+	}
+	if !strings.Contains(err.Error(), "DB_POOL_MIN_CONNS") {
+		t.Errorf("error = %q, debería mencionar la variable", err)
+	}
+}
+
+// TestLoad_PoolConnectTimeoutRequired verifica que un ConnectTimeout=0
+// es rechazado (sin él, el arranque puede colgarse).
+func TestLoad_PoolConnectTimeoutRequired(t *testing.T) {
+	t.Setenv("DATABASE_URL", "postgres://test:test@localhost/test")
+	t.Setenv("ENV", "production")
+	unsetPoolEnv(t)
+
+	t.Setenv("DB_POOL_CONNECT_TIMEOUT", "0s")
+
+	_, err := Load()
+	if err == nil {
+		t.Fatal("Load() debería fallar con DB_POOL_CONNECT_TIMEOUT=0s")
+	}
+	if !strings.Contains(err.Error(), "DB_POOL_CONNECT_TIMEOUT") {
+		t.Errorf("error = %q, debería mencionar la variable", err)
+	}
+}
+
+// unsetPoolEnv limpia todas las variables de entorno relacionadas al pool
+// para que cada test empiece desde un estado conocido (en CI el entorno
+// puede tenerlas pre-seteadas).
+func unsetPoolEnv(t *testing.T) {
+	t.Helper()
+	for _, k := range []string{
+		"DB_POOL_MAX_CONNS",
+		"DB_POOL_MIN_CONNS",
+		"DB_POOL_MAX_CONN_LIFETIME",
+		"DB_POOL_MAX_CONN_IDLE_TIME",
+		"DB_POOL_CONNECT_TIMEOUT",
+		"DB_POOL_HEALTH_CHECK_PERIOD",
+	} {
+		t.Setenv(k, "")
 	}
 }
