@@ -1,0 +1,33 @@
+# Configuración de golangci-lint para ghamusinos.
+# Versión objetivo: v2.1.x (alineada con la CI).
+# Docs: https://golangci-lint.run/product/configuration-v2/
+
+version: "2"
+
+linters:
+  # Empezamos desde "none" para activar SOLO los linters que la issue #24
+  # pide. Si necesitamos más, los añadimos explícitamente aquí.
+  default: none
+  enable:
+    - errcheck    # errores no gestionados (defer x.Close(), etc.)
+    - govet       # análisis estático del compilador
+    - staticcheck # bugs sutiles, código sospechoso, código muerto
+    - exhaustive  # exhaustividad de los switch
+    - noctx       # http.Client / Request sin context.Context
+  settings:
+    # errcheck: en Go idiomático es habitual ignorar el error de un Close()
+    # en defer. Activamos `check-blank: false` para permitirlo sin warning.
+    errcheck:
+      check-blank: false
+
+run:
+  # Mantenemos el timeout cómodo para un repo pequeño; si crece, subir.
+  timeout: 5m
+  # Analiza también los tests para que `_ =` y `defer X.Close()` en _test.go
+  # pasen por la misma regla que el código de producción.
+  tests: true
+
+issues:
+  # Mostrar todos los issues (sin agrupar); en un PR pequeño es más útil.
+  max-issues-per-linter: 0
+  max-same-issues: 0

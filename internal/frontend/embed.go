@@ -46,7 +46,9 @@ func NewSPAHandler(fsys fs.FS) http.Handler {
 		f, err := fsys.Open(path)
 		if err == nil {
 			// El fichero existe: lo servimos con http.FileServer.
-			f.Close()
+			// Ignoramos el error de Close: el descriptor se libera al
+			// terminar la respuesta y no afecta a la lógica del handler.
+			_ = f.Close()
 			fileServer := http.FileServer(http.FS(fsys))
 			fileServer.ServeHTTP(w, r)
 			return
@@ -59,7 +61,9 @@ func NewSPAHandler(fsys fs.FS) http.Handler {
 			http.Error(w, "frontend no construido: ejecuta `make web-build`", http.StatusServiceUnavailable)
 			return
 		}
-		index.Close()
+		// Ignoramos el error de Close: el descriptor se libera al servir
+		// el fichero y no afecta a la respuesta del handler.
+		_ = index.Close()
 
 		// Servimos index.html manteniendo el status 200.
 		r2 := r.Clone(r.Context())

@@ -45,11 +45,26 @@ jobs:
             echo "Ficheros sin formatear:"; echo "$unformatted"; exit 1
           fi
 
-      - name: go vet
-        run: go vet ./...
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@v6
+        with:
+          version: v2.1.6
 
       - name: go test
-        run: go test ./...
+        run: go test -race -coverprofile=coverage.out -covermode=atomic ./...
+
+      - name: coverage summary
+        if: always()
+        run: |
+          test -f coverage.out && go tool cover -func=coverage.out | tail -1 || echo "coverage.out no generado"
+
+      - name: upload coverage
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage
+          path: coverage.out
+          retention-days: 14
 
       - name: go build
         run: go build -o bin/ghamusinos ./cmd/ghamusinos
@@ -80,6 +95,12 @@ jobs:
 
       - name: install
         run: pnpm --dir web install --frozen-lockfile
+
+      # typecheck se ejecuta como paso independiente para que un fallo
+      # de tipos rompa la CI antes de gastar tiempo en el bundle de Vite.
+      # El paso de lint (ESLint) llega con la issue #35.
+      - name: typecheck
+        run: pnpm --dir web typecheck
 
       - name: build
         run: pnpm --dir web build
