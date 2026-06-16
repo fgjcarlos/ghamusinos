@@ -15,7 +15,7 @@ import (
 const createUser = `-- name: CreateUser :one
 INSERT INTO users (clerk_user_id, email, display_name, invite_status)
 VALUES ($1, $2, $3, $4)
-RETURNING id, clerk_user_id, email, display_name, invite_status, created_at, updated_at
+RETURNING id, clerk_user_id, email, display_name, invite_status, hr_max, lthr, ftp, level, timezone, ai_enabled, created_at, updated_at
 `
 
 type CreateUserParams struct {
@@ -39,6 +39,12 @@ func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, e
 		&i.Email,
 		&i.DisplayName,
 		&i.InviteStatus,
+		&i.HrMax,
+		&i.Lthr,
+		&i.Ftp,
+		&i.Level,
+		&i.Timezone,
+		&i.AiEnabled,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -46,7 +52,7 @@ func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, e
 }
 
 const getUserByClerkID = `-- name: GetUserByClerkID :one
-SELECT id, clerk_user_id, email, display_name, invite_status, created_at, updated_at
+SELECT id, clerk_user_id, email, display_name, invite_status, hr_max, lthr, ftp, level, timezone, ai_enabled, created_at, updated_at
 FROM users
 WHERE clerk_user_id = $1
 LIMIT 1
@@ -61,6 +67,68 @@ func (q *Queries) GetUserByClerkID(ctx context.Context, clerkUserID string) (Use
 		&i.Email,
 		&i.DisplayName,
 		&i.InviteStatus,
+		&i.HrMax,
+		&i.Lthr,
+		&i.Ftp,
+		&i.Level,
+		&i.Timezone,
+		&i.AiEnabled,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const updateUserPreferences = `-- name: UpdateUserPreferences :one
+UPDATE users
+SET
+    hr_max     = $2,
+    lthr       = $3,
+    ftp        = $4,
+    level      = $5,
+    timezone   = $6,
+    ai_enabled = $7,
+    updated_at = now()
+WHERE id = $1
+RETURNING id, clerk_user_id, email, display_name, invite_status, hr_max, lthr, ftp, level, timezone, ai_enabled, created_at, updated_at
+`
+
+type UpdateUserPreferencesParams struct {
+	ID        pgtype.UUID `json:"id"`
+	HrMax     pgtype.Int2 `json:"hr_max"`
+	Lthr      pgtype.Int2 `json:"lthr"`
+	Ftp       pgtype.Int2 `json:"ftp"`
+	Level     pgtype.Text `json:"level"`
+	Timezone  string      `json:"timezone"`
+	AiEnabled bool        `json:"ai_enabled"`
+}
+
+// Actualiza las preferencias de entrenamiento e IA del usuario (fase 1.1).
+// Las métricas pueden ir a NULL si el usuario no las conoce; timezone y
+// ai_enabled siempre llevan valor (tienen default en el schema).
+func (q *Queries) UpdateUserPreferences(ctx context.Context, arg UpdateUserPreferencesParams) (User, error) {
+	row := q.db.QueryRow(ctx, updateUserPreferences,
+		arg.ID,
+		arg.HrMax,
+		arg.Lthr,
+		arg.Ftp,
+		arg.Level,
+		arg.Timezone,
+		arg.AiEnabled,
+	)
+	var i User
+	err := row.Scan(
+		&i.ID,
+		&i.ClerkUserID,
+		&i.Email,
+		&i.DisplayName,
+		&i.InviteStatus,
+		&i.HrMax,
+		&i.Lthr,
+		&i.Ftp,
+		&i.Level,
+		&i.Timezone,
+		&i.AiEnabled,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -73,7 +141,7 @@ SET
     display_name = $2,
     updated_at   = now()
 WHERE id = $1
-RETURNING id, clerk_user_id, email, display_name, invite_status, created_at, updated_at
+RETURNING id, clerk_user_id, email, display_name, invite_status, hr_max, lthr, ftp, level, timezone, ai_enabled, created_at, updated_at
 `
 
 type UpdateUserProfileParams struct {
@@ -90,6 +158,12 @@ func (q *Queries) UpdateUserProfile(ctx context.Context, arg UpdateUserProfilePa
 		&i.Email,
 		&i.DisplayName,
 		&i.InviteStatus,
+		&i.HrMax,
+		&i.Lthr,
+		&i.Ftp,
+		&i.Level,
+		&i.Timezone,
+		&i.AiEnabled,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
