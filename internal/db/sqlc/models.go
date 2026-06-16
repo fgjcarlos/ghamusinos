@@ -5,25 +5,26 @@
 package sqlc
 
 import (
+	"github.com/fgjcarlos/ghamusinos/internal/db/status"
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
 type Invite struct {
 	ID         pgtype.UUID        `json:"id"`
 	Email      string             `json:"email"`
-	TokenHash  string             `json:"token_hash"`
-	Status     string             `json:"status"`
+	TokenHash  string             `json:"-"`
+	Status     status.Status      `json:"status"`
 	ExpiresAt  pgtype.Timestamptz `json:"expires_at"`
 	AcceptedAt pgtype.Timestamptz `json:"accepted_at"`
 	CreatedAt  pgtype.Timestamptz `json:"created_at"`
 }
 
 type User struct {
-	ID           pgtype.UUID        `json:"id"`
-	ClerkUserID  string             `json:"clerk_user_id"`
-	Email        string             `json:"email"`
-	DisplayName  pgtype.Text        `json:"display_name"`
-	InviteStatus string             `json:"invite_status"`
-	CreatedAt    pgtype.Timestamptz `json:"created_at"`
-	UpdatedAt    pgtype.Timestamptz `json:"updated_at"`
+	ID           pgtype.UUID         `json:"id"`
+	ClerkUserID  string              `json:"clerk_user_id"`
+	Email        string              `json:"email"`
+	DisplayName  pgtype.Text         `json:"display_name"`
+	InviteStatus status.InviteStatus `json:"invite_status"`
+	CreatedAt    pgtype.Timestamptz  `json:"created_at"`
+	UpdatedAt    pgtype.Timestamptz  `json:"updated_at"`
 }

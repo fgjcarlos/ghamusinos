@@ -13,7 +13,7 @@ CREATE TABLE users (
     updated_at      TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
-CREATE INDEX idx_users_email ON users (email);
+CREATE UNIQUE INDEX idx_users_email ON users (email);
 
 CREATE TABLE invites (
     id          UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -25,3 +25,5 @@ CREATE TABLE invites (
     accepted_at TIMESTAMPTZ,
     created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+CREATE UNIQUE INDEX idx_invites_email_pending ON invites (email) WHERE status = 'pending';
