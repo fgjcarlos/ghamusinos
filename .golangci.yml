@@ -2,24 +2,34 @@
 # Versión objetivo: v2.x (alineada con la CI).
 # Docs: https://golangci-lint.run/product/configuration-v2/
 #
-# Esta configuración activa SOLO los linters cuyo coste/beneficio compensa
-# en el estado actual del código. El conjunto completo que la issue #24
-# El conjunto completo que la issue #24 describe (errcheck, staticcheck,
-# exhaustive) está trackeado en #62 y se activará en un PR dedicado tras
-# arreglar los hallazgos pre-existentes.
+# Conjunto de linters v2 activo (issue #24, ampliado en #62):
+#   - govet: sustituye al paso `go vet` previo.
+#   - noctx: protege contra http.Get/Post/etc. sin context.Context.
+#   - errcheck: detecta errores ignorados; `check-blank: false` permite
+#     descartar errores explícitamente con `_ = ...` (lo pide #62).
+#     Endurecer a `check-blank: true` está trackeado en issue de
+#     seguimiento abierta desde #62.
+#   - staticcheck: bugs sutiles y código sospechoso (categorías
+#     `SA*`, `ST*`, `S1xxx`). El código actual pasa con 0 hallazgos.
+#   - exhaustive: fuerza a listar todos los casos en `switch` sobre
+#     tipos enumerados. El código actual pasa con 0 hallazgos.
 
 version: "2"
 
 linters:
   default: none
   enable:
-    # govet sustituye al paso `go vet` previo. No genera hallazgos nuevos
-    # en código que ya pasaba el pipeline v1.
     - govet
-    # noctx protege contra http.Get/Post/etc. sin context.Context. La
-    # migración a testGet en los tests del router (#33) introduce el
-    # helper para satisfacer este linter.
     - noctx
+    - errcheck
+    - staticcheck
+    - exhaustive
+  settings:
+    errcheck:
+      # `check-blank: false` ignora asignaciones a `_` (p.ej.
+      # `_ = conn.Close()` en defer). Es la postura que #62 fija;
+      # endurecer a `true` queda como follow-up.
+      check-blank: false
 
 run:
   timeout: 5m

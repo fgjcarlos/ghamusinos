@@ -39,7 +39,16 @@ func (s *Server) Router() http.Handler {
 	// RealIP confía en X-Forwarded-For / X-Real-IP. Asume que el binario se
 	// despliega DETRÁS de un reverse proxy de confianza (plataforma o Nginx).
 	// Si en algún momento se expone directo a internet, restringir o quitar.
-	r.Use(middleware.RealIP)
+	//
+	// SA1019 (staticcheck) marca `middleware.RealIP` como deprecated por
+	// vulnerabilidad a IP spoofing (GHSA-3fxj-6jh8-hvhx, GHSA-rjr7-jggh-pgcp,
+	// GHSA-9g5q-2w5x-hmxf): muta r.RemoteAddr al primer valor de
+	// X-Forwarded-For aunque la cadena de proxies no sea de confianza.
+	// Se mantiene temporalmente mientras se evalúa la alternativa (p.ej.
+	// `middleware.ForwardedHeader` con lista de IPs de proxy, o quitar
+	// y derivar la IP del log desde el peer directo). Tracked in issue
+	// de seguimiento abierta desde #62.
+	r.Use(middleware.RealIP) //nolint:staticcheck // SA1019: deprecated por IP spoofing, fix trackeado en issue de seguimiento
 	r.Use(middleware.Logger)
 	r.Use(middleware.Recoverer)
 
