@@ -28,8 +28,12 @@ run: ## Ejecuta la aplicación
 
 # ─── Tests y calidad ─────────────────────────────────────────────────────────
 
-test: ## Ejecuta los tests
-	GOTOOLCHAIN=local go test ./...
+test: ## Ejecuta los tests con -race
+	GOTOOLCHAIN=local go test -race ./...
+
+coverage: ## Genera coverage.out (lo usa la CI como artifact)
+	GOTOOLCHAIN=local go test -race -coverprofile=coverage.out -covermode=atomic ./...
+	@go tool cover -func=coverage.out | tail -1
 
 tidy: ## Ordena y limpia go.mod
 	GOTOOLCHAIN=local go mod tidy
@@ -39,6 +43,9 @@ fmt: ## Formatea el código
 
 vet: ## Análisis estático
 	GOTOOLCHAIN=local go vet ./...
+
+lint: ## Ejecuta golangci-lint (requiere binario instalado)
+	GOTOOLCHAIN=local golangci-lint run ./...
 
 check: fmt vet test ## fmt + vet + test
 

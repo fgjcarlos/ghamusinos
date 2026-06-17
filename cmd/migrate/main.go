@@ -42,7 +42,7 @@ func run(databaseURL, command string) error {
 	if err != nil {
 		return fmt.Errorf("error al abrir la conexión SQL: %w", err)
 	}
-	defer sqlDB.Close()
+	defer func() { _ = sqlDB.Close() }()
 
 	if err := sqlDB.PingContext(context.Background()); err != nil {
 		return fmt.Errorf("error al verificar la conexión: %w", err)

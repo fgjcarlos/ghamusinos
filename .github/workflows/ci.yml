@@ -10,10 +10,9 @@ on:
 permissions:
   contents: read
 
-# El entorno de desarrollo usa Go 1.22 y no descarga otras toolchains.
-# Lo fijamos también en CI para que las dependencias no fuercen un upgrade.
-env:
-  GOTOOLCHAIN: local
+# El runner de GitHub Actions usa el toolchain que las dependencias pidan
+# (go.mod declara go 1.25.0). Para entornos offline, fijar
+# GOTOOLCHAIN: local a nivel de job.
 
 jobs:
   backend:
@@ -42,7 +41,7 @@ jobs:
 
       - uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6.4.0
         with:
-          go-version: "1.22"
+          go-version: "1.25"
           cache: true
 
       - name: gofmt
@@ -52,11 +51,41 @@ jobs:
             echo "Ficheros sin formatear:"; echo "$unformatted"; exit 1
           fi
 
-      - name: go vet
-        run: go vet ./...
+      - name: install golangci-lint
+        run: |
+          # Bajar el binario precompilado de golangci-lint v2.12.2 (compatible
+          # con Go >= 1.25). El script de instalacion oficial falla por cache
+          # de checksum stale, asi que bajamos directo del release de GitHub.
+          asset="golangci-lint-2.12.2-linux-amd64.tar.gz"
+          curl -sSfL -o "/tmp/$asset" \
+            "https://github.com/golangci/golangci-lint/releases/download/v2.12.2/$asset"
+          mkdir -p "$(go env GOPATH)/bin"
+          tar -xzf "/tmp/$asset" -C "$(go env GOPATH)/bin" --strip-components=1
+          echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
+          golangci-lint --version
+
+      - name: golangci-lint
+        env:
+          # Forzar el toolchain que setup-go instalo (v1.25.x) para que el
+          # linter pueda parsear el go.mod que declara go 1.25.7.
+          GOTOOLCHAIN: go1.25.7
+        run: golangci-lint run --timeout 5m
 
       - name: go test
-        run: go test ./...
+        run: go test -race -coverprofile=coverage.out -covermode=atomic ./...
+
+      - name: coverage summary
+        if: always()
+        run: |
+          test -f coverage.out && go tool cover -func=coverage.out | tail -1 || echo "coverage.out no generado"
+
+      - name: upload coverage
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: coverage
+          path: coverage.out
+          retention-days: 14
 
       - name: go build
         run: go build -o bin/ghamusinos ./cmd/ghamusinos
@@ -87,6 +116,12 @@ jobs:
 
       - name: install
         run: pnpm --dir web install --frozen-lockfile
+
+      # typecheck se ejecuta como paso independiente para que un fallo
+      # de tipos rompa la CI antes de gastar tiempo en el bundle de Vite.
+      # El paso de lint (ESLint) llega con la issue #35.
+      - name: typecheck
+        run: pnpm --dir web typecheck
 
       - name: build
         run: pnpm --dir web build

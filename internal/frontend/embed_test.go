@@ -1,6 +1,7 @@
 package frontend
 
 import (
+	"context"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -25,7 +26,7 @@ var fsSinBuild = fstest.MapFS{
 
 func TestSPAHandler_IndexEnRaiz(t *testing.T) {
 	h := NewSPAHandler(fsConBuild)
-	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req := httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/", nil)
 	rec := httptest.NewRecorder()
 
 	h.ServeHTTP(rec, req)
@@ -41,7 +42,7 @@ func TestSPAHandler_IndexEnRaiz(t *testing.T) {
 
 func TestSPAHandler_FallbackRutaCliente(t *testing.T) {
 	h := NewSPAHandler(fsConBuild)
-	req := httptest.NewRequest(http.MethodGet, "/lab/entrenos/2024", nil)
+	req := httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/lab/entrenos/2024", nil)
 	rec := httptest.NewRecorder()
 
 	h.ServeHTTP(rec, req)
@@ -57,7 +58,7 @@ func TestSPAHandler_FallbackRutaCliente(t *testing.T) {
 
 func TestSPAHandler_AssetExistente(t *testing.T) {
 	h := NewSPAHandler(fsConBuild)
-	req := httptest.NewRequest(http.MethodGet, "/assets/app.js", nil)
+	req := httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/assets/app.js", nil)
 	rec := httptest.NewRecorder()
 
 	h.ServeHTTP(rec, req)
@@ -74,7 +75,7 @@ func TestSPAHandler_AssetExistente(t *testing.T) {
 
 func TestSPAHandler_SinIndexDevuelve503(t *testing.T) {
 	h := NewSPAHandler(fsSinBuild)
-	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req := httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/", nil)
 	rec := httptest.NewRecorder()
 
 	h.ServeHTTP(rec, req)

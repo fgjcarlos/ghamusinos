@@ -1,9 +1,11 @@
 package http
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 )
 
 // nuevoServidor es un helper de test que crea un Server con pool nil
@@ -15,14 +17,29 @@ func nuevoServidor(t *testing.T) *httptest.Server {
 	return srv
 }
 
+// testGet lanza una petición GET con context.Context contra el server.
+// Usar http.Get directamente dispara el linter noctx; este helper
+// mantiene el patrón idiomático sin saltarse la regla.
+func testGet(t *testing.T, url string) *http.Response {
+	t.Helper()
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	t.Cleanup(cancel)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		t.Fatalf("new request %s: %v", url, err)
+	}
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("GET %s: %v", url, err)
+	}
+	return resp
+}
+
 func TestRouterHealthz(t *testing.T) {
 	srv := nuevoServidor(t)
 
-	resp, err := http.Get(srv.URL + "/healthz")
-	if err != nil {
-		t.Fatalf("GET /healthz: %v", err)
-	}
-	defer resp.Body.Close()
+	resp := testGet(t, srv.URL+"/healthz")
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		t.Fatalf("status = %d, quería %d", resp.StatusCode, http.StatusOK)
@@ -33,11 +50,8 @@ func TestRouterHealthz(t *testing.T) {
 func TestRouterReadyz_sinPool(t *testing.T) {
 	srv := nuevoServidor(t)
 
-	resp, err := http.Get(srv.URL + "/readyz")
-	if err != nil {
-		t.Fatalf("GET /readyz: %v", err)
-	}
-	defer resp.Body.Close()
+	resp := testGet(t, srv.URL+"/readyz")
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusServiceUnavailable {
 		t.Fatalf("status = %d, quería %d (sin pool, readyz debe degradar)", resp.StatusCode, http.StatusServiceUnavailable)
@@ -56,11 +70,8 @@ func TestRouterReadyz_sinPool(t *testing.T) {
 func TestRouterSPARuta(t *testing.T) {
 	srv := nuevoServidor(t)
 
-	resp, err := http.Get(srv.URL + "/lab")
-	if err != nil {
-		t.Fatalf("GET /lab: %v", err)
-	}
-	defer resp.Body.Close()
+	resp := testGet(t, srv.URL+"/lab")
+	defer func() { _ = resp.Body.Close() }()
 
 	// Sin build: 503 (frontend no construido). Con build: 200 (SPA index.html).
 	// Ambos son coherentes; lo que NO debe pasar es que llegue a chi's 404.
@@ -74,11 +85,8 @@ func TestRouterSPARuta(t *testing.T) {
 func TestRouterAPINotFound(t *testing.T) {
 	srv := nuevoServidor(t)
 
-	resp, err := http.Get(srv.URL + "/api/no-existe")
-	if err != nil {
-		t.Fatalf("GET /api/no-existe: %v", err)
-	}
-	defer resp.Body.Close()
+	resp := testGet(t, srv.URL+"/api/no-existe")
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusNotFound {
 		t.Fatalf("GET /api/no-existe quería 404, obtuvo %d", resp.StatusCode)
