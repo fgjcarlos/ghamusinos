@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -11,7 +12,7 @@ import (
 func TestReadyz_poolNil(t *testing.T) {
 	handler := Readyz(nil)
 
-	req := httptest.NewRequest(http.MethodGet, "/readyz", nil)
+	req := httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/readyz", nil)
 	rec := httptest.NewRecorder()
 
 	handler(rec, req)
@@ -43,7 +44,7 @@ func TestReadyz_pingFalla(t *testing.T) {
 	pinger := &fakePinger{err: errPingFailed}
 	handler := Readyz(pinger)
 
-	req := httptest.NewRequest(http.MethodGet, "/readyz", nil)
+	req := httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/readyz", nil)
 	rec := httptest.NewRecorder()
 
 	handler(rec, req)
@@ -74,7 +75,7 @@ func TestReadyz_pingOK(t *testing.T) {
 	pinger := &fakePinger{err: nil}
 	handler := Readyz(pinger)
 
-	req := httptest.NewRequest(http.MethodGet, "/readyz", nil)
+	req := httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/readyz", nil)
 	rec := httptest.NewRecorder()
 
 	handler(rec, req)
