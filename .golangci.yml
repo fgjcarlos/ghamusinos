@@ -4,8 +4,9 @@
 #
 # Esta configuración activa SOLO los linters cuyo coste/beneficio compensa
 # en el estado actual del código. El conjunto completo que la issue #24
-# describe (errcheck, staticcheck, exhaustive) está trackeado en #61 y se
-# activará en un PR dedicado tras arreglar los hallazgos pre-existentes.
+# El conjunto completo que la issue #24 describe (errcheck, staticcheck,
+# exhaustive) está trackeado en #62 y se activará en un PR dedicado tras
+# arreglar los hallazgos pre-existentes.
 
 version: "2"
 
