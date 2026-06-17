@@ -50,8 +50,14 @@ func TestStatusValues(t *testing.T) {
 // TestInviteStatusType verifica que InviteStatus e Status son tipos distintos
 // y no se pueden mezclar sin una conversión explícita.
 func TestTypesAreDistinct(t *testing.T) {
-	var is status.InviteStatus = status.InviteStatusPending
-	var s status.Status = status.StatusPending
+	// Los tipos explícitos son la garantía del test: si el compilador
+	// aceptase `var is = status.InviteStatusPending` y dedujese el tipo,
+	// este test perdería su valor (verificaría trivialmente que el
+	// mismo valor es igual a sí mismo). Por eso se mantiene la
+	// declaración con tipo. Tracked in issue de seguimiento abierta
+	// desde #62.
+	var is status.InviteStatus = status.InviteStatusPending //nolint:staticcheck // SA5009 / ST1023: el tipo explícito ES la garantía del test
+	var s status.Status = status.StatusPending              //nolint:staticcheck // SA5009 / ST1023: el tipo explícito ES la garantía del test
 
 	// Mismo string subyacente, pero tipos distintos — la conversión explícita
 	// es necesaria; si compilara sin ella sería un bug de tipos.
