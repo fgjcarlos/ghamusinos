@@ -53,15 +53,22 @@ jobs:
 
       - name: install golangci-lint
         run: |
-          curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin v2.12.2
-          echo "$(go env GOPATH)/bin" >> $GITHUB_PATH
+          # Bajar el binario precompilado de golangci-lint v2.12.2 (compatible
+          # con Go >= 1.25). El script de instalacion oficial falla por cache
+          # de checksum stale, asi que bajamos directo del release de GitHub.
+          asset="golangci-lint-2.12.2-linux-amd64.tar.gz"
+          curl -sSfL -o "/tmp/$asset" \
+            "https://github.com/golangci/golangci-lint/releases/download/v2.12.2/$asset"
+          mkdir -p "$(go env GOPATH)/bin"
+          tar -xzf "/tmp/$asset" -C "$(go env GOPATH)/bin" --strip-components=1
+          echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
+          golangci-lint --version
 
       - name: golangci-lint
         env:
-          # Forzar el toolchain que setup-go instaló para evitar que el linter
-          # intente cargar paquetes con un Go más viejo (el binario v2.12.2
-          # exige Go >= 1.25 para parsear un go.mod que declare 1.25.x).
-          GOTOOLCHAIN: go1.25.0
+          # Forzar el toolchain que setup-go instalo (v1.25.x) para que el
+          # linter pueda parsear el go.mod que declara go 1.25.7.
+          GOTOOLCHAIN: go1.25.7
         run: golangci-lint run --timeout 5m
 
       - name: go test
