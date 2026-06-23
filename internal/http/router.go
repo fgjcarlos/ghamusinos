@@ -85,7 +85,9 @@ func (s *Server) Router() http.Handler {
 		r.NotFound(func(w http.ResponseWriter, _ *http.Request) {
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusNotFound)
-			_ = json.NewEncoder(w).Encode(map[string]string{"error": "not found"})
+			//nolint:errcheck
+
+			json.NewEncoder(w).Encode(map[string]string{"error": "not found"})
 		})
 	})
 
