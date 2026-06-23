@@ -46,7 +46,7 @@ func TestResolveUser_UnknownClerkID_CreatesUser(t *testing.T) {
 	mockQ := &mockQuerier{
 		users: make(map[string]sqlc.User),
 	}
-	
+
 	// Set the callback after creation to capture mockQ
 	mockQ.onCreateUser = func(clerkID, email, name string) (sqlc.User, error) {
 		newUser := sqlc.User{
@@ -247,11 +247,11 @@ func TestResolveUser_ContextContainsUserID(t *testing.T) {
 
 // Mock querier for testing
 type mockQuerier struct {
-	users                       map[string]sqlc.User
-	onCreateUser                func(clerkID, email, name string) (sqlc.User, error)
-	getActiveInviteFunc         func(email string) (sqlc.GetActiveInviteByEmailRow, error)
-	markInviteAcceptedFunc      func(id pgtype.UUID) error
-	updateUserInviteStatusFunc  func(id pgtype.UUID, status string) (sqlc.User, error)
+	users                      map[string]sqlc.User
+	onCreateUser               func(clerkID, email, name string) (sqlc.User, error)
+	getActiveInviteFunc        func(email string) (sqlc.GetActiveInviteByEmailRow, error)
+	markInviteAcceptedFunc     func(id pgtype.UUID) error
+	updateUserInviteStatusFunc func(id pgtype.UUID, status string) (sqlc.User, error)
 }
 
 func (m *mockQuerier) GetUserByClerkID(ctx context.Context, clerkUserID string) (sqlc.User, error) {

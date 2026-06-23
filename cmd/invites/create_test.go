@@ -150,7 +150,6 @@ func TestInviteCLI_ExpiresIn(t *testing.T) {
 	}
 }
 
-
 // Test token uniqueness
 func TestGenerateTokenAndHash_Unique(t *testing.T) {
 	token1, _, _ := generateTokenAndHash(32)
