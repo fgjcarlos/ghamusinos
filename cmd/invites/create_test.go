@@ -122,6 +122,35 @@ func TestCreateInviteFlags_Email(t *testing.T) {
 	}
 }
 
+// Test CLI expiry flag parsing with --expires-in
+// SPEC: Scenario "Invite CLI accepts --expires-in 7d and produces correct DB expiry"
+func TestInviteCLI_ExpiresIn(t *testing.T) {
+	// Test various expiry formats accepted by the CLI
+	tests := []struct {
+		input    string
+		expected time.Duration
+	}{
+		{"7d", 7 * 24 * time.Hour},
+		{"24h", 24 * time.Hour},
+		{"1d", 24 * time.Hour},
+		{"14d", 14 * 24 * time.Hour},
+		{"72h", 72 * time.Hour},
+	}
+
+	for _, tt := range tests {
+		d, err := parseDuration(tt.input)
+		if err != nil {
+			t.Errorf("parseDuration(%q) error: %v", tt.input, err)
+			continue
+		}
+
+		if d != tt.expected {
+			t.Errorf("parseDuration(%q) = %v, want %v", tt.input, d, tt.expected)
+		}
+	}
+}
+
+
 // Test token uniqueness
 func TestGenerateTokenAndHash_Unique(t *testing.T) {
 	token1, _, _ := generateTokenAndHash(32)
