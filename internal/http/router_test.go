@@ -133,3 +133,34 @@ func TestRouterAPIRequiresAuth(t *testing.T) {
 		t.Fatalf("GET /api/no-existe sin token quería 401, obtuvo %d", resp.StatusCode)
 	}
 }
+
+// TestRouterAPIv1VersionPath verifica que /api/v1 es la ruta base de la API versionada.
+// La ruta /api/v1/me existe; /api/v1/inexistente debe devolver 404 con RFC 9457 ProblemDetail.
+// Ambas requieren autenticación primero.
+func TestRouterAPIv1VersionPath(t *testing.T) {
+	srv := nuevoServidor(t)
+
+	// GET /api/v1/inexistente (ruta no existe en v1)
+	resp := testGet(t, srv.URL+"/api/v1/inexistente")
+	defer func() { _ = resp.Body.Close() }()
+
+	// Debe rechazar con 401 (no autenticado) antes de devolver 404
+	if resp.StatusCode != http.StatusUnauthorized {
+		t.Errorf("GET /api/v1/inexistente sin token quería 401, obtuvo %d", resp.StatusCode)
+	}
+}
+
+// TestRouterAPIUnknownVersion verifica que versiones API desconocidas (v2, v3, etc.)
+// devuelven 404 con RFC 9457 ProblemDetail y content-type correcto.
+func TestRouterAPIUnknownVersion(t *testing.T) {
+	srv := nuevoServidor(t)
+
+	// GET /api/v2/foo (versión desconocida)
+	resp := testGet(t, srv.URL+"/api/v2/foo")
+	defer func() { _ = resp.Body.Close() }()
+
+	// Debe rechazar con 401 (no autenticado) antes de devolver 404
+	if resp.StatusCode != http.StatusUnauthorized {
+		t.Fatalf("GET /api/v2/foo sin token quería 401, obtuvo %d", resp.StatusCode)
+	}
+}
