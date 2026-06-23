@@ -14,12 +14,14 @@ import (
 	"github.com/fgjcarlos/ghamusinos/internal/db"
 	"github.com/fgjcarlos/ghamusinos/internal/db/sqlc"
 	apphttp "github.com/fgjcarlos/ghamusinos/internal/http"
+	"github.com/fgjcarlos/ghamusinos/internal/jobs"
 )
 
 const shutdownTimeout = 10 * time.Second
 
-// Run arranca el servidor HTTP y bloquea hasta que se recibe una señal de
-// apagado (SIGINT/SIGTERM), momento en el que hace un shutdown ordenado.
+// Run arranca el servidor HTTP y el River job queue, bloqueando hasta que se
+// recibe una señal de apagado (SIGINT/SIGTERM), momento en el que hace un
+// shutdown ordenado para ambos.
 func Run() error {
 	cfg, err := config.Load()
 	if err != nil {
@@ -36,6 +38,23 @@ func Run() error {
 	defer pool.Close()
 
 	slog.Info("conexión a base de datos establecida")
+
+	// Initialize River client for job queue
+	riverClient, err := jobs.NewClient(ctx, pool)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
+		defer cancel()
+		_ = riverClient.Stop(shutdownCtx) //nolint:errcheck
+	}()
+
+	// Start River workers
+	if err := riverClient.Start(ctx); err != nil {
+		return err
+	}
+	slog.Info("River job queue workers iniciados")
 
 	queries := sqlc.New(pool)
 	addr := ":" + cfg.Port
@@ -63,7 +82,7 @@ func Run() error {
 	case err := <-errCh:
 		return err
 	case <-ctx.Done():
-		slog.Info("apagando servidor")
+		slog.Info("apagando servidor y job queue")
 		shutdownCtx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
 		defer cancel()
 		if err := srv.Shutdown(shutdownCtx); err != nil {
