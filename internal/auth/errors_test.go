@@ -51,7 +51,7 @@ func TestErrorSentinels(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Error should implement error interface
-			if err, ok := tt.err.(error); !ok || err.Error() == "" {
+			if tt.err == nil || tt.Error() == "" {
 				t.Fatalf("error sentinel %s does not implement error interface or has empty message", tt.name)
 			}
 
