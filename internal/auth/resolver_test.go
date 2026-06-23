@@ -46,7 +46,7 @@ func TestResolveUser_UnknownClerkID_CreatesUser(t *testing.T) {
 	mockQ := &mockQuerier{
 		users: make(map[string]sqlc.User),
 	}
-	
+
 	// Set the callback after creation to capture mockQ
 	mockQ.onCreateUser = func(clerkID, email, name string) (sqlc.User, error) {
 		newUser := sqlc.User{
