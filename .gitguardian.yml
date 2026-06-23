@@ -1,0 +1,24 @@
+# Test files contain JWT-shaped fixtures and placeholder DB URLs.
+# These are NOT real secrets - test inputs for auth middleware.
+# GitGuardian IDs 34204676/34204677 are known false positives from slice 2.
+
+version: 2
+ignored_paths:
+- '**/*_test.go'
+- '**/testhelpers_test.go'
+- '**/testdata/**'
+ignored_matches:
+- name: Test JWT fixtures (known false positives)
+  git_guardian_ids:
+  - 34204676
+  - 34204677
+- name: Test JWT fixtures (path-based)
+  paths:
+  - '**/*_test.go'
+  matches:
+  - type: jwt
+- name: Test postgres URLs
+  paths:
+  - '**/*_test.go'
+  matches:
+  - type: postgres_uri
