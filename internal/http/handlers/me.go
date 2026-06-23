@@ -19,6 +19,7 @@ func Me(q sqlc.Querier) http.Handler {
 			w.WriteHeader(http.StatusUnauthorized)
 			//nolint:errcheck
 
+			//nolint:errcheck
 			json.NewEncoder(w).Encode(map[string]string{"error": "unauthorized"})
 			return
 		}
@@ -28,6 +29,7 @@ func Me(q sqlc.Querier) http.Handler {
 		w.WriteHeader(http.StatusOK)
 		//nolint:errcheck
 
+		//nolint:errcheck
 		json.NewEncoder(w).Encode(map[string]interface{}{
 			"id":            user.ID,
 			"clerk_user_id": user.ClerkUserID,
