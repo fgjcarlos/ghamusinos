@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"net/http"
 
+	"github.com/go-chi/chi/v5/middleware"
+
 	"github.com/fgjcarlos/ghamusinos/internal/auth"
 	"github.com/fgjcarlos/ghamusinos/internal/db/sqlc"
 )
@@ -15,9 +17,9 @@ func Me(q sqlc.Querier) http.Handler {
 		// Get user from context (set by auth middleware)
 		user := auth.AuthUser(r.Context())
 		if user == nil {
-			w.Header().Set("Content-Type", "application/json")
-			w.WriteHeader(http.StatusUnauthorized)
-			json.NewEncoder(w).Encode(map[string]string{"error": "unauthorized"})
+			requestID := middleware.GetReqID(r.Context())
+			problem := NewUnauthorized("not authenticated", requestID)
+			WriteProblem(w, problem)
 			return
 		}
 

@@ -2,7 +2,6 @@
 package http
 
 import (
-	"encoding/json"
 	"net/http"
 	"time"
 
@@ -66,11 +65,10 @@ func (s *Server) Router() http.Handler {
 	// Readiness: refleja el estado real de la base de datos.
 	r.Get("/readyz", handlers.Readyz(s.pool))
 
-	// Grupo de API. Las rutas privadas (protegidas por auth) se añaden en la
-	// fase de autenticación. Tiene su propio NotFound para que /api/inexistente
-	// devuelva JSON y NO caiga al handler SPA.
+	// Grupo de API. TODAS las rutas /api/* están protegidas por autenticación.
+	// Las rutas específicas de cada versión (v1, v2, etc.) se definen dentro.
 	r.Route("/api", func(r chi.Router) {
-		// Wire auth middleware
+		// Wire auth middleware for ALL /api routes
 		jwksCache := auth.NewJWKSCache(s.cfg.ClerkJWKSURL, time.Hour)
 		validator := auth.NewJWTValidator(jwksCache, s.cfg.ClerkAudience)
 		resolver := auth.NewUserResolver(s.queries)
@@ -79,13 +77,34 @@ func (s *Server) Router() http.Handler {
 		r.Use(auth.ResolveMiddleware(resolver))
 		r.Use(auth.InviteGateMiddleware(s.queries))
 
-		// Protected routes
-		r.Get("/me", handlers.Me(s.queries).ServeHTTP)
+		// v1 API routes
+		r.Route("/v1", func(r chi.Router) {
+			r.Get("/me", handlers.Me(s.queries).ServeHTTP)
 
-		r.NotFound(func(w http.ResponseWriter, _ *http.Request) {
-			w.Header().Set("Content-Type", "application/json")
-			w.WriteHeader(http.StatusNotFound)
-			_ = json.NewEncoder(w).Encode(map[string]string{"error": "not found"})
+			// Custom NotFound and MethodNotAllowed for v1 API (RFC 9457 ProblemDetail)
+			r.NotFound(func(w http.ResponseWriter, r *http.Request) {
+				requestID := middleware.GetReqID(r.Context())
+				problem := handlers.NewNotFound("endpoint not found", requestID)
+				handlers.WriteProblem(w, problem)
+			})
+			r.MethodNotAllowed(func(w http.ResponseWriter, r *http.Request) {
+				requestID := middleware.GetReqID(r.Context())
+				problem := handlers.ProblemDetail{
+					Type:     "about:blank",
+					Title:    "Method Not Allowed",
+					Status:   http.StatusMethodNotAllowed,
+					Detail:   "method " + r.Method + " not allowed for this endpoint",
+					Instance: requestID,
+				}
+				handlers.WriteProblem(w, problem)
+			})
+		})
+
+		// Catch unknown API versions and return 404
+		r.NotFound(func(w http.ResponseWriter, r *http.Request) {
+			requestID := middleware.GetReqID(r.Context())
+			problem := handlers.NewNotFound("API version not found", requestID)
+			handlers.WriteProblem(w, problem)
 		})
 	})
 
