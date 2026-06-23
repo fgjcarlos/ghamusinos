@@ -3,6 +3,7 @@
 package config
 
 import (
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"os"
@@ -28,6 +29,14 @@ type Config struct {
 	ClerkJWKSURL string
 	// ClerkAudience es el valor esperado del claim 'aud' en Clerk JWTs (opcional).
 	ClerkAudience string
+
+	// Strava OAuth configuration
+	StravaClientID       string // STRAVA_CLIENT_ID (required)
+	StravaClientSecret   string // STRAVA_CLIENT_SECRET (required)
+	StravaCallbackURL    string // STRAVA_CALLBACK_URL (required)
+	StravaWebhookSecret  string // STRAVA_WEBHOOK_SECRET (required)
+	StravaTokenEncKeyHex string // STRAVA_TOKEN_ENCRYPTION_KEY (required, 64 hex chars = 32 bytes)
+	StravaBackfillDays   int    // STRAVA_BACKFILL_DAYS (optional, default 42)
 }
 
 // Load lee las variables de entorno y devuelve un Config validado.
@@ -60,6 +69,14 @@ func Load() (*Config, error) {
 		Pool:          pool,
 		ClerkJWKSURL:  os.Getenv("CLERK_JWKS_URL"),
 		ClerkAudience: getEnv("CLERK_AUDIENCE", ""),
+
+		// Strava OAuth configuration
+		StravaClientID:       os.Getenv("STRAVA_CLIENT_ID"),
+		StravaClientSecret:   os.Getenv("STRAVA_CLIENT_SECRET"),
+		StravaCallbackURL:    os.Getenv("STRAVA_CALLBACK_URL"),
+		StravaWebhookSecret:  os.Getenv("STRAVA_WEBHOOK_SECRET"),
+		StravaTokenEncKeyHex: os.Getenv("STRAVA_TOKEN_ENCRYPTION_KEY"),
+		StravaBackfillDays:   getEnvInt("STRAVA_BACKFILL_DAYS", 42),
 	}
 
 	if cfg.DatabaseURL == "" {
@@ -67,6 +84,11 @@ func Load() (*Config, error) {
 	}
 	if cfg.ClerkJWKSURL == "" {
 		return nil, errors.New("config: CLERK_JWKS_URL es obligatoria y está vacía")
+	}
+
+	// Validate Strava configuration (all required for OAuth to work)
+	if err := validateStravaConfig(cfg); err != nil {
+		return nil, err
 	}
 
 	return cfg, nil
@@ -176,4 +198,53 @@ func getEnvDuration(key string, defaultVal time.Duration) (time.Duration, error)
 		return 0, fmt.Errorf("config: %s=%q no es una duración válida (espera formato Go, e.g. 5s, 1h30m): %w", key, v, err)
 	}
 	return d, nil
+}
+
+// getEnvInt devuelve el valor entero de key, o defaultVal si está vacía.
+func getEnvInt(key string, defaultVal int) int {
+	v := os.Getenv(key)
+	if v == "" {
+		return defaultVal
+	}
+	n, err := strconv.Atoi(v)
+	if err != nil {
+		// If parsing fails, use default (be lenient for numeric config)
+		return defaultVal
+	}
+	return n
+}
+
+// validateStravaConfig verifies that all required Strava configuration is present and valid.
+func validateStravaConfig(cfg *Config) error {
+	if cfg.StravaClientID == "" {
+		return errors.New("config: STRAVA_CLIENT_ID es obligatoria y está vacía")
+	}
+	if cfg.StravaClientSecret == "" {
+		return errors.New("config: STRAVA_CLIENT_SECRET es obligatoria y está vacía")
+	}
+	if cfg.StravaCallbackURL == "" {
+		return errors.New("config: STRAVA_CALLBACK_URL es obligatoria y está vacía")
+	}
+	if cfg.StravaWebhookSecret == "" {
+		return errors.New("config: STRAVA_WEBHOOK_SECRET es obligatoria y está vacía")
+	}
+	if cfg.StravaTokenEncKeyHex == "" {
+		return errors.New("config: STRAVA_TOKEN_ENCRYPTION_KEY es obligatoria y está vacía")
+	}
+
+	// Validate that the key is 64 hex characters (32 bytes)
+	if len(cfg.StravaTokenEncKeyHex) != 64 {
+		return fmt.Errorf("config: STRAVA_TOKEN_ENCRYPTION_KEY debe ser 64 caracteres hex (32 bytes), recibido %d chars", len(cfg.StravaTokenEncKeyHex))
+	}
+
+	// Try to decode the hex string
+	if _, err := hex.DecodeString(cfg.StravaTokenEncKeyHex); err != nil {
+		return fmt.Errorf("config: STRAVA_TOKEN_ENCRYPTION_KEY no es un hex válido: %w", err)
+	}
+
+	if cfg.StravaBackfillDays <= 0 {
+		cfg.StravaBackfillDays = 42 // default if invalid
+	}
+
+	return nil
 }
