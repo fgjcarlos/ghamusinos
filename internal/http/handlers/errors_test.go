@@ -105,6 +105,7 @@ func TestWriteProblem(t *testing.T) {
 	// Check JSON body
 	var body ProblemDetail
 	//nolint:errcheck
+	//nolint:errcheck
 	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
 		t.Fatalf("failed to unmarshal response body: %v", err)
 	}
@@ -133,6 +134,7 @@ func TestWriteProblem_404(t *testing.T) {
 
 	var body ProblemDetail
 	//nolint:errcheck
+	//nolint:errcheck
 	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
 		t.Fatalf("failed to unmarshal response body: %v", err)
 	}
@@ -158,6 +160,7 @@ func TestWriteProblem_EmptyInstance(t *testing.T) {
 
 	var body ProblemDetail
 	//nolint:errcheck
+	//nolint:errcheck
 	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
 		t.Fatalf("failed to unmarshal response body: %v", err)
 	}
@@ -182,6 +185,7 @@ func TestProblemDetail_OmitEmptyDetail(t *testing.T) {
 	WriteProblem(rec, p)
 
 	var body map[string]interface{}
+	//nolint:errcheck
 	//nolint:errcheck
 	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
 		t.Fatalf("failed to unmarshal response body: %v", err)
