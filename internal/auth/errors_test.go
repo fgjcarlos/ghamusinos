@@ -106,7 +106,7 @@ func TestAuthErrorFormat_NoTokenLeak(t *testing.T) {
 	// Use a realistic but invalid JWT format
 	badToken := "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ1c2VyXzEyMyJ9.invalid_signature_here"
 
-	req := httptest.NewRequest("GET", "/api/test", nil)
+	req := httptest.NewRequestWithContext(context.Background(), "GET", "/api/test", nil)
 	req.Header.Set("Authorization", "Bearer "+badToken)
 	w := httptest.NewRecorder()
 	handler.ServeHTTP(w, req)
@@ -121,6 +121,7 @@ func TestAuthErrorFormat_NoTokenLeak(t *testing.T) {
 	}
 
 	var resp map[string]string
+	//nolint:errcheck
 	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
 		t.Fatalf("response body is not valid JSON: %v", err)
 	}

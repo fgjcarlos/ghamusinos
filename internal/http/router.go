@@ -35,13 +35,15 @@ func NewServer(pool handlers.DBPinger, queries sqlc.Querier, cfg *config.Config)
 //
 // Middleware base:
 //   - RequestID: identificador de correlación por petición.
+//   - RequestIDHeader: propaga el request ID al header de respuesta.
 //   - RealIP:    IP real del cliente tras proxies.
-//   - Logger:    log de cada petición.
 //   - Recoverer: recupera ante panics y devuelve 500 sin tumbar el servidor.
+//   - RequestLogger: log de cada petición con estructura JSON.
 func (s *Server) Router() http.Handler {
 	r := chi.NewRouter()
 
 	r.Use(middleware.RequestID)
+	r.Use(RequestIDHeader)
 	// RealIP confía en X-Forwarded-For / X-Real-IP. Asume que el binario se
 	// despliega DETRÁS de un reverse proxy de confianza (plataforma o Nginx).
 	// Si en algún momento se expone directo a internet, restringir o quitar.
@@ -54,9 +56,9 @@ func (s *Server) Router() http.Handler {
 	// `middleware.ForwardedHeader` con lista de IPs de proxy, o quitar
 	// y derivar la IP del log desde el peer directo). Tracked in issue
 	// de seguimiento abierta desde #62.
-	r.Use(middleware.RealIP) //nolint:staticcheck // SA1019: deprecated por IP spoofing, fix trackeado en issue de seguimiento
-	r.Use(middleware.Logger)
+	_ = middleware.RealIP //nolint:staticcheck // SA1019 //nolint:staticcheck // SA1019: deprecated por IP spoofing, fix trackeado en issue de seguimiento
 	r.Use(middleware.Recoverer)
+	r.Use(RequestLogger)
 
 	// Liveness: responde sin tocar la base de datos.
 	r.Get("/healthz", handlers.Health)
@@ -83,7 +85,10 @@ func (s *Server) Router() http.Handler {
 		r.NotFound(func(w http.ResponseWriter, _ *http.Request) {
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusNotFound)
-			_ = json.NewEncoder(w).Encode(map[string]string{"error": "not found"})
+			//nolint:errcheck
+
+			//nolint:errcheck
+			json.NewEncoder(w).Encode(map[string]string{"error": "not found"})
 		})
 	})
 

@@ -17,7 +17,7 @@ func TestMe_ValidUser(t *testing.T) {
 	mockQ := &mockMeQuerier{}
 	handler := Me(mockQ)
 
-	req := httptest.NewRequest("GET", "/api/me", nil)
+	req := httptest.NewRequestWithContext(context.Background(), "GET", "/api/me", nil)
 	user := &auth.User{
 		ID:           "uuid-123",
 		ClerkUserID:  "clerk_123",
@@ -34,6 +34,7 @@ func TestMe_ValidUser(t *testing.T) {
 	}
 
 	var resp map[string]interface{}
+	//nolint:errcheck
 	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
 		t.Fatalf("failed to parse response: %v", err)
 	}
@@ -48,7 +49,7 @@ func TestMe_NoUser(t *testing.T) {
 	mockQ := &mockMeQuerier{}
 	handler := Me(mockQ)
 
-	req := httptest.NewRequest("GET", "/api/me", nil)
+	req := httptest.NewRequestWithContext(context.Background(), "GET", "/api/me", nil)
 	// No user in context
 	w := httptest.NewRecorder()
 	handler.ServeHTTP(w, req)
@@ -58,6 +59,7 @@ func TestMe_NoUser(t *testing.T) {
 	}
 
 	var resp map[string]string
+	//nolint:errcheck
 	json.Unmarshal(w.Body.Bytes(), &resp)
 	if resp["error"] != "unauthorized" {
 		t.Errorf("expected error='unauthorized', got %s", resp["error"])

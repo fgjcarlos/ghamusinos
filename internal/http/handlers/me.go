@@ -17,6 +17,9 @@ func Me(q sqlc.Querier) http.Handler {
 		if user == nil {
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusUnauthorized)
+			//nolint:errcheck
+
+			//nolint:errcheck
 			json.NewEncoder(w).Encode(map[string]string{"error": "unauthorized"})
 			return
 		}
@@ -24,6 +27,9 @@ func Me(q sqlc.Querier) http.Handler {
 		// Return user as JSON
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
+		//nolint:errcheck
+
+		//nolint:errcheck
 		json.NewEncoder(w).Encode(map[string]interface{}{
 			"id":            user.ID,
 			"clerk_user_id": user.ClerkUserID,
