@@ -4,10 +4,14 @@ package http
 import (
 	"encoding/json"
 	"net/http"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 
+	"github.com/fgjcarlos/ghamusinos/internal/auth"
+	"github.com/fgjcarlos/ghamusinos/internal/config"
+	"github.com/fgjcarlos/ghamusinos/internal/db/sqlc"
 	"github.com/fgjcarlos/ghamusinos/internal/frontend"
 	"github.com/fgjcarlos/ghamusinos/internal/http/handlers"
 )
@@ -16,13 +20,15 @@ import (
 // Se amplía con nuevas dependencias (queries SQLC, etc.) sin modificar la firma
 // de construcción de cada handler.
 type Server struct {
-	pool handlers.DBPinger
+	pool    handlers.DBPinger
+	queries sqlc.Querier
+	cfg     *config.Config
 }
 
-// NewServer crea un Server con el pool de base de datos proporcionado.
+// NewServer crea un Server con el pool de base de datos y configuración proporcionados.
 // pool puede ser nil en tests sin base de datos; /readyz responderá 503 en ese caso.
-func NewServer(pool handlers.DBPinger) *Server {
-	return &Server{pool: pool}
+func NewServer(pool handlers.DBPinger, queries sqlc.Querier, cfg *config.Config) *Server {
+	return &Server{pool: pool, queries: queries, cfg: cfg}
 }
 
 // Router construye el handler HTTP con el middleware base y todas las rutas.
@@ -62,6 +68,18 @@ func (s *Server) Router() http.Handler {
 	// fase de autenticación. Tiene su propio NotFound para que /api/inexistente
 	// devuelva JSON y NO caiga al handler SPA.
 	r.Route("/api", func(r chi.Router) {
+		// Wire auth middleware
+		jwksCache := auth.NewJWKSCache(s.cfg.ClerkJWKSURL, time.Hour)
+		validator := auth.NewJWTValidator(jwksCache, s.cfg.ClerkAudience)
+		resolver := auth.NewUserResolver(s.queries)
+
+		r.Use(auth.AuthMiddleware(validator))
+		r.Use(auth.ResolveMiddleware(resolver))
+		r.Use(auth.InviteGateMiddleware(s.queries))
+
+		// Protected routes
+		r.Get("/me", handlers.Me(s.queries).ServeHTTP)
+
 		r.NotFound(func(w http.ResponseWriter, _ *http.Request) {
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusNotFound)

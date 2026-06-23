@@ -24,6 +24,10 @@ type Config struct {
 	DatabaseURL string
 	// Pool contiene los parámetros de tuning de pgxpool.
 	Pool db.PoolConfig
+	// ClerkJWKSURL es la URL del endpoint JWKS para verificar firmas JWT de Clerk (obligatoria).
+	ClerkJWKSURL string
+	// ClerkAudience es el valor esperado del claim 'aud' en Clerk JWTs (opcional).
+	ClerkAudience string
 }
 
 // Load lee las variables de entorno y devuelve un Config validado.
@@ -50,14 +54,19 @@ func Load() (*Config, error) {
 	}
 
 	cfg := &Config{
-		Env:         getEnv("ENV", "development"),
-		Port:        getEnv("PORT", "8080"),
-		DatabaseURL: os.Getenv("DATABASE_URL"),
-		Pool:        pool,
+		Env:            getEnv("ENV", "development"),
+		Port:           getEnv("PORT", "8080"),
+		DatabaseURL:    os.Getenv("DATABASE_URL"),
+		Pool:           pool,
+		ClerkJWKSURL:   os.Getenv("CLERK_JWKS_URL"),
+		ClerkAudience:  getEnv("CLERK_AUDIENCE", ""),
 	}
 
 	if cfg.DatabaseURL == "" {
 		return nil, errors.New("config: DATABASE_URL es obligatoria y está vacía")
+	}
+	if cfg.ClerkJWKSURL == "" {
+		return nil, errors.New("config: CLERK_JWKS_URL es obligatoria y está vacía")
 	}
 
 	return cfg, nil
