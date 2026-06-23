@@ -147,11 +147,8 @@ func TestResolveUser_CreateError(t *testing.T) {
 
 // Mock querier for testing
 type mockQuerier struct {
-	users                      map[string]sqlc.User
-	onCreateUser               func(clerkID, email, name string) (sqlc.User, error)
-	getActiveInviteFunc        func(email string) (sqlc.GetActiveInviteByEmailRow, error)
-	markInviteAcceptedFunc     func(id pgtype.UUID) error
-	updateUserInviteStatusFunc func(id pgtype.UUID, status string) (sqlc.User, error)
+	users        map[string]sqlc.User
+	onCreateUser func(clerkID, email, name string) (sqlc.User, error)
 }
 
 func (m *mockQuerier) GetUserByClerkID(ctx context.Context, clerkUserID string) (sqlc.User, error) {
@@ -182,29 +179,17 @@ func (m *mockQuerier) CreateInvite(ctx context.Context, arg sqlc.CreateInvitePar
 	return sqlc.Invite{}, nil
 }
 func (m *mockQuerier) GetActiveInviteByEmail(ctx context.Context, email string) (sqlc.GetActiveInviteByEmailRow, error) {
-	if m.getActiveInviteFunc != nil {
-		return m.getActiveInviteFunc(email)
-	}
 	return sqlc.GetActiveInviteByEmailRow{}, nil
 }
 func (m *mockQuerier) GetInviteByTokenHash(ctx context.Context, tokenHash string) (sqlc.Invite, error) {
 	return sqlc.Invite{}, nil
 }
 func (m *mockQuerier) MarkInviteAccepted(ctx context.Context, id pgtype.UUID) error {
-	if m.markInviteAcceptedFunc != nil {
-		return m.markInviteAcceptedFunc(id)
-	}
 	return nil
 }
 func (m *mockQuerier) UpdateUserPreferences(ctx context.Context, arg sqlc.UpdateUserPreferencesParams) (sqlc.User, error) {
 	return sqlc.User{}, nil
 }
 func (m *mockQuerier) UpdateUserProfile(ctx context.Context, arg sqlc.UpdateUserProfileParams) (sqlc.User, error) {
-	return sqlc.User{}, nil
-}
-func (m *mockQuerier) UpdateUserInviteStatus(ctx context.Context, arg sqlc.UpdateUserInviteStatusParams) (sqlc.User, error) {
-	if m.updateUserInviteStatusFunc != nil {
-		return m.updateUserInviteStatusFunc(arg.ID, string(arg.InviteStatus))
-	}
 	return sqlc.User{}, nil
 }
