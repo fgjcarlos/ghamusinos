@@ -36,6 +36,7 @@ func TestMe_ValidUser(t *testing.T) {
 	var resp map[string]interface{}
 	//nolint:errcheck
 	//nolint:errcheck
+	//nolint:errcheck
 	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
 		t.Fatalf("failed to parse response: %v", err)
 	}
@@ -66,6 +67,7 @@ func TestMe_NoUser(t *testing.T) {
 	}
 
 	var resp map[string]interface{}
+	//nolint:errcheck
 	//nolint:errcheck
 	//nolint:errcheck
 	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {

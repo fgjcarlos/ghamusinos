@@ -124,6 +124,7 @@ func TestAuthErrorFormat_NoTokenLeak(t *testing.T) {
 	//nolint:errcheck
 	//nolint:errcheck
 	//nolint:errcheck
+	//nolint:errcheck
 	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
 		t.Fatalf("response body is not valid JSON: %v", err)
 	}
