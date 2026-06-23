@@ -12,19 +12,24 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"log"
+	"log/slog"
 	"os"
 
 	_ "github.com/jackc/pgx/v5/stdlib" // driver database/sql para pgx
 	"github.com/pressly/goose/v3"
 
 	"github.com/fgjcarlos/ghamusinos/internal/db"
+	"github.com/fgjcarlos/ghamusinos/internal/logging"
 )
 
 func main() {
+	// Initialize structured logging
+	logging.Setup(os.Getenv("ENV"), os.Stdout)
+
 	databaseURL := os.Getenv("DATABASE_URL")
 	if databaseURL == "" {
-		log.Fatal("migrate: DATABASE_URL es obligatoria y está vacía")
+		slog.Error("migrate: DATABASE_URL is required and empty")
+		os.Exit(1)
 	}
 
 	command := "up"
@@ -33,7 +38,8 @@ func main() {
 	}
 
 	if err := run(databaseURL, command); err != nil {
-		log.Fatalf("migrate: %v", err)
+		slog.Error("migrate failed", slog.String("error", err.Error()))
+		os.Exit(1)
 	}
 }
 

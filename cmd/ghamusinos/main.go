@@ -3,13 +3,19 @@
 package main
 
 import (
-	"log"
+	"log/slog"
+	"os"
 
 	"github.com/fgjcarlos/ghamusinos/internal/app"
+	"github.com/fgjcarlos/ghamusinos/internal/logging"
 )
 
 func main() {
+	// Initialize structured logging
+	logging.Setup(os.Getenv("ENV"), os.Stdout)
+
 	if err := app.Run(); err != nil {
-		log.Fatalf("ghamusinos: %v", err)
+		slog.Error("ghamusinos failed", slog.String("error", err.Error()))
+		os.Exit(1)
 	}
 }
