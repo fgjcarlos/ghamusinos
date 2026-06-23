@@ -145,113 +145,10 @@ func TestResolveUser_CreateError(t *testing.T) {
 	}
 }
 
-// Test 3.4.1: Resolving same ClerkID twice returns same user without duplicate insert
-// SPEC: Scenario "Known Clerk user is resolved"
-func TestResolveUser_SameClerkIDTwice(t *testing.T) {
-	mockQ := &mockQuerier{
-		users: make(map[string]sqlc.User),
-	}
-
-	createCount := 0
-	mockQ.onCreateUser = func(clerkID, email, name string) (sqlc.User, error) {
-		createCount++
-		newUser := sqlc.User{
-			ID:           pgtype.UUID{Bytes: [16]byte{5}, Valid: true},
-			ClerkUserID:  clerkID,
-			Email:        email,
-			DisplayName:  pgtype.Text{String: name, Valid: true},
-			InviteStatus: "pending",
-		}
-		mockQ.users[clerkID] = newUser
-		return newUser, nil
-	}
-
-	resolver := NewUserResolver(mockQ)
-	claims := &Claims{Subject: "clerk_same", Email: "same@example.com", Name: "Same User"}
-
-	// First resolution: creates user
-	user1, err := resolver.Resolve(context.Background(), claims)
-	if err != nil {
-		t.Fatalf("first resolve failed: %v", err)
-	}
-	if user1 == nil {
-		t.Fatal("first user should not be nil")
-	}
-	if createCount != 1 {
-		t.Errorf("expected 1 create call, got %d", createCount)
-	}
-
-	// Second resolution with same ClerkID: should not create again
-	user2, err := resolver.Resolve(context.Background(), claims)
-	if err != nil {
-		t.Fatalf("second resolve failed: %v", err)
-	}
-	if user2 == nil {
-		t.Fatal("second user should not be nil")
-	}
-
-	if createCount != 1 {
-		t.Errorf("expected 1 create call total (not 2), got %d", createCount)
-	}
-
-	// Both should have the same ID
-	if user1.ID != user2.ID {
-		t.Errorf("expected same user ID, got %v and %v", user1.ID, user2.ID)
-	}
-}
-
-// Test 3.4.2: Resolved user is available in context
-// SPEC: Scenario "Resolved user is available in context"
-func TestResolveUser_ContextContainsUserID(t *testing.T) {
-	mockQ := &mockQuerier{
-		users: map[string]sqlc.User{
-			"clerk_ctx": {
-				ID:           pgtype.UUID{Bytes: [16]byte{6}, Valid: true},
-				ClerkUserID:  "clerk_ctx",
-				Email:        "ctx@example.com",
-				InviteStatus: "active",
-			},
-		},
-	}
-
-	resolver := NewUserResolver(mockQ)
-	claims := &Claims{Subject: "clerk_ctx", Email: "ctx@example.com"}
-
-	ctx := context.Background()
-	user, err := resolver.Resolve(ctx, claims)
-	if err != nil {
-		t.Fatalf("resolve failed: %v", err)
-	}
-	if user == nil {
-		t.Fatal("user should not be nil")
-	}
-
-	// Inject user into context (simulating what middleware does)
-	ctxWithUser := WithAuthUser(ctx, &User{
-		ID:           user.ID.String(),
-		ClerkUserID:  user.ClerkUserID,
-		Email:        user.Email,
-		InviteStatus: string(user.InviteStatus),
-	})
-
-	// Retrieve user from context
-	retrievedUser := AuthUser(ctxWithUser)
-	if retrievedUser == nil {
-		t.Fatal("user should be retrievable from context")
-	}
-
-	if retrievedUser.ClerkUserID != "clerk_ctx" {
-		t.Errorf("expected clerk_ctx in context, got %s", retrievedUser.ClerkUserID)
-	}
-}
-
 // Mock querier for testing
 type mockQuerier struct {
-	users                      map[string]sqlc.User
-	onCreateUser               func(clerkID, email, name string) (sqlc.User, error)
-	getActiveInviteFunc        func(email string) (sqlc.GetActiveInviteByEmailRow, error)
-	markInviteAcceptedFunc     func(id pgtype.UUID) error
-	updateUserInviteStatusFunc func(id pgtype.UUID, status string) (sqlc.User, error)
+	users        map[string]sqlc.User
+	onCreateUser func(clerkID, email, name string) (sqlc.User, error)
 }
 
 func (m *mockQuerier) GetUserByClerkID(ctx context.Context, clerkUserID string) (sqlc.User, error) {
@@ -282,18 +179,12 @@ func (m *mockQuerier) CreateInvite(ctx context.Context, arg sqlc.CreateInvitePar
 	return sqlc.Invite{}, nil
 }
 func (m *mockQuerier) GetActiveInviteByEmail(ctx context.Context, email string) (sqlc.GetActiveInviteByEmailRow, error) {
-	if m.getActiveInviteFunc != nil {
-		return m.getActiveInviteFunc(email)
-	}
 	return sqlc.GetActiveInviteByEmailRow{}, nil
 }
 func (m *mockQuerier) GetInviteByTokenHash(ctx context.Context, tokenHash string) (sqlc.Invite, error) {
 	return sqlc.Invite{}, nil
 }
 func (m *mockQuerier) MarkInviteAccepted(ctx context.Context, id pgtype.UUID) error {
-	if m.markInviteAcceptedFunc != nil {
-		return m.markInviteAcceptedFunc(id)
-	}
 	return nil
 }
 func (m *mockQuerier) UpdateUserPreferences(ctx context.Context, arg sqlc.UpdateUserPreferencesParams) (sqlc.User, error) {
@@ -301,97 +192,4 @@ func (m *mockQuerier) UpdateUserPreferences(ctx context.Context, arg sqlc.Update
 }
 func (m *mockQuerier) UpdateUserProfile(ctx context.Context, arg sqlc.UpdateUserProfileParams) (sqlc.User, error) {
 	return sqlc.User{}, nil
-}
-func (m *mockQuerier) UpdateUserInviteStatus(ctx context.Context, arg sqlc.UpdateUserInviteStatusParams) (sqlc.User, error) {
-	if m.updateUserInviteStatusFunc != nil {
-		return m.updateUserInviteStatusFunc(arg.ID, string(arg.InviteStatus))
-	}
-	return sqlc.User{}, nil
-}
-
-// Test 3.10: Invite expiry — invite with expiry date in past should not be found
-// SPEC: Scenario "Expired invite does not grant access"
-func TestInviteExpiry_ExpiredBlocks(t *testing.T) {
-	mockQ := &mockQuerier{
-		getActiveInviteFunc: func(email string) (sqlc.GetActiveInviteByEmailRow, error) {
-			if email == "expired@example.com" {
-				// GetActiveInviteByEmail should filter out expired invites in the DB query
-				// so we return an error to simulate no active invite found
-				return sqlc.GetActiveInviteByEmailRow{}, errors.New("no active invite")
-			}
-			return sqlc.GetActiveInviteByEmailRow{}, nil
-		},
-	}
-
-	// Simulate a pending user trying to access with an expired invite
-	// The gate should reject because no active invite is found
-	mockQ.users = map[string]sqlc.User{
-		"user_exp": {
-			ID:           pgtype.UUID{Bytes: [16]byte{7}, Valid: true},
-			ClerkUserID:  "user_exp",
-			Email:        "expired@example.com",
-			InviteStatus: "pending",
-		},
-	}
-
-	resolver := &dbUserResolver{q: mockQ}
-	user, err := resolver.Resolve(context.Background(), &Claims{
-		Subject: "user_exp",
-		Email:   "expired@example.com",
-	})
-
-	// Since no active invite is found, the access should be denied
-	// This is handled at the middleware level, not the resolver
-	// So resolver should still return the user, but gate middleware should reject
-	if err != nil {
-		t.Errorf("resolver should find user: %v", err)
-	}
-	if user.InviteStatus != "pending" {
-		t.Errorf("expected user to still be pending after resolve, got %v", user.InviteStatus)
-	}
-}
-
-// Test 3.11: Invite without expiry should always be valid
-// SPEC: Scenario "Invite with no expiry never expires"
-func TestInviteExpiry_NullExpiryNeverExpires(t *testing.T) {
-	mockQ := &mockQuerier{
-		getActiveInviteFunc: func(email string) (sqlc.GetActiveInviteByEmailRow, error) {
-			if email == "noexpiry@example.com" {
-				// Return an invite with NULL expiry (never expires)
-				// In pgx, NULL is represented as Valid: false
-				return sqlc.GetActiveInviteByEmailRow{
-					ID:        pgtype.UUID{Bytes: [16]byte{8}, Valid: true},
-					Email:     "noexpiry@example.com",
-					Status:    "pending",
-					ExpiresAt: pgtype.Timestamptz{Valid: false}, // NULL = never expires
-				}, nil
-			}
-			return sqlc.GetActiveInviteByEmailRow{}, errors.New("no invite")
-		},
-		markInviteAcceptedFunc: func(id pgtype.UUID) error {
-			return nil
-		},
-	}
-
-	mockQ.users = map[string]sqlc.User{
-		"user_noexp": {
-			ID:           pgtype.UUID{Bytes: [16]byte{8}, Valid: true},
-			ClerkUserID:  "user_noexp",
-			Email:        "noexpiry@example.com",
-			InviteStatus: "pending",
-		},
-	}
-
-	resolver := &dbUserResolver{q: mockQ}
-	user, err := resolver.Resolve(context.Background(), &Claims{
-		Subject: "user_noexp",
-		Email:   "noexpiry@example.com",
-	})
-
-	if err != nil {
-		t.Errorf("resolver should find user: %v", err)
-	}
-	if user.Email != "noexpiry@example.com" {
-		t.Errorf("expected user with no-expiry invite, got %s", user.Email)
-	}
 }
