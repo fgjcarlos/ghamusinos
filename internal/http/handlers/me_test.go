@@ -17,7 +17,7 @@ func TestMe_ValidUser(t *testing.T) {
 	mockQ := &mockMeQuerier{}
 	handler := Me(mockQ)
 
-	req := httptest.NewRequest("GET", "/api/me", nil)
+	req := httptest.NewRequestWithContext(context.Background(), "GET", "/api/me", nil)
 	user := &auth.User{
 		ID:           "uuid-123",
 		ClerkUserID:  "clerk_123",
@@ -49,7 +49,7 @@ func TestMe_NoUser(t *testing.T) {
 	mockQ := &mockMeQuerier{}
 	handler := Me(mockQ)
 
-	req := httptest.NewRequest("GET", "/api/me", nil)
+	req := httptest.NewRequestWithContext(context.Background(), "GET", "/api/me", nil)
 	// No user in context
 	w := httptest.NewRecorder()
 	handler.ServeHTTP(w, req)
