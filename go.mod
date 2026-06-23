@@ -8,6 +8,8 @@ require (
 	github.com/joho/godotenv v1.5.1
 	github.com/lestrrat-go/jwx/v2 v2.1.6
 	github.com/pressly/goose/v3 v3.27.1
+	github.com/riverqueue/river v0.39.0
+	github.com/riverqueue/river/riverdriver/riverpgxv5 v0.39.0
 )
 
 require (
@@ -24,9 +26,7 @@ require (
 	github.com/lestrrat-go/option v1.0.1 // indirect
 	github.com/mfridman/interpolate v0.0.2 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
-	github.com/riverqueue/river v0.39.0 // indirect
 	github.com/riverqueue/river/riverdriver v0.39.0 // indirect
-	github.com/riverqueue/river/riverdriver/riverpgxv5 v0.39.0 // indirect
 	github.com/riverqueue/river/rivershared v0.39.0 // indirect
 	github.com/riverqueue/river/rivertype v0.39.0 // indirect
 	github.com/segmentio/asm v1.2.1 // indirect
