@@ -54,12 +54,12 @@ func Load() (*Config, error) {
 	}
 
 	cfg := &Config{
-		Env:            getEnv("ENV", "development"),
-		Port:           getEnv("PORT", "8080"),
-		DatabaseURL:    os.Getenv("DATABASE_URL"),
-		Pool:           pool,
-		ClerkJWKSURL:   os.Getenv("CLERK_JWKS_URL"),
-		ClerkAudience:  getEnv("CLERK_AUDIENCE", ""),
+		Env:           getEnv("ENV", "development"),
+		Port:          getEnv("PORT", "8080"),
+		DatabaseURL:   os.Getenv("DATABASE_URL"),
+		Pool:          pool,
+		ClerkJWKSURL:  os.Getenv("CLERK_JWKS_URL"),
+		ClerkAudience: getEnv("CLERK_AUDIENCE", ""),
 	}
 
 	if cfg.DatabaseURL == "" {
