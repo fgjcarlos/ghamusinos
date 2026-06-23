@@ -27,6 +27,7 @@ func TestAuthMiddleware_MissingAuth(t *testing.T) {
 		//nolint:errcheck
 
 		//nolint:errcheck
+		//nolint:errcheck
 		w.Write([]byte("ok"))
 	}))
 
@@ -39,6 +40,7 @@ func TestAuthMiddleware_MissingAuth(t *testing.T) {
 	}
 
 	var resp map[string]string
+	//nolint:errcheck
 	//nolint:errcheck
 	json.Unmarshal(w.Body.Bytes(), &resp)
 	if resp["error"] != "unauthorized" {
