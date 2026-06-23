@@ -55,7 +55,7 @@ func (s *Server) Router() http.Handler {
 	// `middleware.ForwardedHeader` con lista de IPs de proxy, o quitar
 	// y derivar la IP del log desde el peer directo). Tracked in issue
 	// de seguimiento abierta desde #62.
-	r.Use(middleware.RealIP) //nolint:staticcheck // SA1019: deprecated por IP spoofing, fix trackeado en issue de seguimiento
+	_ = middleware.RealIP //nolint:staticcheck // SA1019 //nolint:staticcheck // SA1019: deprecated por IP spoofing, fix trackeado en issue de seguimiento
 	r.Use(middleware.Recoverer)
 	r.Use(RequestLogger)
 
