@@ -21,14 +21,6 @@ const testJWKSResponse = `{
   ]
 }`
 
-// Valid JWT token signed with test key (exp far in future)
-const validTestToken = "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6InRlc3Qta2V5LTEifQ.eyJzdWIiOiJ1c2VyXzEyMyIsImVtYWlsIjoidGVzdEBleGFtcGxlLmNvbSIsIm5hbWUiOiJUZXN0IFVzZXIiLCJleHAiOjk5OTk5OTk5OTksImlhdCI6MTYwMDAwMDAwMH0.fake-signature"
-
-// Expired JWT token (exp in past)
-const expiredTestToken = "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6InRlc3Qta2V5LTEifQ.eyJzdWIiOiJ1c2VyXzEyMyIsImV4cCI6MTAwMDAwMDAwfQ.fake-signature"
-
-// JWT without sub claim
-const missingSubToken = "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6InRlc3Qta2V5LTEifQ.eyJleHAiOjk5OTk5OTk5OTl9.fake-signature"
 
 func TestJWTValidator_ValidToken(t *testing.T) {
 	// Parse the test JWKS
