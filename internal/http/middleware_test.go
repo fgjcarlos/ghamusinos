@@ -23,7 +23,7 @@ func TestRequestIDHeader_EchoesIncomingHeader(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 	})
 
-	httptest.NewRequestWithContext(context.Background(), "GET", "/test", nil)
+	req := httptest.NewRequestWithContext(context.Background(), "GET", "/test", nil)
 	req.Header.Set("X-Request-Id", "abc-123")
 	rec := httptest.NewRecorder()
 
@@ -45,7 +45,7 @@ func TestRequestIDHeader_GeneratesIDWhenAbsent(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 	})
 
-	httptest.NewRequestWithContext(context.Background(), "GET", "/test", nil)
+	req := httptest.NewRequestWithContext(context.Background(), "GET", "/test", nil)
 	rec := httptest.NewRecorder()
 
 	r.ServeHTTP(rec, req)
@@ -75,7 +75,7 @@ func TestRequestLogger_StructuredLog(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 	})
 
-	httptest.NewRequestWithContext(context.Background(), "GET", "/healthz", nil)
+	req := httptest.NewRequestWithContext(context.Background(), "GET", "/healthz", nil)
 	rec := httptest.NewRecorder()
 
 	r.ServeHTTP(rec, req)
@@ -126,7 +126,7 @@ func TestRequestLogger_WarnLevel_4xx(t *testing.T) {
 		w.WriteHeader(http.StatusUnauthorized)
 	})
 
-	httptest.NewRequestWithContext(context.Background(), "GET", "/test", nil)
+	req := httptest.NewRequestWithContext(context.Background(), "GET", "/test", nil)
 	rec := httptest.NewRecorder()
 
 	r.ServeHTTP(rec, req)
@@ -155,7 +155,7 @@ func TestRequestLogger_ErrorLevel_5xx(t *testing.T) {
 		w.WriteHeader(http.StatusInternalServerError)
 	})
 
-	httptest.NewRequestWithContext(context.Background(), "GET", "/test", nil)
+	req := httptest.NewRequestWithContext(context.Background(), "GET", "/test", nil)
 	rec := httptest.NewRecorder()
 
 	r.ServeHTTP(rec, req)
@@ -184,7 +184,7 @@ func TestRequestLogger_InfoLevel_2xx(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 	})
 
-	httptest.NewRequestWithContext(context.Background(), "GET", "/test", nil)
+	req := httptest.NewRequestWithContext(context.Background(), "GET", "/test", nil)
 	rec := httptest.NewRecorder()
 
 	r.ServeHTTP(rec, req)
@@ -218,7 +218,7 @@ func TestRequestLogger_RequestIDInLog(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 	})
 
-	httptest.NewRequestWithContext(context.Background(), "GET", "/test", nil)
+	req := httptest.NewRequestWithContext(context.Background(), "GET", "/test", nil)
 	req.Header.Set("X-Request-Id", "my-request-id")
 	rec := httptest.NewRecorder()
 
