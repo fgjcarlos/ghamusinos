@@ -6,13 +6,53 @@ import (
 	"net/http/httptest"
 	"testing"
 	"time"
+
+	"github.com/jackc/pgx/v5/pgtype"
+
+	"github.com/fgjcarlos/ghamusinos/internal/config"
+	"github.com/fgjcarlos/ghamusinos/internal/db/sqlc"
 )
+
+// mockQuerier es un stub minimal para tests sin base de datos.
+type mockQuerier struct{}
+
+func (m *mockQuerier) CreateInvite(ctx context.Context, arg sqlc.CreateInviteParams) (sqlc.Invite, error) {
+	return sqlc.Invite{}, nil
+}
+func (m *mockQuerier) CreateUser(ctx context.Context, arg sqlc.CreateUserParams) (sqlc.User, error) {
+	return sqlc.User{}, nil
+}
+func (m *mockQuerier) GetActiveInviteByEmail(ctx context.Context, email string) (sqlc.GetActiveInviteByEmailRow, error) {
+	return sqlc.GetActiveInviteByEmailRow{}, nil
+}
+func (m *mockQuerier) GetInviteByTokenHash(ctx context.Context, tokenHash string) (sqlc.Invite, error) {
+	return sqlc.Invite{}, nil
+}
+func (m *mockQuerier) GetUserByClerkID(ctx context.Context, clerkID string) (sqlc.User, error) {
+	return sqlc.User{}, nil
+}
+func (m *mockQuerier) MarkInviteAccepted(ctx context.Context, id pgtype.UUID) error {
+	return nil
+}
+func (m *mockQuerier) UpdateUserInviteStatus(ctx context.Context, arg sqlc.UpdateUserInviteStatusParams) (sqlc.User, error) {
+	return sqlc.User{}, nil
+}
+func (m *mockQuerier) UpdateUserPreferences(ctx context.Context, arg sqlc.UpdateUserPreferencesParams) (sqlc.User, error) {
+	return sqlc.User{}, nil
+}
+func (m *mockQuerier) UpdateUserProfile(ctx context.Context, arg sqlc.UpdateUserProfileParams) (sqlc.User, error) {
+	return sqlc.User{}, nil
+}
 
 // nuevoServidor es un helper de test que crea un Server con pool nil
 // (entorno sin base de datos) y lo envuelve en httptest.
 func nuevoServidor(t *testing.T) *httptest.Server {
 	t.Helper()
-	srv := httptest.NewServer(NewServer(nil).Router())
+	cfg := &config.Config{
+		ClerkJWKSURL:  "https://clerk.example.com/.well-known/jwks.json",
+		ClerkAudience: "test",
+	}
+	srv := httptest.NewServer(NewServer(nil, &mockQuerier{}, cfg).Router())
 	t.Cleanup(srv.Close)
 	return srv
 }
@@ -80,20 +120,16 @@ func TestRouterSPARuta(t *testing.T) {
 	}
 }
 
-// TestRouterAPINotFound verifica que /api/inexistente devuelva JSON 404
-// y NO el index.html de la SPA.
-func TestRouterAPINotFound(t *testing.T) {
+// TestRouterAPIRequiresAuth verifica que /api/inexistente rechaza sin autenticación
+// (401 antes de que el router pueda devolver 404).
+// Las rutas de /api están protegidas por el middleware de autenticación.
+func TestRouterAPIRequiresAuth(t *testing.T) {
 	srv := nuevoServidor(t)
 
 	resp := testGet(t, srv.URL+"/api/no-existe")
 	defer func() { _ = resp.Body.Close() }()
 
-	if resp.StatusCode != http.StatusNotFound {
-		t.Fatalf("GET /api/no-existe quería 404, obtuvo %d", resp.StatusCode)
-	}
-
-	ct := resp.Header.Get("Content-Type")
-	if ct == "" {
-		t.Fatal("GET /api/no-existe debería devolver Content-Type JSON")
+	if resp.StatusCode != http.StatusUnauthorized {
+		t.Fatalf("GET /api/no-existe sin token quería 401, obtuvo %d", resp.StatusCode)
 	}
 }

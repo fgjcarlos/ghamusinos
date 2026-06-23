@@ -12,6 +12,7 @@ import (
 
 	"github.com/fgjcarlos/ghamusinos/internal/config"
 	"github.com/fgjcarlos/ghamusinos/internal/db"
+	"github.com/fgjcarlos/ghamusinos/internal/db/sqlc"
 	apphttp "github.com/fgjcarlos/ghamusinos/internal/http"
 )
 
@@ -36,10 +37,11 @@ func Run() error {
 
 	slog.Info("conexión a base de datos establecida")
 
+	queries := sqlc.New(pool)
 	addr := ":" + cfg.Port
 	srv := &http.Server{
 		Addr:              addr,
-		Handler:           apphttp.NewServer(pool).Router(),
+		Handler:           apphttp.NewServer(pool, queries, cfg).Router(),
 		ReadHeaderTimeout: 5 * time.Second,
 		ReadTimeout:       15 * time.Second,
 		WriteTimeout:      15 * time.Second,

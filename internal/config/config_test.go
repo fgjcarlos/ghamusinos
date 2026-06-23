@@ -11,6 +11,7 @@ import (
 func TestLoad_FailsWithoutDatabaseURL(t *testing.T) {
 	t.Setenv("DATABASE_URL", "")
 	t.Setenv("ENV", "production") // evita que cargue .env en disco
+	t.Setenv("CLERK_JWKS_URL", "https://clerk.example.com/.well-known/jwks.json")
 	// Limpiamos también las vars del pool para que no contaminen este test.
 	unsetPoolEnv(t)
 
@@ -24,6 +25,7 @@ func TestLoad_DefaultValues(t *testing.T) {
 	t.Setenv("DATABASE_URL", "postgres://test:test@localhost/test")
 	t.Setenv("ENV", "production")
 	t.Setenv("PORT", "")
+	t.Setenv("CLERK_JWKS_URL", "https://clerk.example.com/.well-known/jwks.json")
 	unsetPoolEnv(t)
 
 	cfg, err := Load()
@@ -43,6 +45,7 @@ func TestLoad_RespectsEnvValues(t *testing.T) {
 	t.Setenv("DATABASE_URL", "postgres://user:pass@host:5432/db")
 	t.Setenv("ENV", "production")
 	t.Setenv("PORT", "9090")
+	t.Setenv("CLERK_JWKS_URL", "https://clerk.example.com/.well-known/jwks.json")
 	unsetPoolEnv(t)
 
 	cfg, err := Load()
@@ -64,6 +67,7 @@ func TestLoad_RespectsEnvValues(t *testing.T) {
 func TestLoad_EnvDefaultIsDevelopment(t *testing.T) {
 	t.Setenv("DATABASE_URL", "postgres://test:test@localhost/test")
 	t.Setenv("ENV", "")
+	t.Setenv("CLERK_JWKS_URL", "https://clerk.example.com/.well-known/jwks.json")
 	unsetPoolEnv(t)
 
 	cfg, err := Load()
@@ -80,6 +84,7 @@ func TestLoad_EnvDefaultIsDevelopment(t *testing.T) {
 func TestLoad_PoolDefaults(t *testing.T) {
 	t.Setenv("DATABASE_URL", "postgres://test:test@localhost/test")
 	t.Setenv("ENV", "production")
+	t.Setenv("CLERK_JWKS_URL", "https://clerk.example.com/.well-known/jwks.json")
 	unsetPoolEnv(t)
 
 	cfg, err := Load()
@@ -98,6 +103,7 @@ func TestLoad_PoolDefaults(t *testing.T) {
 func TestLoad_PoolEnvOverrides(t *testing.T) {
 	t.Setenv("DATABASE_URL", "postgres://test:test@localhost/test")
 	t.Setenv("ENV", "production")
+	t.Setenv("CLERK_JWKS_URL", "https://clerk.example.com/.well-known/jwks.json")
 	unsetPoolEnv(t)
 
 	t.Setenv("DB_POOL_MAX_CONNS", "50")
@@ -214,6 +220,73 @@ func TestLoad_PoolConnectTimeoutRequired(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "DB_POOL_CONNECT_TIMEOUT") {
 		t.Errorf("error = %q, debería mencionar la variable", err)
+	}
+}
+
+// TestLoad_FailsWithoutClerkJWKSURL verifica que CLERK_JWKS_URL es obligatoria.
+func TestLoad_FailsWithoutClerkJWKSURL(t *testing.T) {
+	t.Setenv("DATABASE_URL", "postgres://test:test@localhost/test")
+	t.Setenv("ENV", "production")
+	t.Setenv("CLERK_JWKS_URL", "")
+	unsetPoolEnv(t)
+
+	_, err := Load()
+	if err == nil {
+		t.Fatal("Load() debería fallar cuando CLERK_JWKS_URL está vacía")
+	}
+	if !strings.Contains(err.Error(), "CLERK_JWKS_URL") {
+		t.Errorf("error = %q, debería mencionar CLERK_JWKS_URL", err)
+	}
+}
+
+// TestLoad_ClerkJWKSURLRequired verifica que Load falla si CLERK_JWKS_URL está vacía.
+func TestLoad_ClerkJWKSURLRequired(t *testing.T) {
+	t.Setenv("DATABASE_URL", "postgres://test:test@localhost/test")
+	t.Setenv("ENV", "production")
+	unsetPoolEnv(t)
+
+	_, err := Load()
+	if err == nil {
+		t.Fatal("Load() debería fallar sin CLERK_JWKS_URL")
+	}
+}
+
+// TestLoad_ClerkConfigValues verifica que CLERK_JWKS_URL y CLERK_AUDIENCE se leen correctamente.
+func TestLoad_ClerkConfigValues(t *testing.T) {
+	t.Setenv("DATABASE_URL", "postgres://test:test@localhost/test")
+	t.Setenv("ENV", "production")
+	t.Setenv("CLERK_JWKS_URL", "https://clerk.example.com/.well-known/jwks.json")
+	t.Setenv("CLERK_AUDIENCE", "my-app-prod")
+	unsetPoolEnv(t)
+
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("Load() error inesperado: %v", err)
+	}
+
+	if cfg.ClerkJWKSURL != "https://clerk.example.com/.well-known/jwks.json" {
+		t.Errorf("ClerkJWKSURL = %q, quería %q", cfg.ClerkJWKSURL, "https://clerk.example.com/.well-known/jwks.json")
+	}
+	if cfg.ClerkAudience != "my-app-prod" {
+		t.Errorf("ClerkAudience = %q, quería %q", cfg.ClerkAudience, "my-app-prod")
+	}
+}
+
+// TestLoad_ClerkAudienceOptional verifica que CLERK_AUDIENCE por defecto es vacío.
+func TestLoad_ClerkAudienceOptional(t *testing.T) {
+	t.Setenv("DATABASE_URL", "postgres://test:test@localhost/test")
+	t.Setenv("ENV", "production")
+	t.Setenv("CLERK_JWKS_URL", "https://clerk.example.com/.well-known/jwks.json")
+	t.Setenv("CLERK_AUDIENCE", "")
+	unsetPoolEnv(t)
+
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("Load() error inesperado: %v", err)
+	}
+
+	if cfg.ClerkAudience != "" {
+		t.Errorf("ClerkAudience default = %q, quería vacío", cfg.ClerkAudience)
 	}
 }
 
