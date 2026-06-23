@@ -144,5 +144,6 @@ func jsonError(w http.ResponseWriter, message string, code int) {
 	w.WriteHeader(code)
 	//nolint:errcheck
 
+	//nolint:errcheck
 	json.NewEncoder(w).Encode(map[string]string{"error": message})
 }

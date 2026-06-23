@@ -75,5 +75,6 @@ func WriteProblem(w http.ResponseWriter, p ProblemDetail) {
 	w.WriteHeader(p.Status)
 	//nolint:errcheck
 
+	//nolint:errcheck
 	json.NewEncoder(w).Encode(p)
 }
