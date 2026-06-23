@@ -73,5 +73,7 @@ func NewInternalError(detail, instance string) ProblemDetail {
 func WriteProblem(w http.ResponseWriter, p ProblemDetail) {
 	w.Header().Set("Content-Type", "application/problem+json")
 	w.WriteHeader(p.Status)
-	_ = json.NewEncoder(w).Encode(p)
+	//nolint:errcheck
+
+	json.NewEncoder(w).Encode(p)
 }
