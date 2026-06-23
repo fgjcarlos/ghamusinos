@@ -47,7 +47,7 @@ func Run() error {
 	defer func() {
 		shutdownCtx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
 		defer cancel()
-		riverClient.Stop(shutdownCtx)
+		_ = riverClient.Stop(shutdownCtx) //nolint:errcheck
 	}()
 
 	// Start River workers

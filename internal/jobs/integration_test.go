@@ -37,7 +37,7 @@ func TestRiverIntegration(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to create River client: %v", err)
 	}
-	defer client.Stop(ctx)
+	defer func() { _ = client.Stop(ctx) }() //nolint:errcheck
 
 	// Start the worker
 	if err := client.Start(ctx); err != nil {
