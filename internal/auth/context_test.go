@@ -7,9 +7,9 @@ import (
 
 func TestAuthClaimsContext(t *testing.T) {
 	tests := []struct {
-		name     string
-		setup    func(context.Context) context.Context
-		verify   func(*testing.T, *Claims, error)
+		name   string
+		setup  func(context.Context) context.Context
+		verify func(*testing.T, *Claims, error)
 	}{
 		{
 			name: "empty context returns nil",
@@ -64,9 +64,9 @@ func TestAuthClaimsContext(t *testing.T) {
 
 func TestAuthUserContext(t *testing.T) {
 	tests := []struct {
-		name     string
-		setup    func(context.Context) context.Context
-		verify   func(*testing.T, *User)
+		name   string
+		setup  func(context.Context) context.Context
+		verify func(*testing.T, *User)
 	}{
 		{
 			name: "empty context returns nil",
