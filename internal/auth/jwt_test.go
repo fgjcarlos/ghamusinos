@@ -21,7 +21,6 @@ const testJWKSResponse = `{
   ]
 }`
 
-
 func TestJWTValidator_ValidToken(t *testing.T) {
 	// Parse the test JWKS
 	set, err := jwk.Parse([]byte(testJWKSResponse))
