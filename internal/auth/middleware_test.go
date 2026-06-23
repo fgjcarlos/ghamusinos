@@ -24,7 +24,9 @@ func TestAuthMiddleware_MissingAuth(t *testing.T) {
 
 	handler := AuthMiddleware(validator)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		_ = w.Write([]byte("ok"))
+		//nolint:errcheck
+
+		w.Write([]byte("ok"))
 	}))
 
 	req := httptest.NewRequestWithContext(context.Background(), "GET", "/api/test", nil)

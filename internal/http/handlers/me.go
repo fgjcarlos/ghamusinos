@@ -26,7 +26,9 @@ func Me(q sqlc.Querier) http.Handler {
 		// Return user as JSON
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		_ = json.NewEncoder(w).Encode(map[string]interface{}{
+		//nolint:errcheck
+
+		json.NewEncoder(w).Encode(map[string]interface{}{
 			"id":            user.ID,
 			"clerk_user_id": user.ClerkUserID,
 			"email":         user.Email,
