@@ -17,6 +17,14 @@ SET
 WHERE id = $1
 RETURNING *;
 
+-- name: UpdateUserInviteStatus :one
+UPDATE users
+SET
+    invite_status = $2,
+    updated_at    = now()
+WHERE id = $1
+RETURNING *;
+
 -- name: UpdateUserPreferences :one
 -- Actualiza las preferencias de entrenamiento e IA del usuario (fase 1.1).
 -- Las métricas pueden ir a NULL si el usuario no las conoce; timezone y

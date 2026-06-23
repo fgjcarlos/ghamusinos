@@ -79,6 +79,41 @@ func (q *Queries) GetUserByClerkID(ctx context.Context, clerkUserID string) (Use
 	return i, err
 }
 
+const updateUserInviteStatus = `-- name: UpdateUserInviteStatus :one
+UPDATE users
+SET
+    invite_status = $2,
+    updated_at    = now()
+WHERE id = $1
+RETURNING id, clerk_user_id, email, display_name, invite_status, hr_max, lthr, ftp, level, timezone, ai_enabled, created_at, updated_at
+`
+
+type UpdateUserInviteStatusParams struct {
+	ID           pgtype.UUID         `json:"id"`
+	InviteStatus status.InviteStatus `json:"invite_status"`
+}
+
+func (q *Queries) UpdateUserInviteStatus(ctx context.Context, arg UpdateUserInviteStatusParams) (User, error) {
+	row := q.db.QueryRow(ctx, updateUserInviteStatus, arg.ID, arg.InviteStatus)
+	var i User
+	err := row.Scan(
+		&i.ID,
+		&i.ClerkUserID,
+		&i.Email,
+		&i.DisplayName,
+		&i.InviteStatus,
+		&i.HrMax,
+		&i.Lthr,
+		&i.Ftp,
+		&i.Level,
+		&i.Timezone,
+		&i.AiEnabled,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
 const updateUserPreferences = `-- name: UpdateUserPreferences :one
 UPDATE users
 SET

@@ -6,6 +6,8 @@ import (
 	"strings"
 
 	"github.com/fgjcarlos/ghamusinos/internal/db/sqlc"
+	"github.com/fgjcarlos/ghamusinos/internal/db/status"
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 // AuthMiddleware validates JWT tokens from the Authorization header.
@@ -122,9 +124,23 @@ func InviteGateMiddleware(q sqlc.Querier) func(http.Handler) http.Handler {
 					return
 				}
 
-				// TODO: Update user invite_status to 'active' in a separate query
-				// (This would require an UpdateUserInviteStatus query in sqlc)
-				// For now, promote in memory for this request
+				// Parse user ID back to UUID and update invite status
+				var userID pgtype.UUID
+				if err := userID.Scan(user.ID); err != nil {
+					jsonError(w, "internal error", http.StatusInternalServerError)
+					return
+				}
+
+				params := sqlc.UpdateUserInviteStatusParams{
+					ID:           userID,
+					InviteStatus: status.InviteStatusActive,
+				}
+				if _, err := q.UpdateUserInviteStatus(r.Context(), params); err != nil {
+					jsonError(w, "internal error", http.StatusInternalServerError)
+					return
+				}
+
+				// Promote user in context for this request
 				user.InviteStatus = "active"
 				ctx := WithAuthUser(r.Context(), user)
 				next.ServeHTTP(w, r.WithContext(ctx))
