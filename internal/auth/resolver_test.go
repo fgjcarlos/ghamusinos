@@ -147,8 +147,9 @@ func TestResolveUser_CreateError(t *testing.T) {
 
 // Mock querier for testing
 type mockQuerier struct {
-	users        map[string]sqlc.User
-	onCreateUser func(clerkID, email, name string) (sqlc.User, error)
+	users               map[string]sqlc.User
+	onCreateUser        func(clerkID, email, name string) (sqlc.User, error)
+	getActiveInviteFunc func(email string) (sqlc.GetActiveInviteByEmailRow, error)
 }
 
 func (m *mockQuerier) GetUserByClerkID(ctx context.Context, clerkUserID string) (sqlc.User, error) {
@@ -179,6 +180,9 @@ func (m *mockQuerier) CreateInvite(ctx context.Context, arg sqlc.CreateInvitePar
 	return sqlc.Invite{}, nil
 }
 func (m *mockQuerier) GetActiveInviteByEmail(ctx context.Context, email string) (sqlc.GetActiveInviteByEmailRow, error) {
+	if m.getActiveInviteFunc != nil {
+		return m.getActiveInviteFunc(email)
+	}
 	return sqlc.GetActiveInviteByEmailRow{}, nil
 }
 func (m *mockQuerier) GetInviteByTokenHash(ctx context.Context, tokenHash string) (sqlc.Invite, error) {
