@@ -1,0 +1,20 @@
+# Test files contain JWT-shaped fixtures and placeholder DB URLs.
+# These are NOT real secrets - test inputs for the auth middleware.
+# Without this config, GitGuardian flags every JWT-shaped string.
+
+version: 2
+ignored_paths:
+- '**/*_test.go'
+- '**/testhelpers_test.go'
+- '**/testdata/**'
+ignored_matches:
+- name: Test JWT fixtures
+  paths:
+  - '**/*_test.go'
+  matches:
+  - type: jwt
+- name: Test postgres URLs
+  paths:
+  - '**/*_test.go'
+  matches:
+  - type: postgres_uri
