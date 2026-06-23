@@ -93,6 +93,7 @@ func ResolveMiddleware(resolver UserResolver) func(http.Handler) http.Handler {
 //   - invite_status='active': allow
 //   - invite_status='pending': check for valid pending invite; if found, mark accepted and promote user
 //   - invite_status='blocked': deny with 403
+//
 // Returns 403 if access is denied.
 func InviteGateMiddleware(q sqlc.Querier) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {

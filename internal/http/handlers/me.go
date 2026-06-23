@@ -25,11 +25,11 @@ func Me(q sqlc.Querier) http.Handler {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
 		json.NewEncoder(w).Encode(map[string]interface{}{
-			"id":             user.ID,
-			"clerk_user_id":  user.ClerkUserID,
-			"email":          user.Email,
-			"display_name":   user.DisplayName,
-			"invite_status":  user.InviteStatus,
+			"id":            user.ID,
+			"clerk_user_id": user.ClerkUserID,
+			"email":         user.Email,
+			"display_name":  user.DisplayName,
+			"invite_status": user.InviteStatus,
 		})
 	})
 }
