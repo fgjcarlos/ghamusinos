@@ -27,7 +27,7 @@ func TestAuthMiddleware_MissingAuth(t *testing.T) {
 		_ = w.Write([]byte("ok"))
 	}))
 
-	httptest.NewRequestWithContext(context.Background(), "GET", "/api/test", nil)
+	req := httptest.NewRequestWithContext(context.Background(), "GET", "/api/test", nil)
 	w := httptest.NewRecorder()
 	handler.ServeHTTP(w, req)
 
@@ -62,7 +62,7 @@ func TestAuthMiddleware_ValidToken(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 	}))
 
-	httptest.NewRequestWithContext(context.Background(), "GET", "/api/test", nil)
+	req := httptest.NewRequestWithContext(context.Background(), "GET", "/api/test", nil)
 	req.Header.Set("Authorization", "Bearer valid-token")
 	w := httptest.NewRecorder()
 	handler.ServeHTTP(w, req)
@@ -95,7 +95,7 @@ func TestResolveMiddleware_InjectsUser(t *testing.T) {
 	}))
 
 	// Prepare request with claims already in context
-	httptest.NewRequestWithContext(context.Background(), "GET", "/api/test", nil)
+	req := httptest.NewRequestWithContext(context.Background(), "GET", "/api/test", nil)
 	claims := &Claims{Subject: "user_123", Email: "user@example.com"}
 	req = req.WithContext(WithAuthClaims(context.Background(), claims))
 	w := httptest.NewRecorder()
@@ -118,7 +118,7 @@ func TestInviteGateMiddleware_PendingNoInvite(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 	}))
 
-	httptest.NewRequestWithContext(context.Background(), "GET", "/api/test", nil)
+	req := httptest.NewRequestWithContext(context.Background(), "GET", "/api/test", nil)
 	user := &User{
 		ID:           "uuid-1",
 		ClerkUserID:  "user_123",
@@ -142,7 +142,7 @@ func TestInviteGateMiddleware_Active(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 	}))
 
-	httptest.NewRequestWithContext(context.Background(), "GET", "/api/test", nil)
+	req := httptest.NewRequestWithContext(context.Background(), "GET", "/api/test", nil)
 	user := &User{
 		ID:           "uuid-1",
 		ClerkUserID:  "user_123",
