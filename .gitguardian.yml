@@ -1,0 +1,12 @@
+version: 2
+
+# JWT-shaped strings, postgres URLs, and similar secrets-shaped fixtures
+# appear in test files. They are NOT real secrets — they're test inputs
+# to exercise auth middleware, JWT validation, and DB query paths.
+#
+# This config tells GitGuardian to ignore secret-shaped patterns in Go test
+# files. Any real secret accidentally committed to a test file will still be
+# visible to reviewers (the path is in the PR diff) but won't trigger the
+# automated security check.
+ignored_paths:
+  - "**/*_test.go"
