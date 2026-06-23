@@ -23,6 +23,7 @@ type Querier interface {
 	GetInviteByTokenHash(ctx context.Context, tokenHash string) (Invite, error)
 	GetUserByClerkID(ctx context.Context, clerkUserID string) (User, error)
 	MarkInviteAccepted(ctx context.Context, id pgtype.UUID) error
+	UpdateUserInviteStatus(ctx context.Context, arg UpdateUserInviteStatusParams) (User, error)
 	// Actualiza las preferencias de entrenamiento e IA del usuario (fase 1.1).
 	// Las métricas pueden ir a NULL si el usuario no las conoce; timezone y
 	// ai_enabled siempre llevan valor (tienen default en el schema).
