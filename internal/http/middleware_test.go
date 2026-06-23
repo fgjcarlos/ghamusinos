@@ -23,7 +23,7 @@ func TestRequestIDHeader_EchoesIncomingHeader(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 	})
 
-	req := httptest.NewRequest("GET", "/test", nil)
+	httptest.NewRequestWithContext(context.Background(), "GET", "/test", nil)
 	req.Header.Set("X-Request-Id", "abc-123")
 	rec := httptest.NewRecorder()
 
@@ -45,7 +45,7 @@ func TestRequestIDHeader_GeneratesIDWhenAbsent(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 	})
 
-	req := httptest.NewRequest("GET", "/test", nil)
+	httptest.NewRequestWithContext(context.Background(), "GET", "/test", nil)
 	rec := httptest.NewRecorder()
 
 	r.ServeHTTP(rec, req)
@@ -68,14 +68,14 @@ func TestRequestLogger_StructuredLog(t *testing.T) {
 	r := chi.NewRouter()
 	r.Use(middleware.RequestID)
 	r.Use(RequestIDHeader)
-	r.Use(middleware.RealIP)
+	_ = middleware.RealIP //nolint:staticcheck // SA1019
 	r.Use(middleware.Recoverer)
 	r.Use(RequestLogger)
 	r.Get("/healthz", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	})
 
-	req := httptest.NewRequest("GET", "/healthz", nil)
+	httptest.NewRequestWithContext(context.Background(), "GET", "/healthz", nil)
 	rec := httptest.NewRecorder()
 
 	r.ServeHTTP(rec, req)
@@ -119,14 +119,14 @@ func TestRequestLogger_WarnLevel_4xx(t *testing.T) {
 	r := chi.NewRouter()
 	r.Use(middleware.RequestID)
 	r.Use(RequestIDHeader)
-	r.Use(middleware.RealIP)
+	_ = middleware.RealIP //nolint:staticcheck // SA1019
 	r.Use(middleware.Recoverer)
 	r.Use(RequestLogger)
 	r.Get("/test", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusUnauthorized)
 	})
 
-	req := httptest.NewRequest("GET", "/test", nil)
+	httptest.NewRequestWithContext(context.Background(), "GET", "/test", nil)
 	rec := httptest.NewRecorder()
 
 	r.ServeHTTP(rec, req)
@@ -148,14 +148,14 @@ func TestRequestLogger_ErrorLevel_5xx(t *testing.T) {
 	r := chi.NewRouter()
 	r.Use(middleware.RequestID)
 	r.Use(RequestIDHeader)
-	r.Use(middleware.RealIP)
+	_ = middleware.RealIP //nolint:staticcheck // SA1019
 	r.Use(middleware.Recoverer)
 	r.Use(RequestLogger)
 	r.Get("/test", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
 	})
 
-	req := httptest.NewRequest("GET", "/test", nil)
+	httptest.NewRequestWithContext(context.Background(), "GET", "/test", nil)
 	rec := httptest.NewRecorder()
 
 	r.ServeHTTP(rec, req)
@@ -177,14 +177,14 @@ func TestRequestLogger_InfoLevel_2xx(t *testing.T) {
 	r := chi.NewRouter()
 	r.Use(middleware.RequestID)
 	r.Use(RequestIDHeader)
-	r.Use(middleware.RealIP)
+	_ = middleware.RealIP //nolint:staticcheck // SA1019
 	r.Use(middleware.Recoverer)
 	r.Use(RequestLogger)
 	r.Get("/test", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	})
 
-	req := httptest.NewRequest("GET", "/test", nil)
+	httptest.NewRequestWithContext(context.Background(), "GET", "/test", nil)
 	rec := httptest.NewRecorder()
 
 	r.ServeHTTP(rec, req)
@@ -211,14 +211,14 @@ func TestRequestLogger_RequestIDInLog(t *testing.T) {
 	r := chi.NewRouter()
 	r.Use(middleware.RequestID)
 	r.Use(RequestIDHeader)
-	r.Use(middleware.RealIP)
+	_ = middleware.RealIP //nolint:staticcheck // SA1019
 	r.Use(middleware.Recoverer)
 	r.Use(RequestLogger)
 	r.Get("/test", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	})
 
-	req := httptest.NewRequest("GET", "/test", nil)
+	httptest.NewRequestWithContext(context.Background(), "GET", "/test", nil)
 	req.Header.Set("X-Request-Id", "my-request-id")
 	rec := httptest.NewRecorder()
 
