@@ -63,10 +63,11 @@ func (v *clerkJWTValidator) Validate(ctx context.Context, rawToken string) (*Cla
 	verifiedToken, err := jwt.Parse([]byte(rawToken), parseOpts...)
 	if err != nil {
 		// Map jwt errors to our sentinel errors
-		if err.Error() == "exp not satisfied" || err.Error() == "nbf not satisfied" {
+		errMsg := err.Error()
+		if errMsg == `"exp" not satisfied` || errMsg == `"nbf" not satisfied` {
 			return nil, ErrExpiredToken
 		}
-		if err.Error() == "aud not satisfied" {
+		if errMsg == `"aud" not satisfied` {
 			return nil, ErrMissingClaims
 		}
 		return nil, ErrUnauthenticated
