@@ -197,3 +197,7 @@ func (m *mockQuerier) UpdateUserPreferences(ctx context.Context, arg sqlc.Update
 func (m *mockQuerier) UpdateUserProfile(ctx context.Context, arg sqlc.UpdateUserProfileParams) (sqlc.User, error) {
 	return sqlc.User{}, nil
 }
+
+func (m *mockQuerier) UpdateUserInviteStatus(ctx context.Context, arg sqlc.UpdateUserInviteStatusParams) (sqlc.User, error) {
+	return sqlc.User{}, nil
+}
