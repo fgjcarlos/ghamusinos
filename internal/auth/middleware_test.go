@@ -181,3 +181,41 @@ func (m *mockUserResolver) Resolve(ctx context.Context, claims *Claims) (*sqlc.U
 	}
 	return nil, ErrUnauthenticated
 }
+
+// mockQuerier for middleware tests (must implement full Querier interface)
+type mockQuerier struct {
+	getActiveInviteFunc func(email string) (sqlc.GetActiveInviteByEmailRow, error)
+}
+
+func (m *mockQuerier) GetActiveInviteByEmail(ctx context.Context, email string) (sqlc.GetActiveInviteByEmailRow, error) {
+	if m.getActiveInviteFunc != nil {
+		return m.getActiveInviteFunc(email)
+	}
+	return sqlc.GetActiveInviteByEmailRow{}, errors.New("not found")
+}
+
+// Implement remaining Querier methods as stubs
+func (m *mockQuerier) GetUserByClerkID(ctx context.Context, clerkUserID string) (sqlc.User, error) {
+	return sqlc.User{}, nil
+}
+func (m *mockQuerier) CreateUser(ctx context.Context, arg sqlc.CreateUserParams) (sqlc.User, error) {
+	return sqlc.User{}, nil
+}
+func (m *mockQuerier) CreateInvite(ctx context.Context, arg sqlc.CreateInviteParams) (sqlc.Invite, error) {
+	return sqlc.Invite{}, nil
+}
+func (m *mockQuerier) GetInviteByTokenHash(ctx context.Context, tokenHash string) (sqlc.Invite, error) {
+	return sqlc.Invite{}, nil
+}
+func (m *mockQuerier) MarkInviteAccepted(ctx context.Context, id pgtype.UUID) error {
+	return nil
+}
+func (m *mockQuerier) UpdateUserPreferences(ctx context.Context, arg sqlc.UpdateUserPreferencesParams) (sqlc.User, error) {
+	return sqlc.User{}, nil
+}
+func (m *mockQuerier) UpdateUserProfile(ctx context.Context, arg sqlc.UpdateUserProfileParams) (sqlc.User, error) {
+	return sqlc.User{}, nil
+}
+func (m *mockQuerier) UpdateUserInviteStatus(ctx context.Context, arg sqlc.UpdateUserInviteStatusParams) (sqlc.User, error) {
+	return sqlc.User{}, nil
+}

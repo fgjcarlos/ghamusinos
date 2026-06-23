@@ -12,7 +12,7 @@ import (
 
 // Test 3.1: Known ClerkID returns existing user
 func TestResolveUser_ExistingUser(t *testing.T) {
-	cache := &mockQuerier{
+	cache := &mockUserQuerier{
 		users: map[string]sqlc.User{
 			"clerk_123": {
 				ID:           pgtype.UUID{Bytes: [16]byte{1}, Valid: true},
@@ -43,7 +43,7 @@ func TestResolveUser_ExistingUser(t *testing.T) {
 
 // Test 3.2: Unknown ClerkID creates pending user on first call
 func TestResolveUser_UnknownClerkID_CreatesUser(t *testing.T) {
-	mockQ := &mockQuerier{
+	mockQ := &mockUserQuerier{
 		users: make(map[string]sqlc.User),
 	}
 
@@ -83,7 +83,7 @@ func TestResolveUser_UnknownClerkID_CreatesUser(t *testing.T) {
 
 // Test 3.3: Race condition on unique constraint handled gracefully
 func TestResolveUser_RaceCondition_Conflict(t *testing.T) {
-	mockQ := &mockQuerier{
+	mockQ := &mockUserQuerier{
 		users: make(map[string]sqlc.User),
 	}
 
@@ -127,7 +127,7 @@ func TestResolveUser_RaceCondition_Conflict(t *testing.T) {
 // Test 3.4: DB error during create returns error
 func TestResolveUser_CreateError(t *testing.T) {
 	dbErr := errors.New("connection lost")
-	cache := &mockQuerier{
+	cache := &mockUserQuerier{
 		onCreateUser: func(clerkID, email, name string) (sqlc.User, error) {
 			return sqlc.User{}, dbErr
 		},
@@ -145,20 +145,20 @@ func TestResolveUser_CreateError(t *testing.T) {
 	}
 }
 
-// Mock querier for testing
-type mockQuerier struct {
+// mockUserQuerier for testing user resolution (with resolver-specific features)
+type mockUserQuerier struct {
 	users        map[string]sqlc.User
 	onCreateUser func(clerkID, email, name string) (sqlc.User, error)
 }
 
-func (m *mockQuerier) GetUserByClerkID(ctx context.Context, clerkUserID string) (sqlc.User, error) {
+func (m *mockUserQuerier) GetUserByClerkID(ctx context.Context, clerkUserID string) (sqlc.User, error) {
 	if user, ok := m.users[clerkUserID]; ok {
 		return user, nil
 	}
 	return sqlc.User{}, errors.New("not found")
 }
 
-func (m *mockQuerier) CreateUser(ctx context.Context, params sqlc.CreateUserParams) (sqlc.User, error) {
+func (m *mockUserQuerier) CreateUser(ctx context.Context, params sqlc.CreateUserParams) (sqlc.User, error) {
 	if m.onCreateUser != nil {
 		return m.onCreateUser(params.ClerkUserID, params.Email, params.DisplayName.String)
 	}
@@ -175,21 +175,24 @@ func (m *mockQuerier) CreateUser(ctx context.Context, params sqlc.CreateUserPara
 }
 
 // Implement remaining Querier methods as stubs
-func (m *mockQuerier) CreateInvite(ctx context.Context, arg sqlc.CreateInviteParams) (sqlc.Invite, error) {
+func (m *mockUserQuerier) CreateInvite(ctx context.Context, arg sqlc.CreateInviteParams) (sqlc.Invite, error) {
 	return sqlc.Invite{}, nil
 }
-func (m *mockQuerier) GetActiveInviteByEmail(ctx context.Context, email string) (sqlc.GetActiveInviteByEmailRow, error) {
+func (m *mockUserQuerier) GetActiveInviteByEmail(ctx context.Context, email string) (sqlc.GetActiveInviteByEmailRow, error) {
 	return sqlc.GetActiveInviteByEmailRow{}, nil
 }
-func (m *mockQuerier) GetInviteByTokenHash(ctx context.Context, tokenHash string) (sqlc.Invite, error) {
+func (m *mockUserQuerier) GetInviteByTokenHash(ctx context.Context, tokenHash string) (sqlc.Invite, error) {
 	return sqlc.Invite{}, nil
 }
-func (m *mockQuerier) MarkInviteAccepted(ctx context.Context, id pgtype.UUID) error {
+func (m *mockUserQuerier) MarkInviteAccepted(ctx context.Context, id pgtype.UUID) error {
 	return nil
 }
-func (m *mockQuerier) UpdateUserPreferences(ctx context.Context, arg sqlc.UpdateUserPreferencesParams) (sqlc.User, error) {
+func (m *mockUserQuerier) UpdateUserPreferences(ctx context.Context, arg sqlc.UpdateUserPreferencesParams) (sqlc.User, error) {
 	return sqlc.User{}, nil
 }
-func (m *mockQuerier) UpdateUserProfile(ctx context.Context, arg sqlc.UpdateUserProfileParams) (sqlc.User, error) {
+func (m *mockUserQuerier) UpdateUserProfile(ctx context.Context, arg sqlc.UpdateUserProfileParams) (sqlc.User, error) {
+	return sqlc.User{}, nil
+}
+func (m *mockUserQuerier) UpdateUserInviteStatus(ctx context.Context, arg sqlc.UpdateUserInviteStatusParams) (sqlc.User, error) {
 	return sqlc.User{}, nil
 }
