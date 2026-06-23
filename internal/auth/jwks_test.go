@@ -25,7 +25,7 @@ func TestJWKSCache_FetchesOnFirstCall(t *testing.T) {
 				},
 			},
 		}
-		json.NewEncoder(w).Encode(jwks)
+		_ = json.NewEncoder(w).Encode(jwks)
 	}))
 	defer server.Close()
 
@@ -56,7 +56,7 @@ func TestJWKSCache_ReturnsCachedKeys(t *testing.T) {
 				},
 			},
 		}
-		json.NewEncoder(w).Encode(jwks)
+		_ = json.NewEncoder(w).Encode(jwks)
 	}))
 	defer server.Close()
 
@@ -94,7 +94,7 @@ func TestJWKSCache_RefreshesAfterTTL(t *testing.T) {
 				},
 			},
 		}
-		json.NewEncoder(w).Encode(jwks)
+		_ = json.NewEncoder(w).Encode(jwks)
 	}))
 	defer server.Close()
 
@@ -148,7 +148,7 @@ func TestJWKSCache_MissingKidReturnsError(t *testing.T) {
 				},
 			},
 		}
-		json.NewEncoder(w).Encode(jwks)
+		_ = json.NewEncoder(w).Encode(jwks)
 	}))
 	defer server.Close()
 
