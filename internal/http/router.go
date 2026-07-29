@@ -13,6 +13,7 @@ import (
 	"github.com/fgjcarlos/ghamusinos/internal/db/sqlc"
 	"github.com/fgjcarlos/ghamusinos/internal/frontend"
 	"github.com/fgjcarlos/ghamusinos/internal/http/handlers"
+	"github.com/fgjcarlos/ghamusinos/internal/strava"
 )
 
 // Server agrupa las dependencias inyectadas necesarias para construir el router.
@@ -22,12 +23,27 @@ type Server struct {
 	pool    handlers.DBPinger
 	queries sqlc.Querier
 	cfg     *config.Config
+	// Strava (opcional, fase 1.2 issue #14): si se setea, monta los
+	// handlers OAuth bajo /api/v1/strava/* después del middleware de auth.
+	stravaClient   *strava.Client
+	stravaStore    strava.TokenStore
+	stravaCipherKey []byte
 }
 
 // NewServer crea un Server con el pool de base de datos y configuración proporcionados.
 // pool puede ser nil en tests sin base de datos; /readyz responderá 503 en ese caso.
 func NewServer(pool handlers.DBPinger, queries sqlc.Querier, cfg *config.Config) *Server {
 	return &Server{pool: pool, queries: queries, cfg: cfg}
+}
+
+// WithStrava cablea los handlers de OAuth Strava al router.
+// Se devuelve *Server para fluent chaining. cipherKey debe tener 32 bytes;
+// si no, los handlers devolverán error en runtime al primer callback.
+func (s *Server) WithStrava(client *strava.Client, store strava.TokenStore, cipherKey []byte) *Server {
+	s.stravaClient = client
+	s.stravaStore = store
+	s.stravaCipherKey = cipherKey
+	return s
 }
 
 // Router construye el handler HTTP con el middleware base y todas las rutas.
@@ -80,6 +96,17 @@ func (s *Server) Router() http.Handler {
 		// v1 API routes
 		r.Route("/v1", func(r chi.Router) {
 			r.Get("/me", handlers.Me(s.queries).ServeHTTP)
+
+			// Strava OAuth (issue #14, fase 1.2): se monta solo si el wiring
+			// inyectó dependencias (cliente + store + cipher key). Las rutas
+			// quedan detrás del middleware de auth: el user_id se toma del
+			// contexto (inyectado por ResolveMiddleware) en vez de query string.
+			if s.stravaClient != nil && s.stravaStore != nil && s.stravaCipherKey != nil {
+				r.Route("/strava", func(r chi.Router) {
+					r.Get("/connect", strava.ConnectHandler(s.stravaClient))
+					r.Get("/callback", strava.CallbackHandler(s.stravaClient, s.stravaStore, s.stravaCipherKey))
+				})
+			}
 
 			// Custom NotFound and MethodNotAllowed for v1 API (RFC 9457 ProblemDetail)
 			r.NotFound(func(w http.ResponseWriter, r *http.Request) {

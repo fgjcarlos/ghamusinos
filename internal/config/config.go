@@ -3,6 +3,7 @@
 package config
 
 import (
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"os"
@@ -28,6 +29,25 @@ type Config struct {
 	ClerkJWKSURL string
 	// ClerkAudience es el valor esperado del claim 'aud' en Clerk JWTs (opcional).
 	ClerkAudience string
+	// Strava contiene la configuración de la integración con Strava
+	// (fase 1.2, issue #14). Es nil si las variables de entorno no
+	// están definidas; en ese caso los handlers OAuth no se montan.
+	Strava *StravaConfig
+}
+
+// StravaConfig agrupa las credenciales de la app Strava global (ADR 0001)
+// y la clave AES-256-GCM usada para cifrar los tokens persistidos.
+//
+// Los tokens de Strava (STRAVA_CLIENT_ID / SECRET) son obligatorios para
+// que la integración funcione. STRAVA_REDIRECT_URL debe coincidir con la
+// URL configurada en la app de Strava. STRAVA_CIPHER_KEY es la clave
+// AES-256 (32 bytes) codificada en base64 estándar.
+type StravaConfig struct {
+	ClientID     string
+	ClientSecret string
+	RedirectURL  string
+	Scopes       string
+	CipherKey    []byte
 }
 
 // Load lee las variables de entorno y devuelve un Config validado.
@@ -69,7 +89,45 @@ func Load() (*Config, error) {
 		return nil, errors.New("config: CLERK_JWKS_URL es obligatoria y está vacía")
 	}
 
+	strava, err := loadStravaConfig()
+	if err != nil {
+		return nil, err
+	}
+	cfg.Strava = strava
+
 	return cfg, nil
+}
+
+// loadStravaConfig lee las variables de Strava. Devuelve nil si la
+// integración no está configurada (faltan CLIENT_ID o CLIENT_SECRET).
+// Devuelve error solo si las variables están definidas pero malformadas
+// (cipher key con base64 inválido, longitud incorrecta, etc.).
+func loadStravaConfig() (*StravaConfig, error) {
+	id := os.Getenv("STRAVA_CLIENT_ID")
+	secret := os.Getenv("STRAVA_CLIENT_SECRET")
+	if id == "" || secret == "" {
+		return nil, nil
+	}
+
+	cipherB64 := os.Getenv("STRAVA_CIPHER_KEY")
+	if cipherB64 == "" {
+		return nil, errors.New("config: STRAVA_CIPHER_KEY es obligatoria cuando STRAVA_CLIENT_ID/SECRET están definidas")
+	}
+	key, err := base64.StdEncoding.DecodeString(cipherB64)
+	if err != nil {
+		return nil, fmt.Errorf("config: STRAVA_CIPHER_KEY no es base64 válido: %w", err)
+	}
+	if len(key) != 32 {
+		return nil, fmt.Errorf("config: STRAVA_CIPHER_KEY debe decodificar a 32 bytes (AES-256), got %d", len(key))
+	}
+
+	return &StravaConfig{
+		ClientID:     id,
+		ClientSecret: secret,
+		RedirectURL:  os.Getenv("STRAVA_REDIRECT_URL"),
+		Scopes:       getEnv("STRAVA_SCOPES", "read,activity:read"),
+		CipherKey:    key,
+	}, nil
 }
 
 // validatePool comprueba que los valores del pool son consistentes.

@@ -14,25 +14,60 @@ import (
 )
 
 // mockQuerier es un stub minimal para tests sin base de datos.
+// Implementa sqlc.Querier completo; los métodos Strava/Activities/Sync
+// devuelven valores cero porque estos tests no ejercitan Strava.
 type mockQuerier struct{}
 
 func (m *mockQuerier) CreateInvite(ctx context.Context, arg sqlc.CreateInviteParams) (sqlc.Invite, error) {
 	return sqlc.Invite{}, nil
 }
+func (m *mockQuerier) CreateSyncSession(ctx context.Context, arg sqlc.CreateSyncSessionParams) (sqlc.SyncSession, error) {
+	return sqlc.SyncSession{}, nil
+}
 func (m *mockQuerier) CreateUser(ctx context.Context, arg sqlc.CreateUserParams) (sqlc.User, error) {
 	return sqlc.User{}, nil
+}
+func (m *mockQuerier) DeleteStravaTokensByUserID(ctx context.Context, userID pgtype.UUID) error {
+	return nil
+}
+func (m *mockQuerier) EnqueueActivityEvent(ctx context.Context, arg sqlc.EnqueueActivityEventParams) (sqlc.ActivityEvent, error) {
+	return sqlc.ActivityEvent{}, nil
 }
 func (m *mockQuerier) GetActiveInviteByEmail(ctx context.Context, email string) (sqlc.GetActiveInviteByEmailRow, error) {
 	return sqlc.GetActiveInviteByEmailRow{}, nil
 }
+func (m *mockQuerier) GetActivityByExternalID(ctx context.Context, arg sqlc.GetActivityByExternalIDParams) (sqlc.Activity, error) {
+	return sqlc.Activity{}, nil
+}
 func (m *mockQuerier) GetInviteByTokenHash(ctx context.Context, tokenHash string) (sqlc.Invite, error) {
 	return sqlc.Invite{}, nil
+}
+func (m *mockQuerier) GetStravaTokensByUserID(ctx context.Context, userID pgtype.UUID) (sqlc.StravaToken, error) {
+	return sqlc.StravaToken{}, nil
 }
 func (m *mockQuerier) GetUserByClerkID(ctx context.Context, clerkID string) (sqlc.User, error) {
 	return sqlc.User{}, nil
 }
+func (m *mockQuerier) ListActivitiesByUser(ctx context.Context, arg sqlc.ListActivitiesByUserParams) ([]sqlc.Activity, error) {
+	return nil, nil
+}
+func (m *mockQuerier) ListPendingActivityEvents(ctx context.Context, limit int32) ([]sqlc.ActivityEvent, error) {
+	return nil, nil
+}
+func (m *mockQuerier) ListSyncSessionsByUser(ctx context.Context, arg sqlc.ListSyncSessionsByUserParams) ([]sqlc.SyncSession, error) {
+	return nil, nil
+}
+func (m *mockQuerier) MarkActivityEventProcessed(ctx context.Context, id pgtype.UUID) error {
+	return nil
+}
 func (m *mockQuerier) MarkInviteAccepted(ctx context.Context, id pgtype.UUID) error {
 	return nil
+}
+func (m *mockQuerier) UpdateSyncSessionProgress(ctx context.Context, arg sqlc.UpdateSyncSessionProgressParams) (sqlc.SyncSession, error) {
+	return sqlc.SyncSession{}, nil
+}
+func (m *mockQuerier) UpdateSyncSessionStatus(ctx context.Context, arg sqlc.UpdateSyncSessionStatusParams) (sqlc.SyncSession, error) {
+	return sqlc.SyncSession{}, nil
 }
 func (m *mockQuerier) UpdateUserInviteStatus(ctx context.Context, arg sqlc.UpdateUserInviteStatusParams) (sqlc.User, error) {
 	return sqlc.User{}, nil
@@ -42,6 +77,15 @@ func (m *mockQuerier) UpdateUserPreferences(ctx context.Context, arg sqlc.Update
 }
 func (m *mockQuerier) UpdateUserProfile(ctx context.Context, arg sqlc.UpdateUserProfileParams) (sqlc.User, error) {
 	return sqlc.User{}, nil
+}
+func (m *mockQuerier) UpsertActivity(ctx context.Context, arg sqlc.UpsertActivityParams) (sqlc.Activity, error) {
+	return sqlc.Activity{}, nil
+}
+func (m *mockQuerier) UpsertActivityStream(ctx context.Context, arg sqlc.UpsertActivityStreamParams) (sqlc.ActivityStream, error) {
+	return sqlc.ActivityStream{}, nil
+}
+func (m *mockQuerier) UpsertStravaTokens(ctx context.Context, arg sqlc.UpsertStravaTokensParams) (sqlc.StravaToken, error) {
+	return sqlc.StravaToken{}, nil
 }
 
 // nuevoServidor es un helper de test que crea un Server con pool nil

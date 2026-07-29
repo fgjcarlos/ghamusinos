@@ -10,11 +10,14 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/jackc/pgx/v5/pgxpool"
+
 	"github.com/fgjcarlos/ghamusinos/internal/config"
 	"github.com/fgjcarlos/ghamusinos/internal/db"
 	"github.com/fgjcarlos/ghamusinos/internal/db/sqlc"
 	apphttp "github.com/fgjcarlos/ghamusinos/internal/http"
 	"github.com/fgjcarlos/ghamusinos/internal/jobs"
+	"github.com/fgjcarlos/ghamusinos/internal/strava"
 )
 
 const shutdownTimeout = 10 * time.Second
@@ -60,7 +63,7 @@ func Run() error {
 	addr := ":" + cfg.Port
 	srv := &http.Server{
 		Addr:              addr,
-		Handler:           apphttp.NewServer(pool, queries, cfg).Router(),
+		Handler:           buildRouter(cfg, pool, queries),
 		ReadHeaderTimeout: 5 * time.Second,
 		ReadTimeout:       15 * time.Second,
 		WriteTimeout:      15 * time.Second,
@@ -93,4 +96,36 @@ func Run() error {
 		<-errCh
 		return nil
 	}
+}
+
+// buildRouter monta el router con todas las dependencias cableadas.
+// Se extrae de Run() para que app_test.go pueda construir un server
+// equivalente sin arrancarlo.
+//
+// Strava (issue #14, fase 1.2) se monta solo si cfg.Strava != nil
+// (vars de entorno presentes). En su ausencia, /api/v1/strava/* no
+// existe como ruta — comportamiento correcto bajo el NotFound del grupo v1.
+func buildRouter(cfg *config.Config, pool *pgxpool.Pool, queries sqlc.Querier) http.Handler {
+	server := apphttp.NewServer(pool, queries, cfg)
+
+	if cfg.Strava != nil {
+		stravaClient, err := strava.NewClient(strava.Config{
+			ClientID:     cfg.Strava.ClientID,
+			ClientSecret: cfg.Strava.ClientSecret,
+			RedirectURL:  cfg.Strava.RedirectURL,
+			Scopes:       cfg.Strava.Scopes,
+		})
+		if err != nil {
+			// NewClient solo falla si ClientID/Secret están vacíos;
+			// loadStravaConfig ya validó eso, así que esto es paranoia
+			// defense-in-depth: log y continuamos sin Strava.
+			slog.Warn("strava: cliente no inicializado, rutas OAuth deshabilitadas", "err", err)
+		} else {
+			store := strava.NewSQLCTokenStore(queries)
+			server.WithStrava(stravaClient, store, cfg.Strava.CipherKey)
+			slog.Info("strava: rutas OAuth habilitadas", "redirect", cfg.Strava.RedirectURL)
+		}
+	}
+
+	return server.Router()
 }

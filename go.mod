@@ -4,12 +4,14 @@ go 1.25.7
 
 require (
 	github.com/go-chi/chi/v5 v5.3.1
+	github.com/google/uuid v1.6.0
 	github.com/jackc/pgx/v5 v5.10.0
 	github.com/joho/godotenv v1.5.1
 	github.com/lestrrat-go/jwx/v2 v2.1.7
 	github.com/pressly/goose/v3 v3.27.3
 	github.com/riverqueue/river v0.41.0
 	github.com/riverqueue/river/riverdriver/riverpgxv5 v0.41.0
+	github.com/sethvargo/go-retry v0.4.0
 )
 
 require (
@@ -30,7 +32,6 @@ require (
 	github.com/riverqueue/river/rivershared v0.41.0 // indirect
 	github.com/riverqueue/river/rivertype v0.41.0 // indirect
 	github.com/segmentio/asm v1.2.1 // indirect
-	github.com/sethvargo/go-retry v0.4.0 // indirect
 	github.com/stretchr/testify v1.11.1 // indirect
 	github.com/tidwall/gjson v1.19.0 // indirect
 	github.com/tidwall/match v1.2.0 // indirect
