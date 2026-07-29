@@ -27,7 +27,7 @@ func TestBuildRouter_WithoutStrava(t *testing.T) {
 		"/api/v1/strava/connect",
 		"/api/v1/strava/callback",
 	} {
-		req := httptest.NewRequest(http.MethodGet, path, nil)
+		req := httptest.NewRequestWithContext(context.Background(), http.MethodGet, path, nil)
 		rec := httptest.NewRecorder()
 		h.ServeHTTP(rec, req)
 		// Sin Strava configurado, las rutas no se montan: el NotFound
@@ -49,7 +49,7 @@ func TestBuildRouter_HealthzAliveWithoutPool(t *testing.T) {
 	h := buildRouter(cfg, nil, nil)
 
 	rec := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/healthz", nil)
+	req := httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/healthz", nil)
 	h.ServeHTTP(rec, req)
 	if rec.Code != http.StatusOK {
 		t.Errorf("/healthz: status = %d, want 200", rec.Code)
@@ -88,7 +88,7 @@ func TestBuildRouter_ConnectHandlerMountedWhenStravaConfigured(t *testing.T) {
 	server.WithStrava(client, store, key)
 	h := server.Router()
 
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/strava/connect", nil)
+	req := httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/api/v1/strava/connect", nil)
 	rec := httptest.NewRecorder()
 	h.ServeHTTP(rec, req)
 

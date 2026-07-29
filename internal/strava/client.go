@@ -237,7 +237,7 @@ func (c *Client) doJSON(ctx context.Context, req *http.Request, out any) error {
 			lastErr = err
 			return retry.RetryableError(err)
 		}
-		defer resp.Body.Close()
+		defer func() { _ = resp.Body.Close() }()
 
 		switch {
 		case resp.StatusCode == http.StatusUnauthorized:
