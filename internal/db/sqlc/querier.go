@@ -12,7 +12,17 @@ import (
 
 type Querier interface {
 	CreateInvite(ctx context.Context, arg CreateInviteParams) (Invite, error)
+	// Crea una nueva sesión de sincronización en estado 'pending'. El caller la
+	// transita a 'running' con UpdateSyncSessionStatus cuando empieza a procesar.
+	CreateSyncSession(ctx context.Context, arg CreateSyncSessionParams) (SyncSession, error)
 	CreateUser(ctx context.Context, arg CreateUserParams) (User, error)
+	// Limpia los tokens del usuario (logout / desvinculación).
+	DeleteStravaTokensByUserID(ctx context.Context, userID pgtype.UUID) error
+	// Encola un evento de Strava (webhook). Devuelve la fila; si external_id
+	// ya existe, devuelve la fila previa sin error (idempotencia). Los callers
+	// pueden distinguir "nuevo" vs "ya visto" comparando received_at, o vía
+	// INSERT ... ON CONFLICT DO NOTHING RETURNING (cuando lo necesitemos).
+	EnqueueActivityEvent(ctx context.Context, arg EnqueueActivityEventParams) (ActivityEvent, error)
 	// Devuelve la invitación vigente para un email dado.
 	// "Vigente" significa: status pending o accepted, y no expirada
 	// (expires_at es NULL o está en el futuro).
@@ -20,15 +30,47 @@ type Querier interface {
 	// Puede haber varias vigentes a la vez (una accepted histórica + una pending
 	// reenviada): se devuelve la más reciente de forma determinista.
 	GetActiveInviteByEmail(ctx context.Context, email string) (GetActiveInviteByEmailRow, error)
+	// Búsqueda idempotente por (usuario, fuente, id externo). Es la operación
+	// central de la deduplicación: si existe, se actualiza; si no, se inserta.
+	GetActivityByExternalID(ctx context.Context, arg GetActivityByExternalIDParams) (Activity, error)
 	GetInviteByTokenHash(ctx context.Context, tokenHash string) (Invite, error)
+	// Recupera los tokens OAuth de Strava de un usuario (cifrados).
+	GetStravaTokensByUserID(ctx context.Context, userID pgtype.UUID) (StravaToken, error)
 	GetUserByClerkID(ctx context.Context, clerkUserID string) (User, error)
+	// Lista paginada de actividades del usuario, ordenadas de más reciente a
+	// más antigua. El LIMIT es por la query (no cursor) porque el uso esperado
+	// es UI paginada con offset; cuando se necesite cursor, se añadirá en su
+	// propia query sin tocar esta.
+	ListActivitiesByUser(ctx context.Context, arg ListActivitiesByUserParams) ([]Activity, error)
+	// Lista los eventos pendientes (processed_at IS NULL) para alimentar un
+	// job de procesamiento. LIMIT defensivo para evitar scans descontrolados.
+	ListPendingActivityEvents(ctx context.Context, limit int32) ([]ActivityEvent, error)
+	// Lista las sesiones de sincronización del usuario, más recientes primero.
+	ListSyncSessionsByUser(ctx context.Context, arg ListSyncSessionsByUserParams) ([]SyncSession, error)
+	// Marca un evento como procesado una vez consumido por el job.
+	MarkActivityEventProcessed(ctx context.Context, id pgtype.UUID) error
 	MarkInviteAccepted(ctx context.Context, id pgtype.UUID) error
+	// Actualiza los contadores de progreso sin tocar status/finished_at.
+	UpdateSyncSessionProgress(ctx context.Context, arg UpdateSyncSessionProgressParams) (SyncSession, error)
+	// Cambia el estado de la sesión. Si falla el job, se guarda el error.
+	UpdateSyncSessionStatus(ctx context.Context, arg UpdateSyncSessionStatusParams) (SyncSession, error)
 	UpdateUserInviteStatus(ctx context.Context, arg UpdateUserInviteStatusParams) (User, error)
 	// Actualiza las preferencias de entrenamiento e IA del usuario (fase 1.1).
 	// Las métricas pueden ir a NULL si el usuario no las conoce; timezone y
 	// ai_enabled siempre llevan valor (tienen default en el schema).
 	UpdateUserPreferences(ctx context.Context, arg UpdateUserPreferencesParams) (User, error)
 	UpdateUserProfile(ctx context.Context, arg UpdateUserProfileParams) (User, error)
+	// Inserción idempotente de actividad normalizada. Devuelve la fila final
+	// (insertada o actualizada) junto con xmax=0 → insert, xmax<>0 → update,
+	// expuesto vía RETURNING para que el caller distinga el caso.
+	UpsertActivity(ctx context.Context, arg UpsertActivityParams) (Activity, error)
+	// Guarda/actualiza un stream concreto de una actividad (HR, watts, ...).
+	// PRIMARY KEY (activity_id, stream_type) hace el upsert natural.
+	UpsertActivityStream(ctx context.Context, arg UpsertActivityStreamParams) (ActivityStream, error)
+	// Inserta o reemplaza los tokens OAuth cifrados de un usuario.
+	// Strava solo permite un set de tokens activo por usuario; ON CONFLICT cubre
+	// el caso "usuario reconecta" y el refresh que rota access_token.
+	UpsertStravaTokens(ctx context.Context, arg UpsertStravaTokensParams) (StravaToken, error)
 }
 
 var _ Querier = (*Queries)(nil)

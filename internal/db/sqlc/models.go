@@ -9,6 +9,44 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+type Activity struct {
+	ID             pgtype.UUID        `json:"id"`
+	UserID         pgtype.UUID        `json:"user_id"`
+	ExternalSource string             `json:"external_source"`
+	ExternalID     int64              `json:"external_id"`
+	Name           string             `json:"name"`
+	SportType      string             `json:"sport_type"`
+	StartedAt      pgtype.Timestamptz `json:"started_at"`
+	ElapsedSeconds int32              `json:"elapsed_seconds"`
+	MovingSeconds  int32              `json:"moving_seconds"`
+	DistanceMeters pgtype.Numeric     `json:"distance_meters"`
+	ElevationGainM pgtype.Numeric     `json:"elevation_gain_m"`
+	AvgHr          pgtype.Int2        `json:"avg_hr"`
+	MaxHr          pgtype.Int2        `json:"max_hr"`
+	AvgPower       pgtype.Int2        `json:"avg_power"`
+	RawPayload     []byte             `json:"raw_payload"`
+	CreatedAt      pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt      pgtype.Timestamptz `json:"updated_at"`
+}
+
+type ActivityEvent struct {
+	ID          pgtype.UUID        `json:"id"`
+	ExternalID  string             `json:"external_id"`
+	UserID      pgtype.UUID        `json:"user_id"`
+	ObjectType  string             `json:"object_type"`
+	AspectType  string             `json:"aspect_type"`
+	ObjectID    int64              `json:"object_id"`
+	ReceivedAt  pgtype.Timestamptz `json:"received_at"`
+	ProcessedAt pgtype.Timestamptz `json:"processed_at"`
+	RawPayload  []byte             `json:"raw_payload"`
+}
+
+type ActivityStream struct {
+	ActivityID pgtype.UUID `json:"activity_id"`
+	StreamType string      `json:"stream_type"`
+	Data       []byte      `json:"data"`
+}
+
 type Invite struct {
 	ID         pgtype.UUID        `json:"id"`
 	Email      string             `json:"email"`
@@ -17,6 +55,30 @@ type Invite struct {
 	ExpiresAt  pgtype.Timestamptz `json:"expires_at"`
 	AcceptedAt pgtype.Timestamptz `json:"accepted_at"`
 	CreatedAt  pgtype.Timestamptz `json:"created_at"`
+}
+
+type StravaToken struct {
+	UserID        pgtype.UUID        `json:"user_id"`
+	AccessCipher  string             `json:"access_cipher"`
+	RefreshCipher string             `json:"refresh_cipher"`
+	ExpiresAt     pgtype.Timestamptz `json:"expires_at"`
+	AthleteID     int64              `json:"athlete_id"`
+	Scopes        string             `json:"scopes"`
+	CreatedAt     pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt     pgtype.Timestamptz `json:"updated_at"`
+}
+
+type SyncSession struct {
+	ID              pgtype.UUID        `json:"id"`
+	UserID          pgtype.UUID        `json:"user_id"`
+	Status          string             `json:"status"`
+	WindowDays      int32              `json:"window_days"`
+	TotalActivities int32              `json:"total_activities"`
+	Imported        int32              `json:"imported"`
+	Skipped         int32              `json:"skipped"`
+	Error           pgtype.Text        `json:"error"`
+	StartedAt       pgtype.Timestamptz `json:"started_at"`
+	FinishedAt      pgtype.Timestamptz `json:"finished_at"`
 }
 
 type User struct {

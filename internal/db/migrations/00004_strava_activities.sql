@@ -1,44 +1,9 @@
--- Schema de base de datos de Ghamusinos.
--- Este fichero es usado exclusivamente por SQLC para generar código tipado.
--- Las migraciones reales se gestionan con Goose en internal/db/migrations/.
+-- +goose Up
+-- +goose StatementBegin
 
-CREATE TABLE users (
-    id              UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
-    clerk_user_id   TEXT        NOT NULL UNIQUE,
-    email           TEXT        NOT NULL,
-    display_name    TEXT,
-    invite_status   TEXT        NOT NULL DEFAULT 'pending'
-                                CHECK (invite_status IN ('pending', 'active', 'blocked')),
-    -- Preferencias iniciales del usuario (fase 1.1). Métricas fisiológicas
-    -- opcionales (consumidas desde la fase 1.4); ai_enabled gobierna la IA.
-    hr_max          SMALLINT    CONSTRAINT users_hr_max_valido CHECK (hr_max IS NULL OR (hr_max > 0 AND hr_max <= 260)),
-    lthr            SMALLINT    CONSTRAINT users_lthr_valido   CHECK (lthr   IS NULL OR (lthr   > 0 AND lthr   <= 260)),
-    ftp             SMALLINT    CONSTRAINT users_ftp_valido    CHECK (ftp    IS NULL OR (ftp    > 0 AND ftp    <= 2000)),
-    level           TEXT        CONSTRAINT users_level_valido  CHECK (level  IS NULL OR level IN ('beginner', 'intermediate', 'advanced')),
-    timezone        TEXT        NOT NULL DEFAULT 'UTC'
-                                CONSTRAINT users_timezone_valido CHECK (timezone <> ''),
-    ai_enabled      BOOLEAN     NOT NULL DEFAULT true,
-    created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
-    updated_at      TIMESTAMPTZ NOT NULL DEFAULT now()
-);
-
-CREATE UNIQUE INDEX idx_users_email ON users (email);
-
-CREATE TABLE invites (
-    id          UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
-    email       TEXT        NOT NULL,
-    token_hash  TEXT        NOT NULL UNIQUE,
-    status      TEXT        NOT NULL DEFAULT 'pending'
-                            CHECK (status IN ('pending', 'accepted', 'revoked', 'expired')),
-    expires_at  TIMESTAMPTZ,
-    accepted_at TIMESTAMPTZ,
-    created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
-);
-
-CREATE UNIQUE INDEX idx_invites_email_pending ON invites (email) WHERE status = 'pending';
-
--- Fase 1.2 — Ingesta Strava (issue #14).
--- strava_tokens: un único set de credenciales OAuth por usuario, cifrado.
+-- Tokens OAuth de Strava del usuario (fase 1.2; ADR 0001).
+-- Se almacenan cifrados con AES-256-GCM (internal/crypto): la columna guarda
+-- el sobre (nonce || ciphertext || tag) codificado en base64.
 CREATE TABLE strava_tokens (
     user_id          UUID        PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
     access_cipher    TEXT        NOT NULL,
@@ -52,8 +17,9 @@ CREATE TABLE strava_tokens (
 
 CREATE INDEX idx_strava_tokens_expires_at ON strava_tokens (expires_at);
 
--- Modelo canónico de actividad. La UNIQUE (user, source, external_id) es
--- la base de la deduplicación.
+-- Modelo canónico de actividad (fase 1.2; feature-inventory §5).
+-- external_id es el id de Strava; la unicidad por usuario+external_id es la
+-- base de la deduplicación (re-ingesta idempotente).
 CREATE TABLE activities (
     id                  UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id             UUID        NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -78,7 +44,10 @@ CREATE TABLE activities (
 
 CREATE INDEX idx_activities_user_started ON activities (user_id, started_at DESC);
 
--- Streams por (actividad, tipo) en JSONB.
+-- Streams de Strava (HR, potencia, cadencia, altitud, latlng): los guardamos
+-- como JSONB para no explosion en columnas y poder evolucionar el conjunto
+-- de claves sin migraciones. Una fila por (actividad, tipo) — tipos
+-- habituales en Strava: heartrate, watts, cadence, altitude, latlng, ...
 CREATE TABLE activity_streams (
     activity_id     UUID        NOT NULL REFERENCES activities(id) ON DELETE CASCADE,
     stream_type     TEXT        NOT NULL,
@@ -86,7 +55,9 @@ CREATE TABLE activity_streams (
     PRIMARY KEY (activity_id, stream_type)
 );
 
--- Inbox idempotente de webhooks Strava.
+-- Inbox idempotente de webhooks Strava (fase 1.2; feature-inventory §5).
+-- external_id es el id que Strava asigna al evento; UNIQUE evita reproceso.
+-- Procesados = NULL significa "pendiente de procesar".
 CREATE TABLE activity_events (
     id              UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
     external_id     TEXT        NOT NULL UNIQUE,
@@ -101,7 +72,8 @@ CREATE TABLE activity_events (
 
 CREATE INDEX idx_activity_events_pending ON activity_events (received_at) WHERE processed_at IS NULL;
 
--- Sesión de sincronización con progreso.
+-- Sesión de sincronización con progreso (fase 1.2; feature-inventory §5).
+-- status: pending → running → completed | failed | cancelled.
 CREATE TABLE sync_sessions (
     id              UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id         UUID        NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -117,3 +89,16 @@ CREATE TABLE sync_sessions (
 );
 
 CREATE INDEX idx_sync_sessions_user_started ON sync_sessions (user_id, started_at DESC);
+
+-- +goose StatementEnd
+
+-- +goose Down
+-- +goose StatementBegin
+
+DROP TABLE IF EXISTS sync_sessions;
+DROP TABLE IF EXISTS activity_events;
+DROP TABLE IF EXISTS activity_streams;
+DROP TABLE IF EXISTS activities;
+DROP TABLE IF EXISTS strava_tokens;
+
+-- +goose StatementEnd

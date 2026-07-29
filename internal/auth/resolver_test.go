@@ -201,3 +201,49 @@ func (m *mockQuerier) UpdateUserProfile(ctx context.Context, arg sqlc.UpdateUser
 func (m *mockQuerier) UpdateUserInviteStatus(ctx context.Context, arg sqlc.UpdateUserInviteStatusParams) (sqlc.User, error) {
 	return sqlc.User{}, nil
 }
+
+// Stubs para los métodos añadidos en fase 1.2 (issue #14 Strava).
+// Estos tests no los ejercitan, pero el mock debe implementar la
+// interfaz completa para que el compilador no proteste.
+func (m *mockQuerier) CreateSyncSession(ctx context.Context, arg sqlc.CreateSyncSessionParams) (sqlc.SyncSession, error) {
+	return sqlc.SyncSession{}, nil
+}
+func (m *mockQuerier) DeleteStravaTokensByUserID(ctx context.Context, userID pgtype.UUID) error {
+	return nil
+}
+func (m *mockQuerier) EnqueueActivityEvent(ctx context.Context, arg sqlc.EnqueueActivityEventParams) (sqlc.ActivityEvent, error) {
+	return sqlc.ActivityEvent{}, nil
+}
+func (m *mockQuerier) GetActivityByExternalID(ctx context.Context, arg sqlc.GetActivityByExternalIDParams) (sqlc.Activity, error) {
+	return sqlc.Activity{}, nil
+}
+func (m *mockQuerier) GetStravaTokensByUserID(ctx context.Context, userID pgtype.UUID) (sqlc.StravaToken, error) {
+	return sqlc.StravaToken{}, nil
+}
+func (m *mockQuerier) ListActivitiesByUser(ctx context.Context, arg sqlc.ListActivitiesByUserParams) ([]sqlc.Activity, error) {
+	return nil, nil
+}
+func (m *mockQuerier) ListPendingActivityEvents(ctx context.Context, limit int32) ([]sqlc.ActivityEvent, error) {
+	return nil, nil
+}
+func (m *mockQuerier) ListSyncSessionsByUser(ctx context.Context, arg sqlc.ListSyncSessionsByUserParams) ([]sqlc.SyncSession, error) {
+	return nil, nil
+}
+func (m *mockQuerier) MarkActivityEventProcessed(ctx context.Context, id pgtype.UUID) error {
+	return nil
+}
+func (m *mockQuerier) UpdateSyncSessionProgress(ctx context.Context, arg sqlc.UpdateSyncSessionProgressParams) (sqlc.SyncSession, error) {
+	return sqlc.SyncSession{}, nil
+}
+func (m *mockQuerier) UpdateSyncSessionStatus(ctx context.Context, arg sqlc.UpdateSyncSessionStatusParams) (sqlc.SyncSession, error) {
+	return sqlc.SyncSession{}, nil
+}
+func (m *mockQuerier) UpsertActivity(ctx context.Context, arg sqlc.UpsertActivityParams) (sqlc.Activity, error) {
+	return sqlc.Activity{}, nil
+}
+func (m *mockQuerier) UpsertActivityStream(ctx context.Context, arg sqlc.UpsertActivityStreamParams) (sqlc.ActivityStream, error) {
+	return sqlc.ActivityStream{}, nil
+}
+func (m *mockQuerier) UpsertStravaTokens(ctx context.Context, arg sqlc.UpsertStravaTokensParams) (sqlc.StravaToken, error) {
+	return sqlc.StravaToken{}, nil
+}
