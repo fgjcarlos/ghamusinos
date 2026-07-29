@@ -20,8 +20,13 @@ jobs:
     runs-on: ubuntu-latest
 
     services:
+      # Usamos la misma imagen TimescaleDB que docker-compose.yml (issue #28)
+      # para que los tests de CI y el entorno de desarrollo ejecuten las
+      # migraciones contra el mismo motor. Si una migración crea hypertables
+      # o usa funciones específicas de Timescale, fallaría contra un
+      # postgres puro.
       postgres:
-        image: postgres:16-alpine
+        image: timescale/timescaledb:2.27.2-pg16
         env:
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: postgres
