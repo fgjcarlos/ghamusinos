@@ -25,8 +25,8 @@ type Server struct {
 	cfg     *config.Config
 	// Strava (opcional, fase 1.2 issue #14): si se setea, monta los
 	// handlers OAuth bajo /api/v1/strava/* después del middleware de auth.
-	stravaClient   *strava.Client
-	stravaStore    strava.TokenStore
+	stravaClient    *strava.Client
+	stravaStore     strava.TokenStore
 	stravaCipherKey []byte
 }
 

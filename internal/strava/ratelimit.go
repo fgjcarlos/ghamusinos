@@ -28,10 +28,10 @@ import (
 // ponytail: token bucket en memoria, suficiente para un único proceso.
 // Cuando se escale a N réplicas, mover a Redis (mismas dos ventanas).
 type rateLimiter struct {
-	shortCap   int
-	shortWin   time.Duration
-	dailyCap   int
-	dailyWin   time.Duration
+	shortCap int
+	shortWin time.Duration
+	dailyCap int
+	dailyWin time.Duration
 
 	mu          sync.Mutex
 	shortTokens int
@@ -43,10 +43,10 @@ type rateLimiter struct {
 func newRateLimiter(shortCap int, shortWin time.Duration, dailyCap int) *rateLimiter {
 	now := time.Now()
 	return &rateLimiter{
-		shortCap:   shortCap,
-		shortWin:   shortWin,
-		dailyCap:   dailyCap,
-		dailyWin:   24 * time.Hour,
+		shortCap: shortCap,
+		shortWin: shortWin,
+		dailyCap: dailyCap,
+		dailyWin: 24 * time.Hour,
 
 		shortTokens: shortCap,
 		shortStart:  now,

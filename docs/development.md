@@ -74,3 +74,15 @@ El workflow `.github/workflows/ci.yml` corre en cada push a `main` y en cada PR:
 
 - **backend**: `gofmt`, `go vet`, `go test`, `go build` y un smoke de migraciones contra un PostgreSQL de servicio.
 - **frontend**: `pnpm install` + `pnpm build`.
+
+## Flujo de trabajo con ramas y PRs
+
+El repo sigue una disciplina estricta para evitar acumulación de ramas muertas:
+
+1. **Toda cambio mergeable va por PR.** No se pushea directo a `main`.
+2. **Cada rama tiene un propósito y un nombre descriptivo** (`feat/...`, `fix/...`, `chore/...`, `docs/...`). Para más detalle sobre la convención de títulos y fases, ver `docs/roadmap/issue-backlog.md`.
+3. **El cuerpo del commit sigue conventional commits** (`feat:`, `fix:`, `chore:`, etc.) y referencia la issue que cierra (`Closes #N`).
+4. **Auto-delete de ramas está activado** en la configuración del repo (Settings → General → Pull Requests → "Automatically delete head branches"). Cuando una PR se mergea, su rama se borra automáticamente del remoto.
+5. **Ramas abandonadas** (trabajo que nunca llegó a PR) se archivan en local con el prefijo `archive/<nombre-rama>` antes de borrar la remota. Si querés resurrectir trabajo viejo, las tags `archive/stale-*` mantienen los SHAs disponibles mientras el reflog no los recolecte.
+
+> Si abrís una rama nueva y la dejás sin abrir PR durante más de 2 semanas, es razonable cerrarla y archivar el trabajo. Mantener el remoto limpio es responsabilidad de quien abrió la rama.

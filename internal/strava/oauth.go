@@ -2,28 +2,28 @@
 //
 // Estos handlers implementan el flujo "Conectar con Strava" de ADR 0001:
 //
-//   GET /api/v1/strava/connect?user_id=<uuid>
-//     → redirige al usuario a la pantalla de consentimiento de Strava.
+//	GET /api/v1/strava/connect?user_id=<uuid>
+//	  → redirige al usuario a la pantalla de consentimiento de Strava.
 //
-//   GET /api/v1/strava/callback?code=...&state=...
-//     → Strava redirige aquí tras el consentimiento. Intercambiamos
-//       el code por tokens, los ciframos y los guardamos.
+//	GET /api/v1/strava/callback?code=...&state=...
+//	  → Strava redirige aquí tras el consentimiento. Intercambiamos
+//	    el code por tokens, los ciframos y los guardamos.
 //
 // # Alcance de este esqueleto (issue #14, opción A)
 //
-// - El handshake OAuth funciona y persiste tokens cifrados.
-// - El parámetro state se valida no-vacío (CSRF real se delega a Clerk
-//   en producción; ver TODO).
-// - user_id se recibe por query para evitar acoplar este stub al
-//   middleware de auth — la wiring real se hace en la fase de
-//   autenticación cuando se conecte Clerk.
+//   - El handshake OAuth funciona y persiste tokens cifrados.
+//   - El parámetro state se valida no-vacío (CSRF real se delega a Clerk
+//     en producción; ver TODO).
+//   - user_id se recibe por query para evitar acoplar este stub al
+//     middleware de auth — la wiring real se hace en la fase de
+//     autenticación cuando se conecte Clerk.
 //
 // # Lo que NO hace este esqueleto
 //
-// - No envía al usuario al frontend tras conectar (front lo resuelve #90).
-// - No expone endpoints de "desconectar" (se hace con DeleteStravaTokensByUserID,
-//   ya cubierto en sqlc).
-// - No implementa refresh proactivo (es responsabilidad del job de ingest).
+//   - No envía al usuario al frontend tras conectar (front lo resuelve #90).
+//   - No expone endpoints de "desconectar" (se hace con DeleteStravaTokensByUserID,
+//     ya cubierto en sqlc).
+//   - No implementa refresh proactivo (es responsabilidad del job de ingest).
 package strava
 
 import (
@@ -51,12 +51,12 @@ type TokenStore interface {
 // PersistedTokens es el sobre que SaveTokens recibe: los ciphertexts
 // ya en base64 y los metadatos que NO se cifran.
 type PersistedTokens struct {
-	UserID       string
-	AccessCipher string
+	UserID        string
+	AccessCipher  string
 	RefreshCipher string
-	ExpiresAt    time.Time
-	AthleteID    int64
-	Scopes       string
+	ExpiresAt     time.Time
+	AthleteID     int64
+	Scopes        string
 }
 
 // ConnectHandler devuelve el handler para /api/v1/strava/connect.

@@ -92,7 +92,7 @@ func TestConnectHandler_ReturnsAuthorizeURLAndState(t *testing.T) {
 	c, srv := stravaSrvForOAuth(t)
 	defer srv.Close()
 
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/strava/connect", nil)
+	req := httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/api/v1/strava/connect", nil)
 	rec := httptest.NewRecorder()
 	ConnectHandler(c)(rec, req)
 
@@ -134,10 +134,12 @@ func TestConnectHandler_StateUnique(t *testing.T) {
 	defer srv.Close()
 
 	get := func() string {
-		req := httptest.NewRequest(http.MethodGet, "/api/v1/strava/connect", nil)
+		req := httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/api/v1/strava/connect", nil)
 		rec := httptest.NewRecorder()
 		ConnectHandler(c)(rec, req)
-		var body struct{ State string `json:"state"` }
+		var body struct {
+			State string `json:"state"`
+		}
 		_ = json.NewDecoder(rec.Body).Decode(&body)
 		return body.State
 	}
@@ -271,7 +273,7 @@ func TestCallbackHandler_HTTPIntegration(t *testing.T) {
 	store := &fakeTokenStore{}
 
 	handler := CallbackHandler(c, store, key)
-	req := httptest.NewRequest(http.MethodGet,
+	req := httptest.NewRequestWithContext(context.Background(), http.MethodGet,
 		"/api/v1/strava/callback?code=the-code&state=the-state",
 		nil)
 	// Inyectamos el usuario resuelto por el middleware de auth.
@@ -306,10 +308,10 @@ func TestCallbackHandler_BadRequest(t *testing.T) {
 	ctx := auth.WithAuthUser(context.Background(), &auth.User{ID: "u"})
 
 	for _, q := range []string{
-		"/api/v1/strava/callback?state=s",     // sin code
-		"/api/v1/strava/callback?code=c",      // sin state
+		"/api/v1/strava/callback?state=s", // sin code
+		"/api/v1/strava/callback?code=c",  // sin state
 	} {
-		req := httptest.NewRequest(http.MethodGet, q, nil).WithContext(ctx)
+		req := httptest.NewRequestWithContext(context.Background(), http.MethodGet, q, nil).WithContext(ctx)
 		rec := httptest.NewRecorder()
 		handler(rec, req)
 		if rec.Code != http.StatusBadRequest {
@@ -327,7 +329,7 @@ func TestCallbackHandler_NoUser(t *testing.T) {
 	store := &fakeTokenStore{}
 	handler := CallbackHandler(c, store, nil)
 
-	req := httptest.NewRequest(http.MethodGet,
+	req := httptest.NewRequestWithContext(context.Background(), http.MethodGet,
 		"/api/v1/strava/callback?code=c&state=s", nil)
 	rec := httptest.NewRecorder()
 	handler(rec, req)

@@ -7,10 +7,10 @@
 //
 // # Modelo de amenaza
 //
-// - NO protege contra un atacante que también tiene la KEY (si la DB está
-//   comprometida Y el .env también, no hay defensa).
-// - SÍ protege contra robo de backup de la DB, acceso SQL con un usuario
-//   de aplicación sin acceso a la KEY, o un dump filtrado.
+//   - NO protege contra un atacante que también tiene la KEY (si la DB está
+//     comprometida Y el .env también, no hay defensa).
+//   - SÍ protege contra robo de backup de la DB, acceso SQL con un usuario
+//     de aplicación sin acceso a la KEY, o un dump filtrado.
 //
 // # Gestión de la KEY
 //
