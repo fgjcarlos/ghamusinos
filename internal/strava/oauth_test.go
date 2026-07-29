@@ -137,7 +137,9 @@ func TestConnectHandler_StateUnique(t *testing.T) {
 		req := httptest.NewRequest(http.MethodGet, "/api/v1/strava/connect", nil)
 		rec := httptest.NewRecorder()
 		ConnectHandler(c)(rec, req)
-		var body struct{ State string `json:"state"` }
+		var body struct {
+			State string `json:"state"`
+		}
 		_ = json.NewDecoder(rec.Body).Decode(&body)
 		return body.State
 	}
@@ -306,8 +308,8 @@ func TestCallbackHandler_BadRequest(t *testing.T) {
 	ctx := auth.WithAuthUser(context.Background(), &auth.User{ID: "u"})
 
 	for _, q := range []string{
-		"/api/v1/strava/callback?state=s",     // sin code
-		"/api/v1/strava/callback?code=c",      // sin state
+		"/api/v1/strava/callback?state=s", // sin code
+		"/api/v1/strava/callback?code=c",  // sin state
 	} {
 		req := httptest.NewRequest(http.MethodGet, q, nil).WithContext(ctx)
 		rec := httptest.NewRecorder()

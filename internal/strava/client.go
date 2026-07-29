@@ -36,8 +36,8 @@ const (
 	// Rate limits por app (NO por usuario). Documentados por Strava:
 	// 200 requests / 15 minutos, 2000 requests / día.
 	RateLimitShortWindow = 200
-	RateLimitShortPeriod  = 15 * time.Minute
-	RateLimitDailyQuota   = 2000
+	RateLimitShortPeriod = 15 * time.Minute
+	RateLimitDailyQuota  = 2000
 
 	// defaultMaxRetries acota los reintentos automáticos del cliente.
 	// Strava documenta 429 con Retry-After; reintentamos hasta 3 veces
