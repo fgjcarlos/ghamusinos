@@ -19,7 +19,7 @@ func TestWebhook_MissingSignature(t *testing.T) {
 	mockStore := &mockActivityEventStore{}
 	handler := WebhookHandler("test-secret", mockStore)
 
-	req := httptest.NewRequest("POST", "/webhook", bytes.NewReader(body))
+	req := httptest.NewRequestWithContext(context.Background(), "POST", "/webhook", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	// Missing X-Strava-Signature header
 	w := httptest.NewRecorder()
@@ -37,7 +37,7 @@ func TestWebhook_InvalidSignature(t *testing.T) {
 	mockStore := &mockActivityEventStore{}
 	handler := WebhookHandler("test-secret", mockStore)
 
-	req := httptest.NewRequest("POST", "/webhook", bytes.NewReader(body))
+	req := httptest.NewRequestWithContext(context.Background(), "POST", "/webhook", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("X-Strava-Signature", "v0=invalid_signature_hex")
 	w := httptest.NewRecorder()
@@ -61,7 +61,7 @@ func TestWebhook_ValidSignature(t *testing.T) {
 	h.Write(body)
 	expectedSig := "v0=" + hex.EncodeToString(h.Sum(nil))
 
-	req := httptest.NewRequest("POST", "/webhook", bytes.NewReader(body))
+	req := httptest.NewRequestWithContext(context.Background(), "POST", "/webhook", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("X-Strava-Signature", expectedSig)
 	w := httptest.NewRecorder()
@@ -78,7 +78,7 @@ func TestWebhook_ValidSignature(t *testing.T) {
 func TestWebhookChallenge_ValidChallenge(t *testing.T) {
 	handler := WebhookChallengeHandler("test-verify-token")
 
-	req := httptest.NewRequest("GET", "/webhook?hub.mode=subscribe&hub.challenge=test-challenge&hub.verify_token=test-verify-token", nil)
+	req := httptest.NewRequestWithContext(context.Background(), "GET", "/webhook?hub.mode=subscribe&hub.challenge=test-challenge&hub.verify_token=test-verify-token", nil)
 	w := httptest.NewRecorder()
 
 	handler.ServeHTTP(w, req)
@@ -104,7 +104,7 @@ func TestWebhook_PersistsEvent(t *testing.T) {
 	h.Write(body)
 	expectedSig := "v0=" + hex.EncodeToString(h.Sum(nil))
 
-	req := httptest.NewRequest("POST", "/webhook", bytes.NewReader(body))
+	req := httptest.NewRequestWithContext(context.Background(), "POST", "/webhook", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("X-Strava-Signature", expectedSig)
 	w := httptest.NewRecorder()
@@ -133,7 +133,7 @@ func TestWebhook_Idempotency(t *testing.T) {
 	expectedSig := "v0=" + hex.EncodeToString(h.Sum(nil))
 
 	// First request
-	req1 := httptest.NewRequest("POST", "/webhook", bytes.NewReader(body))
+	req1 := httptest.NewRequestWithContext(context.Background(), "POST", "/webhook", bytes.NewReader(body))
 	req1.Header.Set("Content-Type", "application/json")
 	req1.Header.Set("X-Strava-Signature", expectedSig)
 	w1 := httptest.NewRecorder()
@@ -145,7 +145,7 @@ func TestWebhook_Idempotency(t *testing.T) {
 
 	// Second request with same event_id
 	mockStore.reset()
-	req2 := httptest.NewRequest("POST", "/webhook", bytes.NewReader(body))
+	req2 := httptest.NewRequestWithContext(context.Background(), "POST", "/webhook", bytes.NewReader(body))
 	req2.Header.Set("Content-Type", "application/json")
 	req2.Header.Set("X-Strava-Signature", expectedSig)
 	w2 := httptest.NewRecorder()
@@ -168,7 +168,7 @@ func TestWebhook_EnqueuesRiverJob(t *testing.T) {
 	h.Write(body)
 	expectedSig := "v0=" + hex.EncodeToString(h.Sum(nil))
 
-	req := httptest.NewRequest("POST", "/webhook", bytes.NewReader(body))
+	req := httptest.NewRequestWithContext(context.Background(), "POST", "/webhook", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("X-Strava-Signature", expectedSig)
 	w := httptest.NewRecorder()

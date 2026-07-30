@@ -95,7 +95,7 @@ func WebhookHandler(webhookSecret string, store ActivityEventStore) http.Handler
 			http.Error(w, "failed to read body", http.StatusBadRequest)
 			return
 		}
-		defer r.Body.Close()
+		defer func() { _ = r.Body.Close() }()
 
 		// Verificar firma HMAC
 		signature := r.Header.Get("X-Strava-Signature")
@@ -179,7 +179,7 @@ func WebhookChallengeHandler(verifyToken string) http.HandlerFunc {
 		// Responder el challenge verbatim
 		w.Header().Set("Content-Type", "text/plain")
 		w.WriteHeader(http.StatusOK)
-		fmt.Fprint(w, challenge)
+		_, _ = fmt.Fprint(w, challenge)
 	}
 }
 
