@@ -93,11 +93,46 @@ type ImportStravaWorker struct {
 }
 
 // Work processes an ImportStrava job.
+// It fetches activities from Strava within the given time window and persists them to the database.
 func (w *ImportStravaWorker) Work(ctx context.Context, job *river.Job[ImportStravaArgs]) error {
-	// TODO: Implement Strava API integration
-	// This worker will fetch activity data from Strava within the given window
-	// and persist it to the database.
-	return nil
+	// Get configured dependencies
+	refresher := GetTokenRefresher()
+	querier := GetTokenQuerier()
+	cipherKey := GetCipherKey()
+
+	if refresher == nil || querier == nil || len(cipherKey) == 0 {
+		return ErrTokenRefresherNotConfigured
+	}
+
+	// Cast globalClient to ActivityFetcher (strava.Client implements it)
+	fetcher, ok := refresher.(ActivityFetcher)
+	if !ok {
+		return errors.New("jobs: token refresher does not implement ActivityFetcher")
+	}
+
+	// Create a SyncSessionStore from querier (sqlc.Queries implements it)
+	sessionStore, ok := querier.(SyncSessionStore)
+	if !ok {
+		return errors.New("jobs: token querier does not implement SyncSessionStore")
+	}
+
+	// Create an ActivityInserter from querier (sqlc.Queries implements it)
+	activityStore, ok := querier.(ActivityInserter)
+	if !ok {
+		return errors.New("jobs: token querier does not implement ActivityInserter")
+	}
+
+	// Create implementation instance and execute
+	impl := &importStravaWorkerImpl{
+		fetcher:        fetcher,
+		sessionStore:   sessionStore,
+		activityStore:  activityStore,
+		cipherKey:      cipherKey,
+		tokenQuerier:   querier,
+		tokenRefresher: refresher,
+	}
+
+	return impl.execute(ctx, job.Args.UserID, job.Args.WindowStart, job.Args.WindowEnd)
 }
 
 // RefreshStravaTokenWorker handles refreshing a user's Strava OAuth token.
@@ -146,7 +181,8 @@ type IngestActivityEventWorker struct {
 
 // IngestActivityEventArgs are the arguments for processing an activity event.
 type IngestActivityEventArgs struct {
-	EventID string
+	UserID     string
+	ActivityID int64
 }
 
 // Kind returns the job kind identifier for IngestActivityEventArgs.
@@ -155,16 +191,37 @@ func (a IngestActivityEventArgs) Kind() string {
 }
 
 // Work processes an IngestActivityEvent job.
-// Stub implementation: just receives the event and returns nil.
-// The real implementation in Slice 5a will fetch activity data from Strava
-// and persist it to the activities table.
+// It fetches the full activity data from Strava API and persists it to the database.
 func (w *IngestActivityEventWorker) Work(ctx context.Context, job *river.Job[IngestActivityEventArgs]) error {
-	// TODO: Implement activity ingestion from Strava API (Slice 5a)
-	// This will:
-	// 1. Load the activity event from the database
-	// 2. Fetch the full activity data from Strava API
-	// 3. Parse and validate the data
-	// 4. Persist to the activities table
-	// 5. Mark the event as processed
-	return nil
+	// Get configured dependencies
+	refresher := GetTokenRefresher()
+	querier := GetTokenQuerier()
+	cipherKey := GetCipherKey()
+
+	if refresher == nil || querier == nil || len(cipherKey) == 0 {
+		return ErrTokenRefresherNotConfigured
+	}
+
+	// Cast globalClient to ActivityFetcher (strava.Client implements it)
+	fetcher, ok := refresher.(ActivityFetcher)
+	if !ok {
+		return errors.New("jobs: token refresher does not implement ActivityFetcher")
+	}
+
+	// Create an ActivityInserter from querier (sqlc.Queries implements it)
+	activityStore, ok := querier.(ActivityInserter)
+	if !ok {
+		return errors.New("jobs: token querier does not implement ActivityInserter")
+	}
+
+	// Create implementation instance and execute
+	impl := &ingestActivityEventWorkerImpl{
+		fetcher:        fetcher,
+		activityStore:  activityStore,
+		cipherKey:      cipherKey,
+		tokenQuerier:   querier,
+		tokenRefresher: refresher,
+	}
+
+	return impl.execute(ctx, job.Args.UserID, job.Args.ActivityID)
 }
