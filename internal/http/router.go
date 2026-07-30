@@ -28,6 +28,9 @@ type Server struct {
 	stravaClient    *strava.Client
 	stravaStore     strava.TokenStore
 	stravaCipherKey []byte
+	// Webhook store (opcional, fase 1.2 issue #86): para webhooks de Strava.
+	// Se monta antes del middleware de auth, es signature-gated.
+	webhookStore strava.ActivityEventStore
 }
 
 // NewServer crea un Server con el pool de base de datos y configuración proporcionados.
@@ -43,6 +46,14 @@ func (s *Server) WithStrava(client *strava.Client, store strava.TokenStore, ciph
 	s.stravaClient = client
 	s.stravaStore = store
 	s.stravaCipherKey = cipherKey
+	return s
+}
+
+// WithWebhooks cablea los handlers de webhooks Strava al router.
+// Se devuelve *Server para fluent chaining. El ActivityEventStore maneja
+// tanto la encolada de eventos como la encolada de jobs River.
+func (s *Server) WithWebhooks(store strava.ActivityEventStore) *Server {
+	s.webhookStore = store
 	return s
 }
 
@@ -80,6 +91,14 @@ func (s *Server) Router() http.Handler {
 
 	// Readiness: refleja el estado real de la base de datos.
 	r.Get("/readyz", handlers.Readyz(s.pool))
+
+	// Strava webhooks (issue #86, fase 1.2): se monta ANTES del middleware de auth
+	// porque los webhooks se validan por firma HMAC-SHA256, no por Clerk JWT.
+	// Las rutas quedan fuera de /api para mantenerlas públicas.
+	if s.webhookStore != nil && s.cfg.Strava != nil {
+		r.Get("/strava/webhook", strava.WebhookChallengeHandler("strava"))
+		r.Post("/strava/webhook", strava.WebhookHandler(s.cfg.Strava.WebhookSecret, s.webhookStore))
+	}
 
 	// Grupo de API. TODAS las rutas /api/* están protegidas por autenticación.
 	// Las rutas específicas de cada versión (v1, v2, etc.) se definen dentro.
