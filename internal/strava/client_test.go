@@ -659,8 +659,8 @@ func TestGetStreams(t *testing.T) {
 		t.Fatalf("GetStreams: %v", err)
 	}
 	// Check we got streams back
-	if streams == nil || len(streams) == 0 {
-		t.Errorf("streams is empty or nil: %+v", streams)
+	if len(streams) == 0 {
+		t.Errorf("streams is empty: %+v", streams)
 	}
 	// Verify query parameter was sent
 	if gotQuery.Get("keys") == "" {
