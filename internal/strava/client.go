@@ -312,3 +312,77 @@ func parseRetryAfter(s string) time.Duration {
 	}
 	return 0
 }
+
+// ─────────────────────────────────────────────────────────────────────────
+// API Methods (Slice 2: issue #85)
+// ─────────────────────────────────────────────────────────────────────────
+
+// GetAthlete devuelve la información del atleta autenticado.
+func (c *Client) GetAthlete(ctx context.Context, accessToken string) (*AthleteInfo, error) {
+	var athlete AthleteInfo
+	if err := c.Do(ctx, http.MethodGet, "/athlete", accessToken, &athlete); err != nil {
+		return nil, fmt.Errorf("strava: GetAthlete: %w", err)
+	}
+	return &athlete, nil
+}
+
+// GetActivities devuelve actividades del atleta, paginadas.
+// after, before filtran por fecha; page y perPage controlan paginación.
+func (c *Client) GetActivities(ctx context.Context, accessToken string, after, before time.Time, page, perPage int) ([]ActivitySummary, error) {
+	u, err := url.Parse(APIBase + "/athlete/activities")
+	if err != nil {
+		return nil, fmt.Errorf("strava: GetActivities parse URL: %w", err)
+	}
+	q := u.Query()
+	q.Set("after", strconv.FormatInt(after.Unix(), 10))
+	q.Set("before", strconv.FormatInt(before.Unix(), 10))
+	q.Set("page", strconv.Itoa(page))
+	q.Set("per_page", strconv.Itoa(perPage))
+	u.RawQuery = q.Encode()
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u.String(), nil)
+	if err != nil {
+		return nil, fmt.Errorf("strava: GetActivities NewRequest: %w", err)
+	}
+	req.Header.Set("Authorization", "Bearer "+accessToken)
+
+	var activities []ActivitySummary
+	if err := c.doJSON(ctx, req, &activities); err != nil {
+		return nil, fmt.Errorf("strava: GetActivities: %w", err)
+	}
+	return activities, nil
+}
+
+// GetActivity devuelve los detalles completos de una actividad por ID.
+func (c *Client) GetActivity(ctx context.Context, accessToken string, id int64) (*ActivityDetail, error) {
+	path := "/activities/" + strconv.FormatInt(id, 10)
+	var activity ActivityDetail
+	if err := c.Do(ctx, http.MethodGet, path, accessToken, &activity); err != nil {
+		return nil, fmt.Errorf("strava: GetActivity: %w", err)
+	}
+	return &activity, nil
+}
+
+// GetStreams devuelve datos de streams para una actividad.
+// types es una lista de tipos de stream solicitados (e.g., "time", "heartrate", "watts").
+func (c *Client) GetStreams(ctx context.Context, accessToken string, id int64, types []string) ([]StreamFrame, error) {
+	u, err := url.Parse(APIBase + "/activities/" + strconv.FormatInt(id, 10) + "/streams")
+	if err != nil {
+		return nil, fmt.Errorf("strava: GetStreams parse URL: %w", err)
+	}
+	q := u.Query()
+	q.Set("keys", strings.Join(types, ","))
+	u.RawQuery = q.Encode()
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u.String(), nil)
+	if err != nil {
+		return nil, fmt.Errorf("strava: GetStreams NewRequest: %w", err)
+	}
+	req.Header.Set("Authorization", "Bearer "+accessToken)
+
+	var streams []StreamFrame
+	if err := c.doJSON(ctx, req, &streams); err != nil {
+		return nil, fmt.Errorf("strava: GetStreams: %w", err)
+	}
+	return streams, nil
+}

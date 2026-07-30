@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"strconv"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -457,5 +458,405 @@ func TestParseRetryAfter_ExpiredDate(t *testing.T) {
 	past := time.Now().Add(-time.Hour).UTC().Format(http.TimeFormat)
 	if d := parseRetryAfter(past); d != 0 {
 		t.Errorf("parseRetryAfter(past) = %v, want 0", d)
+	}
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// API Methods tests (Slice 2: issue #85)
+// ─────────────────────────────────────────────────────────────────────────
+
+// TestGetAthleteInfo verifica que GetAthlete devuelve la información
+// del atleta autenticado desde GET /api/v3/athlete.
+func TestGetAthleteInfo(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/api/v3/athlete" {
+			http.NotFound(w, r)
+			return
+		}
+		if r.Header.Get("Authorization") != "Bearer test-token" {
+			http.Error(w, "unauthorized", http.StatusUnauthorized)
+			return
+		}
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"id":        12345,
+			"username":  "testathlete",
+			"firstname": "Test",
+			"lastname":  "Athlete",
+			"profile":   "https://example.com/profile.jpg",
+		})
+	}))
+	defer srv.Close()
+
+	c, _ := NewClient(Config{ClientID: "cid", ClientSecret: "csec", HTTPClient: srv.Client()})
+	c.cfg.HTTPClient.Transport = &rewriteTransport{
+		fromTo: map[string]string{"www.strava.com": strings.TrimPrefix(srv.URL, "http://")},
+		base:   http.DefaultTransport,
+	}
+
+	athlete, err := c.GetAthlete(context.Background(), "test-token")
+	if err != nil {
+		t.Fatalf("GetAthlete: %v", err)
+	}
+	if athlete.ID != 12345 || athlete.Username != "testathlete" {
+		t.Errorf("athlete not decoded correctly: %+v", athlete)
+	}
+}
+
+// TestGetActivities verifica que GetActivities devuelve actividades
+// paginadas desde GET /api/v3/athlete/activities con filtros de fecha.
+func TestGetActivities(t *testing.T) {
+	var gotQuery url.Values
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/api/v3/athlete/activities" {
+			http.NotFound(w, r)
+			return
+		}
+		if r.Header.Get("Authorization") != "Bearer test-token" {
+			http.Error(w, "unauthorized", http.StatusUnauthorized)
+			return
+		}
+		gotQuery = r.URL.Query()
+		// Mock response with 2 activities
+		_ = json.NewEncoder(w).Encode([]map[string]any{
+			{
+				"id":                   111,
+				"name":                 "Morning Run",
+				"type":                 "Run",
+				"start_date":           "2025-01-15T08:00:00Z",
+				"distance":             10000.0,
+				"moving_time":          3000,
+				"elapsed_time":         3600,
+				"total_elevation_gain": 50.0,
+			},
+			{
+				"id":                   222,
+				"name":                 "Evening Ride",
+				"type":                 "Ride",
+				"start_date":           "2025-01-14T18:00:00Z",
+				"distance":             30000.0,
+				"moving_time":          5400,
+				"elapsed_time":         6000,
+				"total_elevation_gain": 200.0,
+			},
+		})
+	}))
+	defer srv.Close()
+
+	c, _ := NewClient(Config{ClientID: "cid", ClientSecret: "csec", HTTPClient: srv.Client()})
+	c.cfg.HTTPClient.Transport = &rewriteTransport{
+		fromTo: map[string]string{"www.strava.com": strings.TrimPrefix(srv.URL, "http://")},
+		base:   http.DefaultTransport,
+	}
+
+	after := time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC)
+	before := time.Date(2025, 1, 31, 23, 59, 59, 0, time.UTC)
+	activities, err := c.GetActivities(context.Background(), "test-token", after, before, 1, 30)
+	if err != nil {
+		t.Fatalf("GetActivities: %v", err)
+	}
+	if len(activities) != 2 {
+		t.Errorf("got %d activities, want 2", len(activities))
+	}
+	if activities[0].ID != 111 || activities[0].Name != "Morning Run" {
+		t.Errorf("first activity incorrect: %+v", activities[0])
+	}
+	// Verify query parameters were sent
+	if gotQuery.Get("per_page") != "30" || gotQuery.Get("page") != "1" {
+		t.Errorf("pagination params incorrect: page=%s, per_page=%s", gotQuery.Get("page"), gotQuery.Get("per_page"))
+	}
+}
+
+// TestGetActivity verifica que GetActivity devuelve una actividad
+// individual desde GET /api/v3/activities/:id con detalles completos.
+func TestGetActivity(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/api/v3/activities/111" {
+			http.NotFound(w, r)
+			return
+		}
+		if r.Header.Get("Authorization") != "Bearer test-token" {
+			http.Error(w, "unauthorized", http.StatusUnauthorized)
+			return
+		}
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"id":                   111,
+			"name":                 "Morning Run",
+			"type":                 "Run",
+			"start_date":           "2025-01-15T08:00:00Z",
+			"distance":             10000.0,
+			"moving_time":          3000,
+			"elapsed_time":         3600,
+			"total_elevation_gain": 50.0,
+			"description":          "Great workout",
+		})
+	}))
+	defer srv.Close()
+
+	c, _ := NewClient(Config{ClientID: "cid", ClientSecret: "csec", HTTPClient: srv.Client()})
+	c.cfg.HTTPClient.Transport = &rewriteTransport{
+		fromTo: map[string]string{"www.strava.com": strings.TrimPrefix(srv.URL, "http://")},
+		base:   http.DefaultTransport,
+	}
+
+	activity, err := c.GetActivity(context.Background(), "test-token", 111)
+	if err != nil {
+		t.Fatalf("GetActivity: %v", err)
+	}
+	if activity.ID != 111 || activity.Name != "Morning Run" || activity.Description == "" {
+		t.Errorf("activity not decoded correctly: %+v", activity)
+	}
+}
+
+// TestGetStreams verifica que GetStreams devuelve streams de datos
+// (time, heartrate, watts, etc.) desde GET /api/v3/activities/:id/streams.
+func TestGetStreams(t *testing.T) {
+	var gotQuery url.Values
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/api/v3/activities/111/streams" {
+			http.NotFound(w, r)
+			return
+		}
+		if r.Header.Get("Authorization") != "Bearer test-token" {
+			http.Error(w, "unauthorized", http.StatusUnauthorized)
+			return
+		}
+		gotQuery = r.URL.Query()
+		// Mock response: Strava returns array of stream objects
+		_ = json.NewEncoder(w).Encode([]map[string]any{
+			{
+				"type":          "time",
+				"data":          []int{0, 1, 2, 3},
+				"series_type":   "time",
+				"original_size": 4,
+				"resolution":    1,
+			},
+			{
+				"type":          "heartrate",
+				"data":          []float64{120, 125, 130, 135},
+				"series_type":   "distance",
+				"original_size": 4,
+				"resolution":    250,
+			},
+			{
+				"type":          "watts",
+				"data":          []float64{250, 260, 270, 280},
+				"series_type":   "distance",
+				"original_size": 4,
+				"resolution":    250,
+			},
+		})
+	}))
+	defer srv.Close()
+
+	c, _ := NewClient(Config{ClientID: "cid", ClientSecret: "csec", HTTPClient: srv.Client()})
+	c.cfg.HTTPClient.Transport = &rewriteTransport{
+		fromTo: map[string]string{"www.strava.com": strings.TrimPrefix(srv.URL, "http://")},
+		base:   http.DefaultTransport,
+	}
+
+	streams, err := c.GetStreams(context.Background(), "test-token", 111, []string{"time", "heartrate", "watts"})
+	if err != nil {
+		t.Fatalf("GetStreams: %v", err)
+	}
+	// Check we got streams back
+	if streams == nil || len(streams) == 0 {
+		t.Errorf("streams is empty or nil: %+v", streams)
+	}
+	// Verify query parameter was sent
+	if gotQuery.Get("keys") == "" {
+		t.Errorf("keys query parameter not sent")
+	}
+}
+
+// TestGetAthleteInfo_BadToken verifica que un token inválido retorna error.
+func TestGetAthleteInfo_BadToken(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+	}))
+	defer srv.Close()
+
+	c, _ := NewClient(Config{ClientID: "cid", ClientSecret: "csec", HTTPClient: srv.Client()})
+	c.cfg.HTTPClient.Transport = &rewriteTransport{
+		fromTo: map[string]string{"www.strava.com": strings.TrimPrefix(srv.URL, "http://")},
+		base:   http.DefaultTransport,
+	}
+
+	athlete, err := c.GetAthlete(context.Background(), "bad-token")
+	if err == nil {
+		t.Errorf("GetAthlete with bad token should error, got: %+v", athlete)
+	}
+	if !errors.Is(err, ErrUnauthorized) {
+		t.Errorf("expected ErrUnauthorized, got: %v", err)
+	}
+}
+
+// TestGetActivities_EmptyList verifica que GetActivities devuelve lista vacía
+// cuando no hay actividades en la ventana de fechas.
+func TestGetActivities_EmptyList(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/api/v3/athlete/activities" {
+			http.NotFound(w, r)
+			return
+		}
+		_ = json.NewEncoder(w).Encode([]map[string]any{})
+	}))
+	defer srv.Close()
+
+	c, _ := NewClient(Config{ClientID: "cid", ClientSecret: "csec", HTTPClient: srv.Client()})
+	c.cfg.HTTPClient.Transport = &rewriteTransport{
+		fromTo: map[string]string{"www.strava.com": strings.TrimPrefix(srv.URL, "http://")},
+		base:   http.DefaultTransport,
+	}
+
+	after := time.Date(2025, 6, 1, 0, 0, 0, 0, time.UTC)
+	before := time.Date(2025, 6, 30, 23, 59, 59, 0, time.UTC)
+	activities, err := c.GetActivities(context.Background(), "test-token", after, before, 1, 30)
+	if err != nil {
+		t.Fatalf("GetActivities: %v", err)
+	}
+	if len(activities) != 0 {
+		t.Errorf("got %d activities, want 0", len(activities))
+	}
+}
+
+// TestGetActivities_MultiplePages verifica que se pueden solicitar diferentes páginas.
+func TestGetActivities_MultiplePages(t *testing.T) {
+	pageRequested := 0
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/api/v3/athlete/activities" {
+			http.NotFound(w, r)
+			return
+		}
+		pageRequested, _ = strconv.Atoi(r.URL.Query().Get("page"))
+		// Return different data based on page
+		if pageRequested == 2 {
+			_ = json.NewEncoder(w).Encode([]map[string]any{
+				{
+					"id":                   333,
+					"name":                 "Page 2 Activity",
+					"type":                 "Run",
+					"start_date":           "2025-02-15T08:00:00Z",
+					"distance":             5000.0,
+					"moving_time":          1800,
+					"elapsed_time":         1900,
+					"total_elevation_gain": 10.0,
+				},
+			})
+		} else {
+			_ = json.NewEncoder(w).Encode([]map[string]any{})
+		}
+	}))
+	defer srv.Close()
+
+	c, _ := NewClient(Config{ClientID: "cid", ClientSecret: "csec", HTTPClient: srv.Client()})
+	c.cfg.HTTPClient.Transport = &rewriteTransport{
+		fromTo: map[string]string{"www.strava.com": strings.TrimPrefix(srv.URL, "http://")},
+		base:   http.DefaultTransport,
+	}
+
+	after := time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC)
+	before := time.Date(2025, 12, 31, 23, 59, 59, 0, time.UTC)
+	activities, err := c.GetActivities(context.Background(), "test-token", after, before, 2, 30)
+	if err != nil {
+		t.Fatalf("GetActivities page 2: %v", err)
+	}
+	if len(activities) != 1 || activities[0].ID != 333 {
+		t.Errorf("page 2 activity not returned correctly: %+v", activities)
+	}
+	if pageRequested != 2 {
+		t.Errorf("page requested = %d, want 2", pageRequested)
+	}
+}
+
+// TestGetActivity_NotFound verifica que un ID inválido retorna error.
+func TestGetActivity_NotFound(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.Error(w, `{"message":"not found"}`, http.StatusNotFound)
+	}))
+	defer srv.Close()
+
+	c, _ := NewClient(Config{ClientID: "cid", ClientSecret: "csec", HTTPClient: srv.Client()})
+	c.cfg.HTTPClient.Transport = &rewriteTransport{
+		fromTo: map[string]string{"www.strava.com": strings.TrimPrefix(srv.URL, "http://")},
+		base:   http.DefaultTransport,
+	}
+
+	activity, err := c.GetActivity(context.Background(), "test-token", 999999)
+	if err == nil {
+		t.Errorf("GetActivity with invalid ID should error, got: %+v", activity)
+	}
+}
+
+// TestGetStreams_NoStreamsAvailable verifica que se devuelve lista vacía
+// cuando la actividad no tiene streams.
+func TestGetStreams_NoStreamsAvailable(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_ = json.NewEncoder(w).Encode([]map[string]any{})
+	}))
+	defer srv.Close()
+
+	c, _ := NewClient(Config{ClientID: "cid", ClientSecret: "csec", HTTPClient: srv.Client()})
+	c.cfg.HTTPClient.Transport = &rewriteTransport{
+		fromTo: map[string]string{"www.strava.com": strings.TrimPrefix(srv.URL, "http://")},
+		base:   http.DefaultTransport,
+	}
+
+	streams, err := c.GetStreams(context.Background(), "test-token", 555, []string{"heartrate"})
+	if err != nil {
+		t.Fatalf("GetStreams: %v", err)
+	}
+	if len(streams) != 0 {
+		t.Errorf("got %d streams, want 0", len(streams))
+	}
+}
+
+// TestGetStreams_MultipleStreamTypes verifica que se pueden solicitar
+// varios tipos de streams simultáneamente.
+func TestGetStreams_MultipleStreamTypes(t *testing.T) {
+	var gotKeys string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotKeys = r.URL.Query().Get("keys")
+		_ = json.NewEncoder(w).Encode([]map[string]any{
+			{
+				"type":          "heartrate",
+				"data":          []float64{120, 125},
+				"series_type":   "distance",
+				"original_size": 2,
+				"resolution":    250,
+			},
+			{
+				"type":          "cadence",
+				"data":          []float64{90, 92},
+				"series_type":   "distance",
+				"original_size": 2,
+				"resolution":    250,
+			},
+			{
+				"type":          "watts",
+				"data":          []float64{250, 260},
+				"series_type":   "distance",
+				"original_size": 2,
+				"resolution":    250,
+			},
+		})
+	}))
+	defer srv.Close()
+
+	c, _ := NewClient(Config{ClientID: "cid", ClientSecret: "csec", HTTPClient: srv.Client()})
+	c.cfg.HTTPClient.Transport = &rewriteTransport{
+		fromTo: map[string]string{"www.strava.com": strings.TrimPrefix(srv.URL, "http://")},
+		base:   http.DefaultTransport,
+	}
+
+	streams, err := c.GetStreams(context.Background(), "test-token", 222, []string{"heartrate", "cadence", "watts"})
+	if err != nil {
+		t.Fatalf("GetStreams: %v", err)
+	}
+	if len(streams) != 3 {
+		t.Errorf("got %d streams, want 3", len(streams))
+	}
+	// Verify that all requested types were included in the query
+	if !strings.Contains(gotKeys, "heartrate") || !strings.Contains(gotKeys, "cadence") || !strings.Contains(gotKeys, "watts") {
+		t.Errorf("keys query = %q, should include all requested types", gotKeys)
 	}
 }
