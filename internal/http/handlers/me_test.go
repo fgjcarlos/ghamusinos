@@ -118,6 +118,9 @@ func (m *mockMeQuerier) GetStravaTokensByUserID(ctx context.Context, userID pgty
 func (m *mockMeQuerier) GetUserByClerkID(ctx context.Context, clerkUserID string) (sqlc.User, error) {
 	return sqlc.User{}, nil
 }
+func (m *mockMeQuerier) GetLatestSyncSession(ctx context.Context, userID pgtype.UUID) (sqlc.SyncSession, error) {
+	return sqlc.SyncSession{}, nil
+}
 func (m *mockMeQuerier) ListActivitiesByUser(ctx context.Context, arg sqlc.ListActivitiesByUserParams) ([]sqlc.Activity, error) {
 	return nil, nil
 }

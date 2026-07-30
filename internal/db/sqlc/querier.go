@@ -34,6 +34,8 @@ type Querier interface {
 	// central de la deduplicación: si existe, se actualiza; si no, se inserta.
 	GetActivityByExternalID(ctx context.Context, arg GetActivityByExternalIDParams) (Activity, error)
 	GetInviteByTokenHash(ctx context.Context, tokenHash string) (Invite, error)
+	// Obtiene la sesión de sincronización más reciente del usuario.
+	GetLatestSyncSession(ctx context.Context, userID pgtype.UUID) (SyncSession, error)
 	// Recupera los tokens OAuth de Strava de un usuario (cifrados).
 	GetStravaTokensByUserID(ctx context.Context, userID pgtype.UUID) (StravaToken, error)
 	GetUserByClerkID(ctx context.Context, clerkUserID string) (User, error)

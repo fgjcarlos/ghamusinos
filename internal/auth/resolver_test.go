@@ -238,6 +238,9 @@ func (m *mockQuerier) UpdateSyncSessionProgress(ctx context.Context, arg sqlc.Up
 func (m *mockQuerier) UpdateSyncSessionStatus(ctx context.Context, arg sqlc.UpdateSyncSessionStatusParams) (sqlc.SyncSession, error) {
 	return sqlc.SyncSession{}, nil
 }
+func (m *mockQuerier) GetLatestSyncSession(ctx context.Context, userID pgtype.UUID) (sqlc.SyncSession, error) {
+	return sqlc.SyncSession{}, nil
+}
 func (m *mockQuerier) UpsertActivity(ctx context.Context, arg sqlc.UpsertActivityParams) (sqlc.Activity, error) {
 	return sqlc.Activity{}, nil
 }
