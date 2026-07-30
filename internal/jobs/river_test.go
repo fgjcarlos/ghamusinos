@@ -47,8 +47,9 @@ func TestImportStravaWorker(t *testing.T) {
 	}
 
 	err := worker.Work(ctx, job)
-	if err != nil {
-		t.Errorf("ImportStravaWorker.Work() returned error: %v", err)
+	// Expect ErrTokenRefresherNotConfigured since ConfigureTokenRefresher was not called
+	if err != ErrTokenRefresherNotConfigured {
+		t.Errorf("ImportStravaWorker.Work() expected ErrTokenRefresherNotConfigured, got %v", err)
 	}
 }
 
