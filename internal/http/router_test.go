@@ -87,6 +87,9 @@ func (m *mockQuerier) UpsertActivityStream(ctx context.Context, arg sqlc.UpsertA
 func (m *mockQuerier) UpsertStravaTokens(ctx context.Context, arg sqlc.UpsertStravaTokensParams) (sqlc.StravaToken, error) {
 	return sqlc.StravaToken{}, nil
 }
+func (m *mockQuerier) GetLatestSyncSession(ctx context.Context, userID pgtype.UUID) (sqlc.SyncSession, error) {
+	return sqlc.SyncSession{}, nil
+}
 
 // nuevoServidor es un helper de test que crea un Server con pool nil
 // (entorno sin base de datos) y lo envuelve en httptest.

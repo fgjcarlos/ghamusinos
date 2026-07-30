@@ -32,3 +32,11 @@ FROM sync_sessions
 WHERE user_id = $1
 ORDER BY started_at DESC
 LIMIT $2 OFFSET $3;
+
+-- name: GetLatestSyncSession :one
+-- Obtiene la sesión de sincronización más reciente del usuario.
+SELECT *
+FROM sync_sessions
+WHERE user_id = $1
+ORDER BY started_at DESC
+LIMIT 1;

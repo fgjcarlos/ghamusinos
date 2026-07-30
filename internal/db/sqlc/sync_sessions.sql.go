@@ -42,6 +42,33 @@ func (q *Queries) CreateSyncSession(ctx context.Context, arg CreateSyncSessionPa
 	return i, err
 }
 
+const getLatestSyncSession = `-- name: GetLatestSyncSession :one
+SELECT id, user_id, status, window_days, total_activities, imported, skipped, error, started_at, finished_at
+FROM sync_sessions
+WHERE user_id = $1
+ORDER BY started_at DESC
+LIMIT 1
+`
+
+// Obtiene la sesión de sincronización más reciente del usuario.
+func (q *Queries) GetLatestSyncSession(ctx context.Context, userID pgtype.UUID) (SyncSession, error) {
+	row := q.db.QueryRow(ctx, getLatestSyncSession, userID)
+	var i SyncSession
+	err := row.Scan(
+		&i.ID,
+		&i.UserID,
+		&i.Status,
+		&i.WindowDays,
+		&i.TotalActivities,
+		&i.Imported,
+		&i.Skipped,
+		&i.Error,
+		&i.StartedAt,
+		&i.FinishedAt,
+	)
+	return i, err
+}
+
 const listSyncSessionsByUser = `-- name: ListSyncSessionsByUser :many
 SELECT id, user_id, status, window_days, total_activities, imported, skipped, error, started_at, finished_at
 FROM sync_sessions
