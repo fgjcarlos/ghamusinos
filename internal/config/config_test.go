@@ -364,6 +364,7 @@ func TestLoad_StravaConfigPopulated(t *testing.T) {
 	t.Setenv("STRAVA_REDIRECT_URL", "http://localhost/callback")
 	t.Setenv("STRAVA_SCOPES", "read")
 	t.Setenv("STRAVA_CIPHER_KEY", stravaKeyB64)
+	t.Setenv("STRAVA_WEBHOOK_SECRET", "webhook-secret-123")
 
 	cfg, err := Load()
 	if err != nil {
@@ -386,6 +387,9 @@ func TestLoad_StravaConfigPopulated(t *testing.T) {
 	if len(cfg.Strava.CipherKey) != len(decoded) {
 		t.Errorf("CipherKey len = %d, quería %d", len(cfg.Strava.CipherKey), len(decoded))
 	}
+	if cfg.Strava.WebhookSecret != "webhook-secret-123" {
+		t.Errorf("WebhookSecret = %q, quería 'webhook-secret-123'", cfg.Strava.WebhookSecret)
+	}
 }
 
 func TestLoad_StravaConfigDefaultScopes(t *testing.T) {
@@ -398,6 +402,7 @@ func TestLoad_StravaConfigDefaultScopes(t *testing.T) {
 	t.Setenv("STRAVA_CLIENT_ID", "id")
 	t.Setenv("STRAVA_CLIENT_SECRET", "secret")
 	t.Setenv("STRAVA_CIPHER_KEY", stravaKeyB64)
+	t.Setenv("STRAVA_WEBHOOK_SECRET", "webhook-secret")
 	// STRAVA_SCOPES no se setea → debe caer al default.
 
 	cfg, err := Load()

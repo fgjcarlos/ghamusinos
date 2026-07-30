@@ -56,6 +56,7 @@ func NewRiverWorkers() *river.Workers {
 	workers := river.NewWorkers()
 	river.AddWorker(workers, &ImportStravaWorker{})
 	river.AddWorker(workers, &RefreshStravaTokenWorker{})
+	river.AddWorker(workers, &IngestActivityEventWorker{})
 	return workers
 }
 
@@ -133,5 +134,37 @@ func (w *RefreshStravaTokenWorker) Work(ctx context.Context, job *river.Job[Refr
 		return err
 	}
 
+	return nil
+}
+
+// IngestActivityEventWorker handles ingesting activity events from Strava webhooks.
+// This is a stub implementation for Slice 4; Slice 5a will implement the actual
+// activity ingestion logic from the Strava API.
+type IngestActivityEventWorker struct {
+	river.WorkerDefaults[IngestActivityEventArgs]
+}
+
+// IngestActivityEventArgs are the arguments for processing an activity event.
+type IngestActivityEventArgs struct {
+	EventID string
+}
+
+// Kind returns the job kind identifier for IngestActivityEventArgs.
+func (a IngestActivityEventArgs) Kind() string {
+	return "ingest_activity_event"
+}
+
+// Work processes an IngestActivityEvent job.
+// Stub implementation: just receives the event and returns nil.
+// The real implementation in Slice 5a will fetch activity data from Strava
+// and persist it to the activities table.
+func (w *IngestActivityEventWorker) Work(ctx context.Context, job *river.Job[IngestActivityEventArgs]) error {
+	// TODO: Implement activity ingestion from Strava API (Slice 5a)
+	// This will:
+	// 1. Load the activity event from the database
+	// 2. Fetch the full activity data from Strava API
+	// 3. Parse and validate the data
+	// 4. Persist to the activities table
+	// 5. Mark the event as processed
 	return nil
 }
