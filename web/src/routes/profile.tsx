@@ -64,7 +64,7 @@ export default function Profile() {
           actividades de entrenamiento, incluyendo distancia, tiempo, ritmo y
           zonas de frecuencia cardíaca.
         </p>
-        <ConnectButton token={token} connected={false} />
+        <ConnectButton connected={false} />
       </section>
 
       <section>

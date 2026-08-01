@@ -12,7 +12,6 @@ import {
   Activity,
   PaginatedActivities,
   SyncSession,
-  ConnectResponse,
   ApiError,
 } from "./types";
 
@@ -37,20 +36,6 @@ async function handleResponse<T>(response: Response): Promise<T> {
     throw new ApiError(response.status, errorMessage);
   }
   return response.json() as Promise<T>;
-}
-
-/**
- * connectStrava initiates the Strava OAuth flow.
- * Returns the authorization URL and CSRF state token.
- */
-export async function connectStrava(
-  token: string
-): Promise<ConnectResponse> {
-  const response = await fetch(`${BASE_URL}/strava/connect`, {
-    method: "GET",
-    headers: makeAuthHeader(token),
-  });
-  return handleResponse<ConnectResponse>(response);
 }
 
 /**

@@ -4,25 +4,11 @@
  * When connected, shows a disabled state with a check icon.
  */
 
-import { connectStrava } from "../../lib/api/strava";
-
 interface ConnectButtonProps {
-  token: string;
   connected: boolean;
 }
 
-export function ConnectButton({ token, connected }: ConnectButtonProps) {
-  const handleConnect = async (e: React.MouseEvent<HTMLAnchorElement>) => {
-    e.preventDefault();
-    try {
-      const { authorize_url } = await connectStrava(token);
-      window.location.assign(authorize_url);
-    } catch (err) {
-      console.error("Failed to connect to Strava:", err);
-      alert("No se pudo conectar con Strava. Intenta nuevamente.");
-    }
-  };
-
+export function ConnectButton({ connected }: ConnectButtonProps) {
   if (connected) {
     return (
       <div
@@ -46,8 +32,7 @@ export function ConnectButton({ token, connected }: ConnectButtonProps) {
 
   return (
     <a
-      href="#"
-      onClick={handleConnect}
+      href="/api/v1/strava/connect"
       style={{
         display: "inline-block",
         padding: "12px 20px",

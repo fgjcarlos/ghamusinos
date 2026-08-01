@@ -86,15 +86,6 @@ export interface SyncSession {
 }
 
 /**
- * ConnectResponse is returned by GET /api/v1/strava/connect.
- * It contains the OAuth redirect URL and a CSRF state token.
- */
-export interface ConnectResponse {
-  authorize_url: string;
-  state: string;
-}
-
-/**
  * ApiError is thrown when an API call fails.
  * It carries the HTTP status code and a descriptive message.
  */
