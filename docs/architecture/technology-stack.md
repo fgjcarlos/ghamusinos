@@ -174,7 +174,6 @@ ghamusinos/
 │   ├── vite.config.ts
 │   └── package.json
 ├── sqlc.yaml
-├── goose.yaml
 ├── go.mod
 ├── Makefile
 └── docs/
@@ -186,10 +185,10 @@ ghamusinos/
 
 ```text
 1. Compilar frontend
-   web/ React + Vite → web/dist/
+   web/ React + Vite → internal/frontend/dist/
 
 2. Embeber assets
-   Go embed.FS incluye web/dist/
+   Go embed.FS incluye internal/frontend/dist/
 
 3. Compilar backend
    Go genera binario único
@@ -578,8 +577,8 @@ Podría reconsiderarse si hay alto volumen, necesidades de streaming, fanout com
 ### Frontend
 
 - [ ] Crear app React + Vite en `web/`.
-- [ ] Configurar build a `web/dist/`.
-- [ ] Embeber `web/dist/` con `embed.FS`.
+- [ ] Configurar build a `internal/frontend/dist/`.
+- [ ] Embeber `internal/frontend/dist/` con `embed.FS`.
 - [ ] Servir assets desde Go.
 - [ ] Configurar fallback SPA.
 - [ ] Definir cliente API frontend.

@@ -7,7 +7,7 @@ Guía para levantar Ghamusinos en local. Stack: Go (binario único) + React/Vite
 | Herramienta | Versión | Notas |
 |---|---|---|
 | Go | 1.22 | El proyecto fija `go 1.22`. Usa `GOTOOLCHAIN=local` para evitar descargas de toolchain |
-| Node | 20+ | Frontend con Vite |
+| Node | 22+ | Frontend con Vite |
 | pnpm | 10+ | Gestor de paquetes del frontend |
 | Docker | — | PostgreSQL local vía `docker-compose` |
 | sqlc | — | Se ejecuta vía Docker (`make generate`), no requiere instalación |
@@ -73,7 +73,7 @@ Ver `.env.example`. Las principales:
 El workflow `.github/workflows/ci.yml` corre en cada push a `main` y en cada PR:
 
 - **backend**: `gofmt`, `go vet`, `go test`, `go build` y un smoke de migraciones contra un PostgreSQL de servicio.
-- **frontend**: `pnpm install` + `pnpm build`.
+- **frontend**: `pnpm --dir web install --frozen-lockfile` + `pnpm --dir web build`.
 
 ## Flujo de trabajo con ramas y PRs
 

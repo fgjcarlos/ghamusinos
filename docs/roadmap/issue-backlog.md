@@ -23,7 +23,7 @@ Orden de implementación según `docs/roadmap/v1-phase-1-plan.md`.
 |---|---|---|
 | 1 | `chore: scaffold del módulo Go y estructura base del repo` | `go.mod`, `cmd/ghamusinos`, `internal/*`, `Makefile`; el proyecto compila |
 | 2 | `feat: servidor HTTP con Chi, healthz y graceful shutdown` | `GET /healthz` responde; middleware base; cierre ordenado |
-| 3 | `feat: app React + Vite mínima con build a web/dist` | `make web-build` genera `web/dist` |
+| 3 | `feat: app React + Vite mínima con build a internal/frontend/dist` | `make web-build` genera `internal/frontend/dist` |
 | 4 | `feat: embeber frontend con embed.FS y servir SPA con fallback` | el binario sirve la SPA; rutas cliente con fallback |
 | 5 | `feat: configuración central por entorno con validación` | falla al arrancar si faltan vars obligatorias; `.env.example` |
 | 6 | `feat: conexión a PostgreSQL y Goose configurado` | conexión viva; `make migrate` aplica migraciones |
