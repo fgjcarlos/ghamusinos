@@ -33,6 +33,8 @@ type Querier interface {
 	// Búsqueda idempotente por (usuario, fuente, id externo). Es la operación
 	// central de la deduplicación: si existe, se actualiza; si no, se inserta.
 	GetActivityByExternalID(ctx context.Context, arg GetActivityByExternalIDParams) (Activity, error)
+	// Obtiene un evento de actividad por su external_id (usado por IngestActivityEventWorker).
+	GetActivityEventByExternalID(ctx context.Context, externalID string) (ActivityEvent, error)
 	GetInviteByTokenHash(ctx context.Context, tokenHash string) (Invite, error)
 	// Obtiene la sesión de sincronización más reciente del usuario.
 	GetLatestSyncSession(ctx context.Context, userID pgtype.UUID) (SyncSession, error)

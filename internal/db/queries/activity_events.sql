@@ -25,3 +25,10 @@ FROM activity_events
 WHERE processed_at IS NULL
 ORDER BY received_at
 LIMIT $1;
+
+-- name: GetActivityEventByExternalID :one
+-- Obtiene un evento de actividad por su external_id (usado por IngestActivityEventWorker).
+SELECT *
+FROM activity_events
+WHERE external_id = $1
+LIMIT 1;

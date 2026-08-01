@@ -58,6 +58,31 @@ func (q *Queries) EnqueueActivityEvent(ctx context.Context, arg EnqueueActivityE
 	return i, err
 }
 
+const getActivityEventByExternalID = `-- name: GetActivityEventByExternalID :one
+SELECT id, external_id, user_id, object_type, aspect_type, object_id, received_at, processed_at, raw_payload
+FROM activity_events
+WHERE external_id = $1
+LIMIT 1
+`
+
+// Obtiene un evento de actividad por su external_id (usado por IngestActivityEventWorker).
+func (q *Queries) GetActivityEventByExternalID(ctx context.Context, externalID string) (ActivityEvent, error) {
+	row := q.db.QueryRow(ctx, getActivityEventByExternalID, externalID)
+	var i ActivityEvent
+	err := row.Scan(
+		&i.ID,
+		&i.ExternalID,
+		&i.UserID,
+		&i.ObjectType,
+		&i.AspectType,
+		&i.ObjectID,
+		&i.ReceivedAt,
+		&i.ProcessedAt,
+		&i.RawPayload,
+	)
+	return i, err
+}
+
 const listPendingActivityEvents = `-- name: ListPendingActivityEvents :many
 SELECT id, external_id, user_id, object_type, aspect_type, object_id, received_at, processed_at, raw_payload
 FROM activity_events
