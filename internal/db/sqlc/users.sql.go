@@ -79,6 +79,18 @@ func (q *Queries) GetUserByClerkID(ctx context.Context, clerkUserID string) (Use
 	return i, err
 }
 
+const getUserHRMaxByID = `-- name: GetUserHRMaxByID :one
+SELECT hr_max FROM users WHERE id = $1 LIMIT 1
+`
+
+// Obtiene el hr_max del usuario para cálculos de zonas HR.
+func (q *Queries) GetUserHRMaxByID(ctx context.Context, id pgtype.UUID) (pgtype.Int2, error) {
+	row := q.db.QueryRow(ctx, getUserHRMaxByID, id)
+	var hr_max pgtype.Int2
+	err := row.Scan(&hr_max)
+	return hr_max, err
+}
+
 const updateUserInviteStatus = `-- name: UpdateUserInviteStatus :one
 UPDATE users
 SET

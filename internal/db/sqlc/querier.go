@@ -33,12 +33,15 @@ type Querier interface {
 	// Búsqueda idempotente por (usuario, fuente, id externo). Es la operación
 	// central de la deduplicación: si existe, se actualiza; si no, se inserta.
 	GetActivityByExternalID(ctx context.Context, arg GetActivityByExternalIDParams) (Activity, error)
+	GetHRZonesByActivity(ctx context.Context, activityID pgtype.UUID) (HrZone, error)
 	GetInviteByTokenHash(ctx context.Context, tokenHash string) (Invite, error)
 	// Obtiene la sesión de sincronización más reciente del usuario.
 	GetLatestSyncSession(ctx context.Context, userID pgtype.UUID) (SyncSession, error)
 	// Recupera los tokens OAuth de Strava de un usuario (cifrados).
 	GetStravaTokensByUserID(ctx context.Context, userID pgtype.UUID) (StravaToken, error)
 	GetUserByClerkID(ctx context.Context, clerkUserID string) (User, error)
+	// Obtiene el hr_max del usuario para cálculos de zonas HR.
+	GetUserHRMaxByID(ctx context.Context, id pgtype.UUID) (pgtype.Int2, error)
 	// Lista paginada de actividades del usuario, ordenadas de más reciente a
 	// más antigua. El LIMIT es por la query (no cursor) porque el uso esperado
 	// es UI paginada con offset; cuando se necesite cursor, se añadirá en su
@@ -69,6 +72,8 @@ type Querier interface {
 	// Guarda/actualiza un stream concreto de una actividad (HR, watts, ...).
 	// PRIMARY KEY (activity_id, stream_type) hace el upsert natural.
 	UpsertActivityStream(ctx context.Context, arg UpsertActivityStreamParams) (ActivityStream, error)
+	// Idempotente por PK activity_id. Upsert de zonas HR calculadas.
+	UpsertHRZones(ctx context.Context, arg UpsertHRZonesParams) (HrZone, error)
 	// Inserta o reemplaza los tokens OAuth cifrados de un usuario.
 	// Strava solo permite un set de tokens activo por usuario; ON CONFLICT cubre
 	// el caso "usuario reconecta" y el refresh que rota access_token.
