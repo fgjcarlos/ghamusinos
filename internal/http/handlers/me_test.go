@@ -160,3 +160,12 @@ func (m *mockMeQuerier) UpsertActivityStream(ctx context.Context, arg sqlc.Upser
 func (m *mockMeQuerier) UpsertStravaTokens(ctx context.Context, arg sqlc.UpsertStravaTokensParams) (sqlc.StravaToken, error) {
 	return sqlc.StravaToken{}, nil
 }
+func (m *mockMeQuerier) GetHRZonesByActivity(ctx context.Context, activityID pgtype.UUID) (sqlc.HrZone, error) {
+	return sqlc.HrZone{}, nil
+}
+func (m *mockMeQuerier) GetUserHRMaxByID(ctx context.Context, userID pgtype.UUID) (pgtype.Int2, error) {
+	return pgtype.Int2{}, nil
+}
+func (m *mockMeQuerier) UpsertHRZones(ctx context.Context, arg sqlc.UpsertHRZonesParams) (sqlc.HrZone, error) {
+	return sqlc.HrZone{}, nil
+}
