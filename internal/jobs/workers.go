@@ -59,6 +59,15 @@ func NewRiverWorkers() *river.Workers {
 	river.AddWorker(workers, &ImportStravaWorker{})
 	river.AddWorker(workers, &RefreshStravaTokenWorker{})
 	river.AddWorker(workers, &IngestActivityEventWorker{})
+	river.AddWorker(workers, &ImportStravaStreamsWorker{
+		fetcher:   globalClient,
+		inserter:  sqlc.New(globalPool),
+		locator:   sqlc.New(globalPool),
+		querier:   sqlc.New(globalPool),
+		refresher: globalClient,
+		zoneStore: sqlc.New(globalPool),
+		cipherKey: globalCipherKey,
+	})
 	return workers
 }
 
@@ -358,4 +367,17 @@ func (w *IngestActivityEventWorker) Work(ctx context.Context, job *river.Job[Ing
 	}
 
 	return nil
+}
+
+// ImportStravaStreamsWorker handles importing Strava activity streams (HR, watts, etc.) and calculating HR zones.
+// Dependencies are injected at initialization time via NewRiverWorkers.
+type ImportStravaStreamsWorker struct {
+	river.WorkerDefaults[ImportStravaStreamsArgs]
+	fetcher   StreamFetcher
+	inserter  StreamInserter
+	zoneStore HRZoneStore
+	locator   ActivityLocator
+	querier   TokenQuerier
+	refresher TokenRefresher
+	cipherKey []byte
 }

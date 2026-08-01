@@ -10,9 +10,10 @@ import (
 type Kind string
 
 const (
-	KindImportStrava       Kind = "import_strava"
-	KindRefreshStravaToken Kind = "refresh_strava_token"
-	KindStub               Kind = "stub"
+	KindImportStrava        Kind = "import_strava"
+	KindRefreshStravaToken  Kind = "refresh_strava_token"
+	KindImportStravaStreams Kind = "import_strava_streams"
+	KindStub                Kind = "stub"
 )
 
 // ImportStravaArgs contains arguments for importing Strava data for a user
@@ -36,6 +37,18 @@ type RefreshStravaTokenArgs struct {
 // Kind returns the job kind for RefreshStravaTokenArgs
 func (a RefreshStravaTokenArgs) Kind() string {
 	return string(KindRefreshStravaToken)
+}
+
+// ImportStravaStreamsArgs contains arguments for importing Strava activity streams
+type ImportStravaStreamsArgs struct {
+	UserID             string
+	ActivityExternalID string
+	StravaActivityID   int64
+}
+
+// Kind returns the job kind for ImportStravaStreamsArgs
+func (a ImportStravaStreamsArgs) Kind() string {
+	return string(KindImportStravaStreams)
 }
 
 // RegisterHandlers creates and returns a river.Workers instance.

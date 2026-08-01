@@ -47,6 +47,16 @@ type ActivityStream struct {
 	Data       []byte      `json:"data"`
 }
 
+type HrZone struct {
+	ActivityID pgtype.UUID        `json:"activity_id"`
+	Z1Seconds  int32              `json:"z1_seconds"`
+	Z2Seconds  int32              `json:"z2_seconds"`
+	Z3Seconds  int32              `json:"z3_seconds"`
+	Z4Seconds  int32              `json:"z4_seconds"`
+	Z5Seconds  int32              `json:"z5_seconds"`
+	ComputedAt pgtype.Timestamptz `json:"computed_at"`
+}
+
 type Invite struct {
 	ID         pgtype.UUID        `json:"id"`
 	Email      string             `json:"email"`

@@ -90,6 +90,15 @@ func (m *mockQuerier) UpsertStravaTokens(ctx context.Context, arg sqlc.UpsertStr
 func (m *mockQuerier) GetLatestSyncSession(ctx context.Context, userID pgtype.UUID) (sqlc.SyncSession, error) {
 	return sqlc.SyncSession{}, nil
 }
+func (m *mockQuerier) GetHRZonesByActivity(ctx context.Context, activityID pgtype.UUID) (sqlc.HrZone, error) {
+	return sqlc.HrZone{}, nil
+}
+func (m *mockQuerier) GetUserHRMaxByID(ctx context.Context, userID pgtype.UUID) (pgtype.Int2, error) {
+	return pgtype.Int2{}, nil
+}
+func (m *mockQuerier) UpsertHRZones(ctx context.Context, arg sqlc.UpsertHRZonesParams) (sqlc.HrZone, error) {
+	return sqlc.HrZone{}, nil
+}
 
 // nuevoServidor es un helper de test que crea un Server con pool nil
 // (entorno sin base de datos) y lo envuelve en httptest.
