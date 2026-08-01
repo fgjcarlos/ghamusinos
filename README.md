@@ -50,16 +50,36 @@ El razonamiento detrás de cada decisión está en [`docs/architecture/technolog
 - **La IA interpreta datos; no inventa métricas. El producto funciona sin IA.**
 - **Las métricas derivadas son estimaciones orientativas, no diagnósticos.**
 
-## Estructura prevista del repositorio
+## Estructura del repositorio
+
+### Estructura actual
 
 ```text
 ghamusinos/
 ├── cmd/ghamusinos/        # entrypoint del binario
-├── internal/              # backend Go (auth, strava, gpx, metrics, ai, jobs, db, http)
-├── web/                   # frontend React + Vite (embebido en build)
+├── internal/              # backend Go
+│   ├── app/               # configuración e inicialización
+│   ├── auth/              # autenticación y autorización
+│   ├── config/            # variables de entorno y configuración
+│   ├── crypto/            # utilidades de cifrado
+│   ├── db/                # conexión y migraciones (Goose)
+│   ├── frontend/          # assets React embebidos (embed.FS)
+│   ├── http/              # router Chi y handlers
+│   ├── jobs/              # workers River (background jobs)
+│   ├── logging/           # observabilidad y logs
+│   └── strava/            # integración Strava OAuth + webhooks + sync
+├── web/                   # frontend React + Vite
 ├── docs/                  # documentación del producto y la arquitectura
-├── sqlc.yaml · goose.yaml · go.mod · Makefile
+├── sqlc.yaml · go.mod · Makefile
 ```
+
+### Estructura prevista (fase 1.3+)
+
+A medida que avance el roadmap se añadirán en `internal/`:
+
+- `gpx/` — parser y análisis de rutas GPX
+- `metrics/` — cálculos de fatiga, rendimiento y salud
+- `ai/` — integración multi-proveedor con Claude / OpenAI / OpenRouter
 
 Detalle completo en [`docs/architecture/technology-stack.md`](docs/architecture/technology-stack.md#5-estructura-de-repositorio-propuesta).
 

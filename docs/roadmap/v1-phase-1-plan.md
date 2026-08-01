@@ -94,7 +94,6 @@ ghamusinos/
 │   └── vite.config.ts
 ├── docs/
 ├── sqlc.yaml
-├── goose.yaml
 ├── go.mod
 └── Makefile
 ```
@@ -117,7 +116,7 @@ Debe incluir:
 Debe incluir:
 
 - App React mínima.
-- Build con Vite hacia `web/dist`.
+- Build con Vite hacia `internal/frontend/dist`.
 - Embebido con `embed.FS`.
 - Go sirviendo assets estáticos.
 - Fallback para SPA.
@@ -214,7 +213,7 @@ La fase se considera terminada cuando:
 3. Añadir endpoint `GET /healthz`.
 4. Crear app React + Vite mínima.
 5. Configurar build del frontend.
-6. Embeber `web/dist` con `embed.FS`.
+6. Embeber `internal/frontend/dist` con `embed.FS`.
 7. Servir SPA desde Go.
 8. Crear configuración central.
 9. Conectar PostgreSQL.
