@@ -4,7 +4,7 @@
  * Mobile-first inline styles with a max-width for larger screens.
  */
 
-import { Activity, PgTypeNumeric, PgTypeInt2 } from "../../lib/api/types";
+import { Activity, PgTypeNumeric } from "../../lib/api/types";
 
 interface ActivityCardProps {
   activity: Activity;
@@ -18,14 +18,6 @@ function getPgNumericValue(val: PgTypeNumeric | null): number | null {
   // For simplicity, parse bigint as a string and convert to number
   // This works for reasonable activity distances/elevations
   return Number(val.bigint) / Math.pow(10, val.exp);
-}
-
-/**
- * Helper: extract value from pgtype.Int2
- */
-function getPgInt2Value(val: PgTypeInt2 | null): number | null {
-  if (!val || !val.valid) return null;
-  return val.int16;
 }
 
 /**
@@ -89,8 +81,7 @@ export function ActivityCard({ activity }: ActivityCardProps) {
         <span
           style={{
             marginLeft: "8px",
-            paddingX: "8px",
-            paddingY: "4px",
+            padding: "4px 8px",
             backgroundColor: "#eef2ff",
             color: "#4f46e5",
             fontSize: "12px",
