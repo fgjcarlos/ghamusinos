@@ -3,6 +3,7 @@ package jobs
 import (
 	"context"
 	"errors"
+	"fmt"
 	"testing"
 	"time"
 
@@ -70,6 +71,35 @@ func (m *mockTokenQuerier) GetStravaTokensByUserID(ctx context.Context, userID p
 
 func (m *mockTokenQuerier) UpsertStravaTokens(ctx context.Context, arg sqlc.UpsertStravaTokensParams) (sqlc.StravaToken, error) {
 	return m.upsertTokensFn(ctx, arg)
+}
+
+// Implement remaining TokenQuerier methods (stubs for backfill tests)
+func (m *mockTokenQuerier) CreateSyncSession(ctx context.Context, arg sqlc.CreateSyncSessionParams) (sqlc.SyncSession, error) {
+	return sqlc.SyncSession{}, nil
+}
+
+func (m *mockTokenQuerier) GetLatestSyncSession(ctx context.Context, userID pgtype.UUID) (sqlc.SyncSession, error) {
+	return sqlc.SyncSession{}, fmt.Errorf("not found")
+}
+
+func (m *mockTokenQuerier) UpdateSyncSessionStatus(ctx context.Context, arg sqlc.UpdateSyncSessionStatusParams) (sqlc.SyncSession, error) {
+	return sqlc.SyncSession{}, nil
+}
+
+func (m *mockTokenQuerier) UpdateSyncSessionProgress(ctx context.Context, arg sqlc.UpdateSyncSessionProgressParams) (sqlc.SyncSession, error) {
+	return sqlc.SyncSession{}, nil
+}
+
+func (m *mockTokenQuerier) UpsertActivity(ctx context.Context, arg sqlc.UpsertActivityParams) (sqlc.Activity, error) {
+	return sqlc.Activity{}, nil
+}
+
+func (m *mockTokenQuerier) GetActivityEventByExternalID(ctx context.Context, externalID string) (sqlc.ActivityEvent, error) {
+	return sqlc.ActivityEvent{}, nil
+}
+
+func (m *mockTokenQuerier) MarkActivityEventProcessed(ctx context.Context, id pgtype.UUID) error {
+	return nil
 }
 
 // TestGetValidToken_ReturnsDecryptedTokenWhenValid tests T3.1 — token not yet expired
