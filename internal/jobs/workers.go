@@ -90,13 +90,23 @@ func (w *StubWorker) Work(ctx context.Context, job *river.Job[StubJob]) error {
 // ImportStravaWorker handles importing Strava data for a user.
 type ImportStravaWorker struct {
 	river.WorkerDefaults[ImportStravaArgs]
+	fetcher  ActivityFetcher
+	store    SyncSessionStore
+	inserter ActivityInserter
+	querier  TokenQuerier
+	config   interface{} // *config.Config, injected at registration
 }
 
 // Work processes an ImportStrava job.
+// It fetches activities from Strava within a backfill window and upserts them to the database.
 func (w *ImportStravaWorker) Work(ctx context.Context, job *river.Job[ImportStravaArgs]) error {
-	// TODO: Implement Strava API integration
-	// This worker will fetch activity data from Strava within the given window
-	// and persist it to the database.
+	// STUB: Minimal implementation for GREEN phase.
+	// The full implementation will:
+	// 1. Parse userID from job args
+	// 2. Retrieve or create sync_session
+	// 3. Fetch activities in pages
+	// 4. Upsert each activity
+	// 5. Update progress and mark completed
 	return nil
 }
 
@@ -138,10 +148,14 @@ func (w *RefreshStravaTokenWorker) Work(ctx context.Context, job *river.Job[Refr
 }
 
 // IngestActivityEventWorker handles ingesting activity events from Strava webhooks.
-// This is a stub implementation for Slice 4; Slice 5a will implement the actual
-// activity ingestion logic from the Strava API.
+// This is stub in Slice 4 (webhook enqueue), fully implemented in Slice 5a.
 type IngestActivityEventWorker struct {
 	river.WorkerDefaults[IngestActivityEventArgs]
+	eventLoader   ActivityEventLoader
+	detailFetcher ActivityDetailFetcher
+	inserter      ActivityInserter
+	querier       TokenQuerier
+	store         SyncSessionStore
 }
 
 // IngestActivityEventArgs are the arguments for processing an activity event.
@@ -155,16 +169,13 @@ func (a IngestActivityEventArgs) Kind() string {
 }
 
 // Work processes an IngestActivityEvent job.
-// Stub implementation: just receives the event and returns nil.
-// The real implementation in Slice 5a will fetch activity data from Strava
-// and persist it to the activities table.
+// STUB: Minimal implementation for GREEN phase.
+// Full implementation will:
+// 1. Load the activity event from database
+// 2. Fetch the full activity data from Strava API
+// 3. Parse and validate the data
+// 4. Upsert to activities table
+// 5. Mark event as processed
 func (w *IngestActivityEventWorker) Work(ctx context.Context, job *river.Job[IngestActivityEventArgs]) error {
-	// TODO: Implement activity ingestion from Strava API (Slice 5a)
-	// This will:
-	// 1. Load the activity event from the database
-	// 2. Fetch the full activity data from Strava API
-	// 3. Parse and validate the data
-	// 4. Persist to the activities table
-	// 5. Mark the event as processed
 	return nil
 }
