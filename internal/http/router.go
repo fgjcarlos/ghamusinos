@@ -123,7 +123,7 @@ func (s *Server) Router() http.Handler {
 			if s.stravaClient != nil && s.stravaStore != nil && s.stravaCipherKey != nil {
 				r.Route("/strava", func(r chi.Router) {
 					r.Get("/connect", strava.ConnectHandler(s.stravaClient))
-					r.Get("/callback", strava.CallbackHandler(s.stravaClient, s.stravaStore, s.stravaCipherKey))
+					r.Get("/callback", strava.CallbackHandler(s.stravaClient, s.stravaStore, s.stravaCipherKey, s.cfg.FrontendURL))
 				})
 			}
 

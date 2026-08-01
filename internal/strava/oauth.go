@@ -30,10 +30,10 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/base64"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
+	"net/url"
 	"time"
 
 	"github.com/fgjcarlos/ghamusinos/internal/auth"
@@ -60,12 +60,8 @@ type PersistedTokens struct {
 }
 
 // ConnectHandler devuelve el handler para /api/v1/strava/connect.
-// El handler genera un state CSRF, construye la URL de Strava y la
-// devuelve en JSON {authorize_url, state}. El frontend decide si hace
-// window.location.assign(authorize_url) o un redirect 302.
-//
-// Devolvemos JSON y no redirect directo para que el stub sea fácil de
-// probar sin seguir redirects; en producción esto puede pasar a 302.
+// El handler genera un state CSRF, construye la URL de Strava y redirige
+// al usuario directo con un 302 (Found).
 func ConnectHandler(client *Client) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		state, err := randomState()
@@ -73,11 +69,7 @@ func ConnectHandler(client *Client) http.HandlerFunc {
 			http.Error(w, "strava: state generation failed", http.StatusInternalServerError)
 			return
 		}
-		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(map[string]string{
-			"authorize_url": client.AuthorizeURL(state),
-			"state":         state,
-		})
+		http.Redirect(w, r, client.AuthorizeURL(state), http.StatusFound)
 	}
 }
 
@@ -99,18 +91,21 @@ type CallbackResult struct {
 // CallbackHandler intercambia el code por tokens, los cifra y los persiste.
 //
 // El user_id se obtiene del contexto de la request (inyectado por el
-// middleware de autenticación ResolveMiddleware). Esta handler se monta
+// middleware de autenticación ResolveMiddleware). Este handler se monta
 // SIEMPRE detrás del middleware de auth, por lo que puede confiar en
 // que el contexto contiene un usuario resuelto.
+//
+// En éxito, redirige a `{frontendURL}/activities?connected=1`.
+// En error, redirige a `{frontendURL}/?error={urlEncodedError}`.
 //
 // El parámetro state sigue siendo obligatorio (defensa CSRF mínima);
 // la validación completa contra la sesión de Clerk queda fuera de
 // este esqueleto (TODO cuando se conecte el sistema de sesiones).
-func CallbackHandler(client *Client, store TokenStore, cipherKey []byte) http.HandlerFunc {
+func CallbackHandler(client *Client, store TokenStore, cipherKey []byte, frontendURL string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		user := auth.AuthUser(r.Context())
 		if user == nil || user.ID == "" {
-			http.Error(w, "strava: user not resolved", http.StatusUnauthorized)
+			http.Redirect(w, r, frontendURL+"/?error=unauthenticated", http.StatusFound)
 			return
 		}
 		userID := user.ID
@@ -118,14 +113,13 @@ func CallbackHandler(client *Client, store TokenStore, cipherKey []byte) http.Ha
 		q := r.URL.Query()
 		params := CallbackParams{Code: q.Get("code"), State: q.Get("state")}
 
-		res, err := HandleCallback(r.Context(), client, store, cipherKey, userID, params)
+		_, err := HandleCallback(r.Context(), client, store, cipherKey, userID, params)
 		if err != nil {
-			writeOAuthError(w, err)
+			http.Redirect(w, r, frontendURL+"/?error="+url.QueryEscape(err.Error()), http.StatusFound)
 			return
 		}
 
-		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(res)
+		http.Redirect(w, r, frontendURL+"/activities?connected=1", http.StatusFound)
 	}
 }
 
