@@ -29,6 +29,8 @@ type Config struct {
 	ClerkJWKSURL string
 	// ClerkAudience es el valor esperado del claim 'aud' en Clerk JWTs (opcional).
 	ClerkAudience string
+	// FrontendURL es la URL base del frontend para redirecciones OAuth (default http://localhost:5173).
+	FrontendURL string
 	// Strava contiene la configuración de la integración con Strava
 	// (fase 1.2, issue #14). Es nil si las variables de entorno no
 	// están definidas; en ese caso los handlers OAuth no se montan.
@@ -86,6 +88,7 @@ func Load() (*Config, error) {
 		Pool:          pool,
 		ClerkJWKSURL:  os.Getenv("CLERK_JWKS_URL"),
 		ClerkAudience: getEnv("CLERK_AUDIENCE", ""),
+		FrontendURL:   getEnv("FRONTEND_URL", "http://localhost:5173"),
 	}
 
 	if cfg.DatabaseURL == "" {
