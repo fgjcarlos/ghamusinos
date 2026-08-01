@@ -51,6 +51,7 @@ type StravaConfig struct {
 	Scopes        string
 	CipherKey     []byte
 	WebhookSecret string
+	BackfillDays  int // default 42 days for backfill window
 }
 
 // Load lee las variables de entorno y devuelve un Config validado.
@@ -129,6 +130,13 @@ func loadStravaConfig() (*StravaConfig, error) {
 		return nil, errors.New("config: STRAVA_WEBHOOK_SECRET es obligatoria cuando STRAVA_CLIENT_ID/SECRET están definidas")
 	}
 
+	backfillDays := 42 // default
+	if days := os.Getenv("STRAVA_BACKFILL_DAYS"); days != "" {
+		if parsed, err := strconv.Atoi(days); err == nil {
+			backfillDays = parsed
+		}
+	}
+
 	return &StravaConfig{
 		ClientID:      id,
 		ClientSecret:  secret,
@@ -136,6 +144,7 @@ func loadStravaConfig() (*StravaConfig, error) {
 		Scopes:        getEnv("STRAVA_SCOPES", "read,activity:read"),
 		CipherKey:     key,
 		WebhookSecret: webhookSecret,
+		BackfillDays:  backfillDays,
 	}, nil
 }
 
