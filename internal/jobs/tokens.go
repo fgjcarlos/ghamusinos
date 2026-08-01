@@ -21,6 +21,13 @@ type TokenRefresher interface {
 type TokenQuerier interface {
 	GetStravaTokensByUserID(ctx context.Context, userID pgtype.UUID) (sqlc.StravaToken, error)
 	UpsertStravaTokens(ctx context.Context, arg sqlc.UpsertStravaTokensParams) (sqlc.StravaToken, error)
+	CreateSyncSession(ctx context.Context, arg sqlc.CreateSyncSessionParams) (sqlc.SyncSession, error)
+	GetLatestSyncSession(ctx context.Context, userID pgtype.UUID) (sqlc.SyncSession, error)
+	UpdateSyncSessionStatus(ctx context.Context, arg sqlc.UpdateSyncSessionStatusParams) (sqlc.SyncSession, error)
+	UpdateSyncSessionProgress(ctx context.Context, arg sqlc.UpdateSyncSessionProgressParams) (sqlc.SyncSession, error)
+	UpsertActivity(ctx context.Context, arg sqlc.UpsertActivityParams) (sqlc.Activity, error)
+	GetActivityEventByExternalID(ctx context.Context, externalID string) (sqlc.ActivityEvent, error)
+	MarkActivityEventProcessed(ctx context.Context, id pgtype.UUID) error
 }
 
 // GetValidToken retrieves the current access token for a user, refreshing if necessary.
