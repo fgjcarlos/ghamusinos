@@ -1,8 +1,33 @@
+// Package strava (continuación): handlers OAuth de Fase 1.2 (issue #14).
+//
+// Estos handlers implementan el flujo "Conectar con Strava" de ADR 0001:
+//
+//	GET /api/v1/strava/connect?user_id=<uuid>
+//	  → redirige al usuario a la pantalla de consentimiento de Strava.
+//
+//	GET /api/v1/strava/callback?code=...&state=...
+//	  → Strava redirige aquí tras el consentimiento. Intercambiamos
+//	    el code por tokens, los ciframos y los guardamos.
+//
+// # Alcance de este esqueleto (issue #14, opción A)
+//
+//   - El handshake OAuth funciona y persiste tokens cifrados.
+//   - El parámetro state se valida no-vacío (CSRF real se delega a Clerk
+//     en producción; ver TODO).
+//   - user_id se recibe por query para evitar acoplar este stub al
+//     middleware de auth — la wiring real se hace en la fase de
+//     autenticación cuando se conecte Clerk.
+//
+// # Lo que NO hace este esqueleto
+//
+//   - No envía al usuario al frontend tras conectar (front lo resuelve #90).
+//   - No expone endpoints de "desconectar" (se hace con DeleteStravaTokensByUserID,
+//     ya cubierto en sqlc).
+//   - No implementa refresh proactivo (es responsabilidad del job de ingest).
 package strava
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"net/http"
 	"net/http/httptest"
@@ -10,7 +35,6 @@ import (
 	"strings"
 	"sync"
 	"testing"
-	"time"
 
 	"github.com/fgjcarlos/ghamusinos/internal/auth"
 	"github.com/fgjcarlos/ghamusinos/internal/crypto"
@@ -49,46 +73,62 @@ func (f *fakeTokenStore) last() (PersistedTokens, bool) {
 // un token válido. Devuelve un Client ya apuntando al servidor y el
 // servidor (para defer Close).
 func stravaSrvForOAuth(t *testing.T) (*Client, *httptest.Server) {
-	t.Helper()
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if err := r.ParseForm(); err != nil {
-			http.Error(w, err.Error(), 400)
+		// La mayoría de endpoints devuelven error; solo /oauth/token tiene
+		// una respuesta ficticia para simular el flujo de intercambio.
+		if r.URL.Path == "/oauth/token" {
+			// Respuesta ficticia que HandleCallback espera.
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{
+				"token_type": "Bearer",
+				"expires_in": 21600,
+				"expires_at": 1568775134,
+				"access_token": "ACCESS-RAW",
+				"refresh_token": "REFRESH-RAW",
+				"athlete": {
+					"id": 9876543210,
+					"resource_state": 2
+				},
+				"scope": "read,activity:read"
+			}`))
 			return
 		}
-		if r.PostForm.Get("grant_type") != "authorization_code" {
-			http.Error(w, "bad grant_type", 400)
-			return
-		}
-		_ = json.NewEncoder(w).Encode(map[string]any{
-			"access_token":  "ACCESS-RAW",
-			"refresh_token": "REFRESH-RAW",
-			"expires_at":    time.Now().Add(6 * time.Hour).Unix(),
-			"athlete":       map[string]any{"id": 9876543210},
-			"scope":         "read,activity:read",
-		})
+
+		// Otros endpoints devuelven error genérico. Los tests que necesiten
+		// respuestas específicas pueden extender este srv.
+		http.Error(w, "not implemented", http.StatusNotImplemented)
 	}))
 
-	c, err := NewClient(Config{
-		ClientID:     "cid",
-		ClientSecret: "csec",
-		HTTPClient:   srv.Client(),
-	})
+	cfg := Config{
+		ClientID:     "client-id",
+		ClientSecret: "client-secret",
+		RedirectURL:  "http://localhost/callback",
+		Scopes:       "activity:read",
+		HTTPClient: &http.Client{
+			Transport: &rewriteTransport{
+				fromTo: map[string]string{
+					"www.strava.com": strings.TrimPrefix(srv.URL, "http://"),
+				},
+				base: http.DefaultTransport,
+			},
+		},
+	}
+
+	c, err := NewClient(cfg)
 	if err != nil {
-		srv.Close()
 		t.Fatalf("NewClient: %v", err)
 	}
-	c.cfg.HTTPClient.Transport = &rewriteTransport{
-		fromTo: map[string]string{"www.strava.com": strings.TrimPrefix(srv.URL, "http://")},
-		base:   http.DefaultTransport,
-	}
+
 	return c, srv
 }
 
 // ─────────────────────────────────────────────────────────────────────────
-// ConnectHandler tests
+// Connect tests
 // ─────────────────────────────────────────────────────────────────────────
 
-func TestConnectHandler_ReturnsAuthorizeURLAndState(t *testing.T) {
+// TestConnectHandler_RedirectsToStrava verifica que ConnectHandler redirija
+// con un 302 directo a Strava (no JSON).
+func TestConnectHandler_RedirectsToStrava(t *testing.T) {
 	c, srv := stravaSrvForOAuth(t)
 	defer srv.Close()
 
@@ -96,34 +136,21 @@ func TestConnectHandler_ReturnsAuthorizeURLAndState(t *testing.T) {
 	rec := httptest.NewRecorder()
 	ConnectHandler(c)(rec, req)
 
-	if rec.Code != http.StatusOK {
-		t.Fatalf("status = %d, want 200", rec.Code)
+	if rec.Code != http.StatusFound {
+		t.Fatalf("status = %d, want 302", rec.Code)
 	}
 
-	var body struct {
-		AuthorizeURL string `json:"authorize_url"`
-		State        string `json:"state"`
-	}
-	if err := json.NewDecoder(rec.Body).Decode(&body); err != nil {
-		t.Fatalf("decode: %v", err)
+	location := rec.Header().Get("Location")
+	if !strings.HasPrefix(location, "https://www.strava.com/oauth/authorize?") {
+		t.Errorf("Location = %q, want strava.com prefix", location)
 	}
 
-	if body.State == "" {
-		t.Error("state vacío")
-	}
-	if len(body.State) < 32 {
-		t.Errorf("state demasiado corto (%d chars): debería ser ≥32 para entropía decente", len(body.State))
-	}
-
-	u, err := url.Parse(body.AuthorizeURL)
-	if err != nil {
-		t.Fatalf("authorize_url no parsea: %v", err)
-	}
-	if u.Host != "www.strava.com" || u.Path != "/oauth/authorize" {
-		t.Errorf("authorize_url host/path = %s%s, want www.strava.com/oauth/authorize", u.Host, u.Path)
-	}
-	if u.Query().Get("state") != body.State {
-		t.Errorf("state en query (%q) no coincide con state en JSON (%q)", u.Query().Get("state"), body.State)
+	// Verificar state en query
+	u, _ := url.Parse(location)
+	if state := u.Query().Get("state"); state == "" {
+		t.Error("state missing in redirect")
+	} else if len(state) < 32 {
+		t.Errorf("state demasiado corto (%d chars): debería ser ≥32", len(state))
 	}
 }
 
@@ -137,11 +164,8 @@ func TestConnectHandler_StateUnique(t *testing.T) {
 		req := httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/api/v1/strava/connect", nil)
 		rec := httptest.NewRecorder()
 		ConnectHandler(c)(rec, req)
-		var body struct {
-			State string `json:"state"`
-		}
-		_ = json.NewDecoder(rec.Body).Decode(&body)
-		return body.State
+		u, _ := url.Parse(rec.Header().Get("Location"))
+		return u.Query().Get("state")
 	}
 
 	s1, s2 := get(), get()
@@ -262,17 +286,18 @@ func TestHandleCallback_StoreError(t *testing.T) {
 	}
 }
 
-// TestCallbackHandler_HTTPIntegration verifica el handler HTTP de cabo
-// a rabo con un user_id en el contexto (inyectado por el middleware
-// de auth) en vez de en la query string.
-func TestCallbackHandler_HTTPIntegration(t *testing.T) {
+// TestCallbackHandler_RedirectsOnSuccess verifica que en éxito redirija a
+// /activities?connected=1 con un 302.
+func TestCallbackHandler_RedirectsOnSuccess(t *testing.T) {
 	c, srv := stravaSrvForOAuth(t)
 	defer srv.Close()
 
 	key, _ := crypto.GenerateKey()
 	store := &fakeTokenStore{}
 
-	handler := CallbackHandler(c, store, key)
+	frontendURL := "http://localhost:5173"
+	handler := CallbackHandler(c, store, key, frontendURL)
+
 	req := httptest.NewRequestWithContext(context.Background(), http.MethodGet,
 		"/api/v1/strava/callback?code=the-code&state=the-state",
 		nil)
@@ -282,28 +307,26 @@ func TestCallbackHandler_HTTPIntegration(t *testing.T) {
 	rec := httptest.NewRecorder()
 	handler(rec, req)
 
-	if rec.Code != http.StatusOK {
-		t.Fatalf("status = %d, body = %s", rec.Code, rec.Body.String())
+	if rec.Code != http.StatusFound {
+		t.Fatalf("status = %d, want 302; body = %s", rec.Code, rec.Body.String())
 	}
 
-	var res CallbackResult
-	if err := json.NewDecoder(rec.Body).Decode(&res); err != nil {
-		t.Fatalf("decode: %v", err)
-	}
-	if res.UserID != userID || res.AthleteID == 0 {
-		t.Errorf("resultado inesperado: %+v", res)
+	location := rec.Header().Get("Location")
+	if !strings.HasSuffix(location, "/activities?connected=1") {
+		t.Errorf("Location = %q, want to end with /activities?connected=1", location)
 	}
 }
 
-// TestCallbackHandler_BadRequest verifica que faltan params devuelven 400.
+// TestCallbackHandler_BadRequest verifica que faltan params devuelven un redirect de error.
 // user_id ahora viene del contexto, no de la query, por lo que se omite
 // del set de "faltantes" en la query string. Si el contexto NO trae
-// usuario, el handler responde 401 (cubierto en TestCallbackHandler_NoUser).
+// usuario, el handler responde 302 a /?error=... (cubierto en TestCallbackHandler_NoUser).
 func TestCallbackHandler_BadRequest(t *testing.T) {
 	c, srv := stravaSrvForOAuth(t)
 	defer srv.Close()
 	store := &fakeTokenStore{}
-	handler := CallbackHandler(c, store, nil)
+	frontendURL := "http://localhost:5173"
+	handler := CallbackHandler(c, store, nil, frontendURL)
 
 	ctx := auth.WithAuthUser(context.Background(), &auth.User{ID: "u"})
 
@@ -314,28 +337,37 @@ func TestCallbackHandler_BadRequest(t *testing.T) {
 		req := httptest.NewRequestWithContext(context.Background(), http.MethodGet, q, nil).WithContext(ctx)
 		rec := httptest.NewRecorder()
 		handler(rec, req)
-		if rec.Code != http.StatusBadRequest {
-			t.Errorf("query %q: status = %d, want 400", q, rec.Code)
+		if rec.Code != http.StatusFound {
+			t.Errorf("query %q: status = %d, want 302", q, rec.Code)
+		}
+		location := rec.Header().Get("Location")
+		if !strings.Contains(location, "/?error=") {
+			t.Errorf("query %q: Location = %q, want /?error=...", q, location)
 		}
 	}
 }
 
 // TestCallbackHandler_NoUser verifica que sin usuario en el contexto
-// (middleware de auth no resolvió) el callback devuelve 401 y NO toca
-// a Strava. Es la garantía de que el handler solo opera detrás del auth.
+// (middleware de auth no resolvió) el callback devuelve 302 a /?error=unauthenticated
+// y NO toca a Strava. Es la garantía de que el handler solo opera detrás del auth.
 func TestCallbackHandler_NoUser(t *testing.T) {
 	c, srv := stravaSrvForOAuth(t)
 	defer srv.Close()
 	store := &fakeTokenStore{}
-	handler := CallbackHandler(c, store, nil)
+	frontendURL := "http://localhost:5173"
+	handler := CallbackHandler(c, store, nil, frontendURL)
 
 	req := httptest.NewRequestWithContext(context.Background(), http.MethodGet,
 		"/api/v1/strava/callback?code=c&state=s", nil)
 	rec := httptest.NewRecorder()
 	handler(rec, req)
 
-	if rec.Code != http.StatusUnauthorized {
-		t.Errorf("status = %d, want 401", rec.Code)
+	if rec.Code != http.StatusFound {
+		t.Errorf("status = %d, want 302", rec.Code)
+	}
+	location := rec.Header().Get("Location")
+	if !strings.Contains(location, "/?error=unauthenticated") {
+		t.Errorf("Location = %q, want /?error=unauthenticated", location)
 	}
 	if store.calls != 0 {
 		t.Errorf("SaveTokens fue llamado %d veces; quería 0", store.calls)

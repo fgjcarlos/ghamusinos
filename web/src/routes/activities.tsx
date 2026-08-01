@@ -3,15 +3,26 @@
  * and provides access to the sync progress modal.
  */
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { ActivityList } from "../features/strava/ActivityList";
 import { SyncProgressModal } from "../features/strava/SyncProgressModal";
 
 export default function Activities() {
   const [syncModalOpen, setSyncModalOpen] = useState(false);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const justConnected = searchParams.get("connected") === "1";
 
   // TODO(#90): Replace with actual Clerk auth token once Clerk SDK is integrated
   const token = import.meta.env.VITE_AUTH_TOKEN || "";
+
+  // Clear the query param after showing the toast
+  useEffect(() => {
+    if (justConnected) {
+      const timer = setTimeout(() => setSearchParams({}), 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [justConnected, setSearchParams]);
 
   if (!token) {
     return (
@@ -35,6 +46,23 @@ export default function Activities() {
 
   return (
     <div style={{ padding: "20px", maxWidth: "600px", margin: "0 auto" }}>
+      {justConnected && (
+        <div
+          role="status"
+          style={{
+            padding: "12px 16px",
+            backgroundColor: "#dcfce7",
+            border: "1px solid #86efac",
+            borderRadius: "6px",
+            color: "#166534",
+            fontSize: "14px",
+            marginBottom: "20px",
+          }}
+        >
+          <strong>✓ ¡Conectado con Strava!</strong> Sincronizando actividades...
+        </div>
+      )}
+
       <div
         style={{
           display: "flex",
