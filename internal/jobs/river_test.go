@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 
+	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/riverqueue/river"
 )
 
@@ -41,14 +42,18 @@ func TestImportStravaWorker(t *testing.T) {
 	ctx := context.Background()
 	worker := &ImportStravaWorker{}
 
+	// Use a valid UUID for userID
+	validUUID := pgtype.UUID{Bytes: [16]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16}, Valid: true}
+
 	// Verify worker embeds WorkerDefaults correctly
 	job := &river.Job[ImportStravaArgs]{
-		Args: ImportStravaArgs{UserID: "test-user"},
+		Args: ImportStravaArgs{UserID: validUUID.String()},
 	}
 
 	err := worker.Work(ctx, job)
-	if err != nil {
-		t.Errorf("ImportStravaWorker.Work() returned error: %v", err)
+	// Expect an error since no dependencies are injected (fetcher, store, inserter all nil)
+	if err != ErrTokenRefresherNotConfigured {
+		t.Errorf("ImportStravaWorker.Work() expected ErrTokenRefresherNotConfigured, got %v", err)
 	}
 }
 
