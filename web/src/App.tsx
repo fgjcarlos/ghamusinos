@@ -1,3 +1,5 @@
+import { Link } from 'react-router-dom'
+
 function App() {
   return (
     <main style={styles.main}>
@@ -11,6 +13,10 @@ function App() {
           El área privada (conexión con Strava, análisis de entrenamientos y
           planificación de carreras) llegará en fases posteriores.
         </p>
+        <div style={styles.navigation}>
+          <Link to="/activities" style={styles.navLink}>Mis actividades</Link>
+          <Link to="/profile" style={styles.navLink}>Perfil</Link>
+        </div>
       </div>
     </main>
   )
@@ -61,7 +67,22 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: '0.9rem',
     color: '#64748b',
     lineHeight: 1.6,
-    margin: 0,
+    margin: '0 0 1.5rem 0',
+  },
+  navigation: {
+    display: 'flex',
+    gap: '12px',
+    justifyContent: 'center',
+    flexWrap: 'wrap',
+  },
+  navLink: {
+    fontSize: '0.9rem',
+    color: '#38bdf8',
+    textDecoration: 'none',
+    padding: '8px 12px',
+    border: '1px solid rgba(56, 189, 248, 0.3)',
+    borderRadius: '6px',
+    transition: 'all 0.2s ease',
   },
 }
 
