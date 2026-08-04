@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<gpx version="1.1" creator="ghamusinos-test" xmlns="http://www.topografix.com/GPX/1/1">
+  <trk><name>Climb track</name><trkseg>
+    <trkpt lat="40.4168" lon="-3.7038"><ele>600</ele><time>2026-01-01T10:00:00Z</time></trkpt>
+    <trkpt lat="40.4258" lon="-3.7038"><ele>700</ele><time>2026-01-01T10:10:00Z</time></trkpt>
+    <trkpt lat="40.4348" lon="-3.7038"><ele>800</ele><time>2026-01-01T10:20:00Z</time></trkpt>
+    <trkpt lat="40.4438" lon="-3.7038"><ele>900</ele><time>2026-01-01T10:30:00Z</time></trkpt>
+    <trkpt lat="40.4528" lon="-3.7038"><ele>850</ele><time>2026-01-01T10:40:00Z</time></trkpt>
+    <trkpt lat="40.4618" lon="-3.7038"><ele>800</ele><time>2026-01-01T10:50:00Z</time></trkpt>
+    <trkpt lat="40.4708" lon="-3.7038"><ele>900</ele><time>2026-01-01T11:00:00Z</time></trkpt>
+    <trkpt lat="40.4798" lon="-3.7038"><ele>1000</ele><time>2026-01-01T11:10:00Z</time></trkpt>
+    <trkpt lat="40.4888" lon="-3.7038"><ele>950</ele><time>2026-01-01T11:20:00Z</time></trkpt>
+    <trkpt lat="40.4978" lon="-3.7038"><ele>900</ele><time>2026-01-01T11:30:00Z</time></trkpt>
+    <trkpt lat="40.5068" lon="-3.7038"><ele>900</ele><time>2026-01-01T11:40:00Z</time></trkpt>
+  </trkseg></trk>
+</gpx>
