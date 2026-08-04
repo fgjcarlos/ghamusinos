@@ -15,6 +15,7 @@ import (
 	"github.com/fgjcarlos/ghamusinos/internal/config"
 	"github.com/fgjcarlos/ghamusinos/internal/db"
 	"github.com/fgjcarlos/ghamusinos/internal/db/sqlc"
+	"github.com/fgjcarlos/ghamusinos/internal/gpx"
 	apphttp "github.com/fgjcarlos/ghamusinos/internal/http"
 	"github.com/fgjcarlos/ghamusinos/internal/jobs"
 	"github.com/fgjcarlos/ghamusinos/internal/strava"
@@ -107,6 +108,16 @@ func Run() error {
 // existe como ruta — comportamiento correcto bajo el NotFound del grupo v1.
 func buildRouter(cfg *config.Config, pool *pgxpool.Pool, queries sqlc.Querier) http.Handler {
 	server := apphttp.NewServer(pool, queries, cfg)
+	server.WithGPX(
+		gpx.NewTransactionalSQLCStore(pool),
+		gpx.Parser{},
+		gpx.Validator{},
+		gpx.Analyzer{},
+		gpx.ClimbService{},
+		gpx.RiskService{},
+		gpx.TrackTypeService{},
+		gpx.Hasher{},
+	)
 
 	if cfg.Strava != nil {
 		stravaClient, err := strava.NewClient(strava.Config{

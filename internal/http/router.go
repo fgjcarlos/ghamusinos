@@ -12,6 +12,7 @@ import (
 	"github.com/fgjcarlos/ghamusinos/internal/config"
 	"github.com/fgjcarlos/ghamusinos/internal/db/sqlc"
 	"github.com/fgjcarlos/ghamusinos/internal/frontend"
+	"github.com/fgjcarlos/ghamusinos/internal/gpx"
 	"github.com/fgjcarlos/ghamusinos/internal/http/handlers"
 	"github.com/fgjcarlos/ghamusinos/internal/strava"
 )
@@ -31,6 +32,16 @@ type Server struct {
 	// Webhook store (opcional, fase 1.2 issue #86): para webhooks de Strava.
 	// Se monta antes del middleware de auth, es signature-gated.
 	webhookStore strava.ActivityEventStore
+	// GPX Lab dependencies are optional so focused router tests and commands that
+	// do not initialize the feature keep their existing construction path.
+	gpxStore         gpx.GPXStore
+	gpxParser        gpx.GPXParser
+	gpxValidator     gpx.GPXValidator
+	gpxAnalyzer      gpx.GPXAnalyzer
+	gpxClimbDetector gpx.ClimbDetector
+	gpxRiskDetector  gpx.RiskZoneDetector
+	gpxTypeDetector  gpx.TrackTypeDetector
+	gpxHasher        gpx.GPXHasher
 }
 
 // NewServer crea un Server con el pool de base de datos y configuración proporcionados.
@@ -54,6 +65,27 @@ func (s *Server) WithStrava(client *strava.Client, store strava.TokenStore, ciph
 // tanto la encolada de eventos como la encolada de jobs River.
 func (s *Server) WithWebhooks(store strava.ActivityEventStore) *Server {
 	s.webhookStore = store
+	return s
+}
+
+func (s *Server) WithGPX(
+	store gpx.GPXStore,
+	parser gpx.GPXParser,
+	validator gpx.GPXValidator,
+	analyzer gpx.GPXAnalyzer,
+	climbDetector gpx.ClimbDetector,
+	riskDetector gpx.RiskZoneDetector,
+	typeDetector gpx.TrackTypeDetector,
+	hasher gpx.GPXHasher,
+) *Server {
+	s.gpxStore = store
+	s.gpxParser = parser
+	s.gpxValidator = validator
+	s.gpxAnalyzer = analyzer
+	s.gpxClimbDetector = climbDetector
+	s.gpxRiskDetector = riskDetector
+	s.gpxTypeDetector = typeDetector
+	s.gpxHasher = hasher
 	return s
 }
 
@@ -115,6 +147,13 @@ func (s *Server) Router() http.Handler {
 		// v1 API routes
 		r.Route("/v1", func(r chi.Router) {
 			r.Get("/me", handlers.Me(s.queries).ServeHTTP)
+
+			if s.gpxStore != nil {
+				r.Route("/gpx", func(r chi.Router) {
+					r.Post("/upload", handlers.UploadGPX(s.gpxStore, s.gpxParser, s.gpxValidator, s.gpxAnalyzer, s.gpxClimbDetector, s.gpxRiskDetector, s.gpxTypeDetector, s.gpxHasher).ServeHTTP)
+					r.Get("/{id}", handlers.GetGPX(s.gpxStore).ServeHTTP)
+				})
+			}
 
 			// Strava OAuth (issue #14, fase 1.2): se monta solo si el wiring
 			// inyectó dependencias (cliente + store + cipher key). Las rutas
