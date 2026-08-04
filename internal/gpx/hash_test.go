@@ -1,12 +1,17 @@
 package gpx
 
 import (
+	"errors"
 	"io"
 	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 )
+
+type failingReader struct{ err error }
+
+func (r failingReader) Read([]byte) (int, error) { return 0, r.err }
 
 func TestHasherReturnsSHA256Hex(t *testing.T) {
 	got, err := (Hasher{}).Hash(strings.NewReader("hello"))
@@ -26,4 +31,9 @@ func TestHasherStreamsReader(t *testing.T) {
 	got, err := (Hasher{}).Hash(io.LimitReader(strings.NewReader(strings.Repeat("gpx", 1000)), 3000))
 	require.NoError(t, err)
 	require.Len(t, got, 64)
+}
+
+func TestHasherReturnsReaderError(t *testing.T) {
+	_, err := (Hasher{}).Hash(failingReader{err: errors.New("read failed")})
+	require.ErrorContains(t, err, "read failed")
 }

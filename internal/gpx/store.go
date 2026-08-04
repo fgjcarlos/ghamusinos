@@ -11,10 +11,19 @@ import (
 )
 
 type SQLCStore struct {
-	q sqlc.Querier
+	q gpxQuerier
 }
 
-func NewSQLCStore(q sqlc.Querier) *SQLCStore {
+// gpxQuerier keeps GPX persistence isolated from sqlc's generated global
+// Querier interface so adding GPX queries does not break unrelated mocks.
+type gpxQuerier interface {
+	CreateGPXTrack(context.Context, sqlc.CreateGPXTrackParams) (sqlc.GpxTrack, error)
+	GetGPXTrackByID(context.Context, sqlc.GetGPXTrackByIDParams) (sqlc.GpxTrack, error)
+	ListGPXTracksByUser(context.Context, sqlc.ListGPXTracksByUserParams) ([]sqlc.GpxTrack, error)
+	DeleteGPXTrack(context.Context, sqlc.DeleteGPXTrackParams) error
+}
+
+func NewSQLCStore(q gpxQuerier) *SQLCStore {
 	return &SQLCStore{q: q}
 }
 

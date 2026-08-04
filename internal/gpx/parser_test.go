@@ -1,6 +1,7 @@
 package gpx
 
 import (
+	"errors"
 	"os"
 	"strings"
 	"testing"
@@ -52,4 +53,9 @@ func TestParserRejectsMalformedXML(t *testing.T) {
 func TestParserRejectsNoTrackpoints(t *testing.T) {
 	_, err := (Parser{}).Parse(strings.NewReader(`<gpx version="1.1" creator="test"></gpx>`))
 	require.ErrorContains(t, err, "no trackpoints")
+}
+
+func TestParserReturnsReaderError(t *testing.T) {
+	_, err := (Parser{}).Parse(failingReader{err: errors.New("read failed")})
+	require.ErrorContains(t, err, "invalid GPX: read")
 }

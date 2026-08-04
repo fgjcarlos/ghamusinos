@@ -2,6 +2,7 @@ package gpx
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	"github.com/fgjcarlos/ghamusinos/internal/db/sqlc"
@@ -17,26 +18,27 @@ type mockGPXQuerier struct {
 	deleteParams sqlc.DeleteGPXTrackParams
 	track        sqlc.GpxTrack
 	tracks       []sqlc.GpxTrack
+	err          error
 }
 
 func (m *mockGPXQuerier) CreateGPXTrack(_ context.Context, params sqlc.CreateGPXTrackParams) (sqlc.GpxTrack, error) {
 	m.created = params
-	return m.track, nil
+	return m.track, m.err
 }
 
 func (m *mockGPXQuerier) GetGPXTrackByID(_ context.Context, params sqlc.GetGPXTrackByIDParams) (sqlc.GpxTrack, error) {
 	m.getParams = params
-	return m.track, nil
+	return m.track, m.err
 }
 
 func (m *mockGPXQuerier) ListGPXTracksByUser(_ context.Context, params sqlc.ListGPXTracksByUserParams) ([]sqlc.GpxTrack, error) {
 	m.listParams = params
-	return m.tracks, nil
+	return m.tracks, m.err
 }
 
 func (m *mockGPXQuerier) DeleteGPXTrack(_ context.Context, params sqlc.DeleteGPXTrackParams) error {
 	m.deleteParams = params
-	return nil
+	return m.err
 }
 
 func TestSQLCStoreCreateMapsTrackAndAnalysis(t *testing.T) {
@@ -76,6 +78,36 @@ func TestSQLCStoreDeleteScopesByUser(t *testing.T) {
 	require.NoError(t, NewSQLCStore(query).Delete(context.Background(), userID, trackID))
 	require.Equal(t, userID, query.deleteParams.UserID)
 	require.Equal(t, trackID, query.deleteParams.ID)
+}
+
+func TestSQLCStoreRejectsMissingDependencies(t *testing.T) {
+	ctx := context.Background()
+	require.Error(t, NewSQLCStore(nil).Create(ctx, &Track{}, &Analysis{}))
+	require.Error(t, NewSQLCStore(&mockGPXQuerier{}).Create(ctx, nil, &Analysis{}))
+	_, err := NewSQLCStore(nil).GetByID(ctx, pgtype.UUID{}, pgtype.UUID{})
+	require.Error(t, err)
+	_, err = NewSQLCStore(nil).List(ctx, pgtype.UUID{}, ListParams{})
+	require.Error(t, err)
+	require.Error(t, NewSQLCStore(nil).Delete(ctx, pgtype.UUID{}, pgtype.UUID{}))
+}
+
+func TestSQLCStoreWrapsQueryErrors(t *testing.T) {
+	query := &mockGPXQuerier{err: errors.New("database unavailable")}
+	ctx := context.Background()
+	track := &Track{Name: "Trail", TrackType: "point-to-point", Points: []Point{{}, {}}}
+	require.ErrorContains(t, NewSQLCStore(query).Create(ctx, track, &Analysis{}), "create track")
+	_, err := NewSQLCStore(query).GetByID(ctx, pgtype.UUID{}, pgtype.UUID{})
+	require.ErrorContains(t, err, "get track")
+	_, err = NewSQLCStore(query).List(ctx, pgtype.UUID{}, ListParams{})
+	require.ErrorContains(t, err, "list tracks")
+	require.ErrorContains(t, NewSQLCStore(query).Delete(ctx, pgtype.UUID{}, pgtype.UUID{}), "delete track")
+}
+
+func TestSQLCStoreRejectsInvalidStoredCoordinates(t *testing.T) {
+	query := &mockGPXQuerier{track: databaseTrack(pgtype.UUID{}, pgtype.UUID{})}
+	query.track.Coordinates = []byte(`not-json`)
+	_, err := NewSQLCStore(query).GetByID(context.Background(), pgtype.UUID{}, pgtype.UUID{})
+	require.ErrorContains(t, err, "unmarshal coordinates")
 }
 
 func databaseTrack(id, userID pgtype.UUID) sqlc.GpxTrack {

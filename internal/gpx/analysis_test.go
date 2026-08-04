@@ -76,6 +76,8 @@ func TestCalculateAdjustedSpeed(t *testing.T) {
 func TestCalculateDifficulty(t *testing.T) {
 	a := Analyzer{}
 	require.Equal(t, DifficultyBeginner, a.CalculateDifficulty(5000, 0, 2))
+	require.Equal(t, DifficultyIntermediate, a.CalculateDifficulty(20000, 1000, 10))
+	require.Equal(t, DifficultyAdvanced, a.CalculateDifficulty(50000, 2500, 20))
 	require.Equal(t, DifficultyPro, a.CalculateDifficulty(100000, 5000, 50))
 }
 
@@ -104,4 +106,12 @@ func TestCalculateTotalDPlusFlatTrack(t *testing.T) {
 func TestCalculateTotalDMinusTwoPoints(t *testing.T) {
 	points := []Point{{Ele: elevation(150)}, {Ele: elevation(100)}}
 	require.InDelta(t, 50, (Analyzer{}).CalculateTotalDMinus(points, 30), 0.001)
+}
+
+func TestCalculateAdjustedSpeedExtremeDownhill(t *testing.T) {
+	require.InDelta(t, 1.4, (Analyzer{}).CalculateAdjustedSpeed(2, -50), 0.001)
+}
+
+func TestCalculateRunnabilityEmptyTrack(t *testing.T) {
+	require.InDelta(t, 1, (Analyzer{}).CalculateRunnabilityIndex(nil), 0.001)
 }

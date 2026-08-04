@@ -11,15 +11,11 @@ import (
 )
 
 type Querier interface {
-	CreateGPXClimb(ctx context.Context, arg CreateGPXClimbParams) (GpxClimb, error)
-	CreateGPXRiskZone(ctx context.Context, arg CreateGPXRiskZoneParams) (GpxRiskZone, error)
-	CreateGPXTrack(ctx context.Context, arg CreateGPXTrackParams) (GpxTrack, error)
 	CreateInvite(ctx context.Context, arg CreateInviteParams) (Invite, error)
 	// Crea una nueva sesión de sincronización en estado 'pending'. El caller la
 	// transita a 'running' con UpdateSyncSessionStatus cuando empieza a procesar.
 	CreateSyncSession(ctx context.Context, arg CreateSyncSessionParams) (SyncSession, error)
 	CreateUser(ctx context.Context, arg CreateUserParams) (User, error)
-	DeleteGPXTrack(ctx context.Context, arg DeleteGPXTrackParams) error
 	// Limpia los tokens del usuario (logout / desvinculación).
 	DeleteStravaTokensByUserID(ctx context.Context, userID pgtype.UUID) error
 	// Encola un evento de Strava (webhook). Devuelve la fila; si external_id
@@ -37,7 +33,6 @@ type Querier interface {
 	// Búsqueda idempotente por (usuario, fuente, id externo). Es la operación
 	// central de la deduplicación: si existe, se actualiza; si no, se inserta.
 	GetActivityByExternalID(ctx context.Context, arg GetActivityByExternalIDParams) (Activity, error)
-	GetGPXTrackByID(ctx context.Context, arg GetGPXTrackByIDParams) (GpxTrack, error)
 	GetHRZonesByActivity(ctx context.Context, activityID pgtype.UUID) (HrZone, error)
 	GetInviteByTokenHash(ctx context.Context, tokenHash string) (Invite, error)
 	// Obtiene la sesión de sincronización más reciente del usuario.
@@ -52,9 +47,6 @@ type Querier interface {
 	// es UI paginada con offset; cuando se necesite cursor, se añadirá en su
 	// propia query sin tocar esta.
 	ListActivitiesByUser(ctx context.Context, arg ListActivitiesByUserParams) ([]Activity, error)
-	ListGPXClimbsByTrack(ctx context.Context, trackID pgtype.UUID) ([]GpxClimb, error)
-	ListGPXRiskZonesByTrack(ctx context.Context, trackID pgtype.UUID) ([]GpxRiskZone, error)
-	ListGPXTracksByUser(ctx context.Context, arg ListGPXTracksByUserParams) ([]GpxTrack, error)
 	// Lista los eventos pendientes (processed_at IS NULL) para alimentar un
 	// job de procesamiento. LIMIT defensivo para evitar scans descontrolados.
 	ListPendingActivityEvents(ctx context.Context, limit int32) ([]ActivityEvent, error)
