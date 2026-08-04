@@ -14,7 +14,7 @@ func testPoint(distanceM, elevationM float64) Point {
 
 func TestFindAllClimbsDetectsSeparatedAscents(t *testing.T) {
 	track := &Track{Points: []Point{
-		testPoint(0, 100), testPoint(100, 155), testPoint(200, 120), testPoint(300, 175),
+		testPoint(0, 100), testPoint(100, 155), testPoint(201, 120), testPoint(301, 175),
 	}}
 
 	climbs, err := (ClimbService{}).FindAllClimbs(track)
@@ -48,6 +48,20 @@ func TestFindAllClimbsIgnoresFlatAndJitter(t *testing.T) {
 	climbs, err := (ClimbService{}).FindAllClimbs(track)
 	require.NoError(t, err)
 	require.Empty(t, climbs)
+}
+
+func TestFindAllClimbsMergesClimbsLessThanHundredMetersApart(t *testing.T) {
+	track := &Track{Points: []Point{
+		testPoint(0, 100), testPoint(100, 155), testPoint(150, 120), testPoint(250, 180),
+	}}
+
+	climbs, err := (ClimbService{}).FindAllClimbs(track)
+	require.NoError(t, err)
+	require.Len(t, climbs, 1)
+	require.Equal(t, 0, climbs[0].StartIdx)
+	require.Equal(t, 3, climbs[0].EndIdx)
+	require.InDelta(t, 115, climbs[0].GainM, 0.01)
+	require.InDelta(t, 250, climbs[0].DistanceM, 1)
 }
 
 func TestFindKingClimbSelectsMaximumGain(t *testing.T) {

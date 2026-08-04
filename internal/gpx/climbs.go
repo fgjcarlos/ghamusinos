@@ -39,7 +39,30 @@ func (s ClimbService) FindAllClimbs(track *Track) ([]Climb, error) {
 		}
 	}
 	climbs = s.appendClimb(climbs, points, start, peak)
-	return climbs, nil
+	return s.mergeNearbyClimbs(points, climbs), nil
+}
+
+func (s ClimbService) mergeNearbyClimbs(points []Point, climbs []Climb) []Climb {
+	if len(climbs) < 2 {
+		return climbs
+	}
+	merged := make([]Climb, 0, len(climbs))
+	merged = append(merged, climbs[0])
+	for _, climb := range climbs[1:] {
+		previous := &merged[len(merged)-1]
+		gap := s.analyzer.CalculatePathDistance(points[previous.EndIdx : climb.StartIdx+1])
+		if gap >= 100 {
+			merged = append(merged, climb)
+			continue
+		}
+		previous.EndIdx = climb.EndIdx
+		previous.GainM += climb.GainM
+		previous.DistanceM = s.analyzer.CalculatePathDistance(points[previous.StartIdx : previous.EndIdx+1])
+		if previous.DistanceM > 0 {
+			previous.AvgSlopePct = previous.GainM / previous.DistanceM * 100
+		}
+	}
+	return merged
 }
 
 func (s ClimbService) appendClimb(climbs []Climb, points []Point, start, end int) []Climb {
