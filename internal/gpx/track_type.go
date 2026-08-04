@@ -14,7 +14,7 @@ func (s TrackTypeService) Detect(track *Track) (TrackTypeResult, error) {
 	}
 	points := track.Points
 	if s.analyzer.CalculateDistance(points[0], points[len(points)-1]) >= circularDistanceM {
-		return TrackTypeResult{Type: "point_to_point"}, nil
+		return TrackTypeResult{Type: "point-to-point"}, nil
 	}
 
 	area := 0.0

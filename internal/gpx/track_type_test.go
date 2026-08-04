@@ -22,7 +22,7 @@ func TestDetectTrackTypeClassifiesPointToPointAtHundredMeters(t *testing.T) {
 
 	result, err := (TrackTypeService{}).Detect(track)
 	require.NoError(t, err)
-	require.Equal(t, "point_to_point", result.Type)
+	require.Equal(t, "point-to-point", result.Type)
 	require.Empty(t, result.Direction)
 }
 
