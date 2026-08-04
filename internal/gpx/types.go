@@ -61,6 +61,28 @@ type Climb struct {
 	DistanceM   float64     `json:"distance_m"`
 	AvgSlopePct float64     `json:"avg_slope_pct"`
 	IsKingClimb bool        `json:"is_king_climb"`
+	VAM         *float64    `json:"vam,omitempty"`
+}
+
+type Muro struct {
+	StartIdx    int     `json:"start_idx"`
+	EndIdx      int     `json:"end_idx"`
+	GainM       float64 `json:"gain_m"`
+	DistanceM   float64 `json:"distance_m"`
+	AvgSlopePct float64 `json:"avg_slope_pct"`
+}
+
+type RecoveryZone struct {
+	StartIdx  int     `json:"start_idx"`
+	EndIdx    int     `json:"end_idx"`
+	DistanceM float64 `json:"distance_m"`
+}
+
+type KmVerticalResult struct {
+	StartIdx  int     `json:"start_idx"`
+	EndIdx    int     `json:"end_idx"`
+	GainM     float64 `json:"gain_m"`
+	DistanceM float64 `json:"distance_m"`
 }
 
 type RiskZone struct {
@@ -69,6 +91,11 @@ type RiskZone struct {
 	EndIdx   int         `json:"end_idx"`
 	RiskType string      `json:"risk_type"`
 	Severity string      `json:"severity"`
+}
+
+type TrackTypeResult struct {
+	Type      string `json:"type"`
+	Direction string `json:"direction,omitempty"`
 }
 
 type StoredTrack struct {
@@ -115,6 +142,22 @@ type GPXAnalyzer interface {
 	CalculateDifficulty(distance, dPlus, maxSlope float64) DifficultyLabel
 	CalculateRunnabilityIndex(track *Track) float64
 	CalculateMovingTime(points []Point, maxDeltaS int) int
+}
+
+type ClimbDetector interface {
+	FindAllClimbs(track *Track) ([]Climb, error)
+	FindKingClimb(track *Track, climbs []Climb) (*Climb, error)
+	FindMuros(track *Track) ([]Muro, error)
+	FindRecoveryZones(track *Track, climbs []Climb) ([]RecoveryZone, error)
+	FindKmVertical(track *Track) (*KmVerticalResult, error)
+}
+
+type RiskZoneDetector interface {
+	Detect(track *Track) ([]RiskZone, error)
+}
+
+type TrackTypeDetector interface {
+	Detect(track *Track) (TrackTypeResult, error)
 }
 
 type GPXStore interface {
