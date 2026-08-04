@@ -47,6 +47,56 @@ type ActivityStream struct {
 	Data       []byte      `json:"data"`
 }
 
+type GpxClimb struct {
+	ID          pgtype.UUID    `json:"id"`
+	TrackID     pgtype.UUID    `json:"track_id"`
+	IsKingClimb bool           `json:"is_king_climb"`
+	StartIdx    int32          `json:"start_idx"`
+	EndIdx      int32          `json:"end_idx"`
+	GainM       pgtype.Numeric `json:"gain_m"`
+	DistanceM   pgtype.Numeric `json:"distance_m"`
+	AvgSlopePct pgtype.Numeric `json:"avg_slope_pct"`
+}
+
+type GpxRiskZone struct {
+	ID       pgtype.UUID `json:"id"`
+	TrackID  pgtype.UUID `json:"track_id"`
+	StartIdx int32       `json:"start_idx"`
+	EndIdx   int32       `json:"end_idx"`
+	RiskType string      `json:"risk_type"`
+	Severity string      `json:"severity"`
+}
+
+type GpxTrack struct {
+	ID              pgtype.UUID        `json:"id"`
+	UserID          pgtype.UUID        `json:"user_id"`
+	Name            string             `json:"name"`
+	FileHash        string             `json:"file_hash"`
+	FileSizeBytes   int64              `json:"file_size_bytes"`
+	Coordinates     []byte             `json:"coordinates"`
+	DistanceM       pgtype.Numeric     `json:"distance_m"`
+	MovingTimeS     int32              `json:"moving_time_s"`
+	DPlusM          pgtype.Numeric     `json:"d_plus_m"`
+	DMinusM         pgtype.Numeric     `json:"d_minus_m"`
+	MaxElevationM   pgtype.Numeric     `json:"max_elevation_m"`
+	MinElevationM   pgtype.Numeric     `json:"min_elevation_m"`
+	AvgSlopePct     pgtype.Numeric     `json:"avg_slope_pct"`
+	MaxSlopePct     pgtype.Numeric     `json:"max_slope_pct"`
+	EffortIndex     pgtype.Numeric     `json:"effort_index"`
+	ItraPoints      pgtype.Numeric     `json:"itra_points"`
+	LegBreakerIndex pgtype.Numeric     `json:"leg_breaker_index"`
+	EstimatedVam    pgtype.Numeric     `json:"estimated_vam"`
+	DifficultyScore int32              `json:"difficulty_score"`
+	DifficultyLabel string             `json:"difficulty_label"`
+	RunnabilityPct  pgtype.Numeric     `json:"runnability_pct"`
+	KingClimb       []byte             `json:"king_climb"`
+	TrackType       string             `json:"track_type"`
+	Direction       pgtype.Text        `json:"direction"`
+	CreatedAt       pgtype.Timestamptz `json:"created_at"`
+	AnalyzedAt      pgtype.Timestamptz `json:"analyzed_at"`
+	UpdatedAt       pgtype.Timestamptz `json:"updated_at"`
+}
+
 type HrZone struct {
 	ActivityID pgtype.UUID        `json:"activity_id"`
 	Z1Seconds  int32              `json:"z1_seconds"`

@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<gpx version="1.1" creator="ghamusinos-test" xmlns="http://www.topografix.com/GPX/1/1">
+  <trk><name>Flat track</name><trkseg>
+    <trkpt lat="40.4168" lon="-3.7038"><ele>650</ele><time>2026-01-01T10:00:00Z</time></trkpt>
+    <trkpt lat="40.4213" lon="-3.7038"><ele>650</ele><time>2026-01-01T10:03:00Z</time></trkpt>
+    <trkpt lat="40.4258" lon="-3.7038"><ele>650</ele><time>2026-01-01T10:06:00Z</time></trkpt>
+    <trkpt lat="40.4303" lon="-3.7038"><ele>650</ele><time>2026-01-01T10:09:00Z</time></trkpt>
+    <trkpt lat="40.4348" lon="-3.7038"><ele>650</ele><time>2026-01-01T10:12:00Z</time></trkpt>
+    <trkpt lat="40.4393" lon="-3.7038"><ele>650</ele><time>2026-01-01T10:15:00Z</time></trkpt>
+    <trkpt lat="40.4438" lon="-3.7038"><ele>650</ele><time>2026-01-01T10:18:00Z</time></trkpt>
+    <trkpt lat="40.4483" lon="-3.7038"><ele>650</ele><time>2026-01-01T10:21:00Z</time></trkpt>
+    <trkpt lat="40.4528" lon="-3.7038"><ele>650</ele><time>2026-01-01T10:24:00Z</time></trkpt>
+    <trkpt lat="40.4573" lon="-3.7038"><ele>650</ele><time>2026-01-01T10:27:00Z</time></trkpt>
+    <trkpt lat="40.4618" lon="-3.7038"><ele>650</ele><time>2026-01-01T10:30:00Z</time></trkpt>
+  </trkseg></trk>
+</gpx>
