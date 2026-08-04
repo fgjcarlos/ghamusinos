@@ -50,7 +50,7 @@ func multipartGPXRequest(t *testing.T, content []byte, authenticated bool) *http
 	_, err = io.Copy(part, bytes.NewReader(content))
 	require.NoError(t, err)
 	require.NoError(t, writer.Close())
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/gpx/upload", &body)
+	req := httptest.NewRequestWithContext(context.Background(), http.MethodPost, "/api/v1/gpx/upload", &body)
 	req.Header.Set("Content-Type", writer.FormDataContentType())
 	if authenticated {
 		req = req.WithContext(auth.WithAuthUser(req.Context(), &auth.User{ID: "00000000-0000-0000-0000-000000000001"}))

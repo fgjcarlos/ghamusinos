@@ -27,7 +27,7 @@ func (s *detailGPXStore) GetDetail(_ context.Context, userID, trackID pgtype.UUI
 }
 
 func getGPXRequest(authenticated bool) *http.Request {
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/gpx/00000000-0000-0000-0000-000000000002", nil)
+	req := httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/api/v1/gpx/00000000-0000-0000-0000-000000000002", nil)
 	routeCtx := chi.NewRouteContext()
 	routeCtx.URLParams.Add("id", "00000000-0000-0000-0000-000000000002")
 	req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, routeCtx))

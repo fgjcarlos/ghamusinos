@@ -106,7 +106,8 @@ func slopeCoefficientVariation(values []float64) float64 {
 	mean /= float64(len(values))
 	var variance float64
 	for _, value := range values {
-		variance += math.Pow(value-mean, 2)
+		delta := value - mean
+		variance += delta * delta
 	}
 	deviation := math.Sqrt(variance / float64(len(values)))
 	if math.Abs(mean) < 1e-9 {

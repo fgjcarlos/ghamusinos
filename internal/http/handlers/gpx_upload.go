@@ -231,6 +231,8 @@ func elevationRange(points []gpx.Point) (*float64, *float64) {
 
 func difficultyScore(label gpx.DifficultyLabel) int {
 	switch label {
+	case gpx.DifficultyBeginner:
+		return 20
 	case gpx.DifficultyIntermediate:
 		return 40
 	case gpx.DifficultyAdvanced:
@@ -238,6 +240,6 @@ func difficultyScore(label gpx.DifficultyLabel) int {
 	case gpx.DifficultyPro:
 		return 80
 	default:
-		return 20
+		return 0
 	}
 }
