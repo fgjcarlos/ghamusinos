@@ -103,6 +103,12 @@ type StoredTrack struct {
 	Analysis Analysis `json:"analysis"`
 }
 
+type StoredTrackDetail struct {
+	Track     StoredTrack `json:"track"`
+	Climbs    []Climb     `json:"climbs"`
+	RiskZones []RiskZone  `json:"risk_zones"`
+}
+
 type ListParams struct {
 	Limit  int32
 	Offset int32
@@ -162,7 +168,12 @@ type TrackTypeDetector interface {
 
 type GPXStore interface {
 	Create(ctx context.Context, track *Track, analysis *Analysis) error
+	CreateDetail(ctx context.Context, track *Track, analysis *Analysis, climbs []Climb, riskZones []RiskZone, kingClimb *Climb) (*StoredTrackDetail, error)
 	GetByID(ctx context.Context, userID pgtype.UUID, trackID pgtype.UUID) (*StoredTrack, error)
+	GetDetail(ctx context.Context, userID pgtype.UUID, trackID pgtype.UUID) (*StoredTrackDetail, error)
+	FindByHash(ctx context.Context, userID pgtype.UUID, fileHash string) (*StoredTrack, error)
+	ListClimbs(ctx context.Context, trackID pgtype.UUID) ([]Climb, error)
+	ListRiskZones(ctx context.Context, trackID pgtype.UUID) ([]RiskZone, error)
 	List(ctx context.Context, userID pgtype.UUID, params ListParams) (*PaginatedTracks, error)
 	Delete(ctx context.Context, userID pgtype.UUID, trackID pgtype.UUID) error
 }

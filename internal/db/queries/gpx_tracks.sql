@@ -22,6 +22,12 @@ FROM gpx_tracks
 WHERE id = $1 AND user_id = $2
 LIMIT 1;
 
+-- name: GetGPXTrackByHash :one
+SELECT *
+FROM gpx_tracks
+WHERE user_id = $1 AND file_hash = $2
+LIMIT 1;
+
 -- name: ListGPXTracksByUser :many
 SELECT *
 FROM gpx_tracks
