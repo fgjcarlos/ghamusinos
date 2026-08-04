@@ -61,6 +61,28 @@ type Climb struct {
 	DistanceM   float64     `json:"distance_m"`
 	AvgSlopePct float64     `json:"avg_slope_pct"`
 	IsKingClimb bool        `json:"is_king_climb"`
+	VAM         *float64    `json:"vam,omitempty"`
+}
+
+type Muro struct {
+	StartIdx    int     `json:"start_idx"`
+	EndIdx      int     `json:"end_idx"`
+	GainM       float64 `json:"gain_m"`
+	DistanceM   float64 `json:"distance_m"`
+	AvgSlopePct float64 `json:"avg_slope_pct"`
+}
+
+type RecoveryZone struct {
+	StartIdx  int     `json:"start_idx"`
+	EndIdx    int     `json:"end_idx"`
+	DistanceM float64 `json:"distance_m"`
+}
+
+type KmVerticalResult struct {
+	StartIdx  int     `json:"start_idx"`
+	EndIdx    int     `json:"end_idx"`
+	GainM     float64 `json:"gain_m"`
+	DistanceM float64 `json:"distance_m"`
 }
 
 type RiskZone struct {
@@ -71,9 +93,20 @@ type RiskZone struct {
 	Severity string      `json:"severity"`
 }
 
+type TrackTypeResult struct {
+	Type      string `json:"type"`
+	Direction string `json:"direction,omitempty"`
+}
+
 type StoredTrack struct {
 	Track    Track    `json:"track"`
 	Analysis Analysis `json:"analysis"`
+}
+
+type StoredTrackDetail struct {
+	Track     StoredTrack `json:"track"`
+	Climbs    []Climb     `json:"climbs"`
+	RiskZones []RiskZone  `json:"risk_zones"`
 }
 
 type ListParams struct {
@@ -117,9 +150,30 @@ type GPXAnalyzer interface {
 	CalculateMovingTime(points []Point, maxDeltaS int) int
 }
 
+type ClimbDetector interface {
+	FindAllClimbs(track *Track) ([]Climb, error)
+	FindKingClimb(track *Track, climbs []Climb) (*Climb, error)
+	FindMuros(track *Track) ([]Muro, error)
+	FindRecoveryZones(track *Track, climbs []Climb) ([]RecoveryZone, error)
+	FindKmVertical(track *Track) (*KmVerticalResult, error)
+}
+
+type RiskZoneDetector interface {
+	Detect(track *Track) ([]RiskZone, error)
+}
+
+type TrackTypeDetector interface {
+	Detect(track *Track) (TrackTypeResult, error)
+}
+
 type GPXStore interface {
 	Create(ctx context.Context, track *Track, analysis *Analysis) error
+	CreateDetail(ctx context.Context, track *Track, analysis *Analysis, climbs []Climb, riskZones []RiskZone, kingClimb *Climb) (*StoredTrackDetail, error)
 	GetByID(ctx context.Context, userID pgtype.UUID, trackID pgtype.UUID) (*StoredTrack, error)
+	GetDetail(ctx context.Context, userID pgtype.UUID, trackID pgtype.UUID) (*StoredTrackDetail, error)
+	FindByHash(ctx context.Context, userID pgtype.UUID, fileHash string) (*StoredTrack, error)
+	ListClimbs(ctx context.Context, trackID pgtype.UUID) ([]Climb, error)
+	ListRiskZones(ctx context.Context, trackID pgtype.UUID) ([]RiskZone, error)
 	List(ctx context.Context, userID pgtype.UUID, params ListParams) (*PaginatedTracks, error)
 	Delete(ctx context.Context, userID pgtype.UUID, trackID pgtype.UUID) error
 }

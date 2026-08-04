@@ -13,12 +13,50 @@ import (
 type mockGPXQuerier struct {
 	sqlc.Querier
 	created      sqlc.CreateGPXTrackParams
+	createdClimb sqlc.CreateGPXClimbParams
+	createdRisk  sqlc.CreateGPXRiskZoneParams
 	getParams    sqlc.GetGPXTrackByIDParams
+	hashParams   sqlc.GetGPXTrackByHashParams
 	listParams   sqlc.ListGPXTracksByUserParams
 	deleteParams sqlc.DeleteGPXTrackParams
 	track        sqlc.GpxTrack
 	tracks       []sqlc.GpxTrack
 	err          error
+	climbs       []sqlc.GpxClimb
+	risks        []sqlc.GpxRiskZone
+}
+
+type mockGPXTransactionRunner struct {
+	query gpxQuerier
+	runs  int
+}
+
+func (m *mockGPXTransactionRunner) WithinTransaction(ctx context.Context, fn func(gpxQuerier) error) error {
+	m.runs++
+	return fn(m.query)
+}
+
+func (m *mockGPXQuerier) CreateGPXClimb(_ context.Context, params sqlc.CreateGPXClimbParams) (sqlc.GpxClimb, error) {
+	m.createdClimb = params
+	return sqlc.GpxClimb{}, m.err
+}
+
+func (m *mockGPXQuerier) CreateGPXRiskZone(_ context.Context, params sqlc.CreateGPXRiskZoneParams) (sqlc.GpxRiskZone, error) {
+	m.createdRisk = params
+	return sqlc.GpxRiskZone{}, m.err
+}
+
+func (m *mockGPXQuerier) GetGPXTrackByHash(_ context.Context, params sqlc.GetGPXTrackByHashParams) (sqlc.GpxTrack, error) {
+	m.hashParams = params
+	return m.track, m.err
+}
+
+func (m *mockGPXQuerier) ListGPXClimbsByTrack(_ context.Context, _ pgtype.UUID) ([]sqlc.GpxClimb, error) {
+	return m.climbs, m.err
+}
+
+func (m *mockGPXQuerier) ListGPXRiskZonesByTrack(_ context.Context, _ pgtype.UUID) ([]sqlc.GpxRiskZone, error) {
+	return m.risks, m.err
 }
 
 func (m *mockGPXQuerier) CreateGPXTrack(_ context.Context, params sqlc.CreateGPXTrackParams) (sqlc.GpxTrack, error) {
@@ -108,6 +146,64 @@ func TestSQLCStoreRejectsInvalidStoredCoordinates(t *testing.T) {
 	query.track.Coordinates = []byte(`not-json`)
 	_, err := NewSQLCStore(query).GetByID(context.Background(), pgtype.UUID{}, pgtype.UUID{})
 	require.ErrorContains(t, err, "unmarshal coordinates")
+}
+
+func TestSQLCStoreCreateDetailPersistsClimbsAndRiskZones(t *testing.T) {
+	trackID := pgtype.UUID{Bytes: [16]byte{9}, Valid: true}
+	query := &mockGPXQuerier{track: databaseTrack(trackID, pgtype.UUID{Valid: true})}
+	track := &Track{Name: "Trail", FileHash: "hash", FileSizeBytes: 2048, TrackType: "circular", Points: []Point{{Lat: 40, Lon: -3}, {Lat: 41, Lon: -4}}}
+	climbs := []Climb{{StartIdx: 1, EndIdx: 4, GainM: 120, DistanceM: 600, AvgSlopePct: 20, IsKingClimb: true}}
+	risks := []RiskZone{{StartIdx: 2, EndIdx: 3, RiskType: "steep", Severity: "high"}}
+
+	detail, err := NewSQLCStore(query).CreateDetail(context.Background(), track, &Analysis{DistanceM: 1000}, climbs, risks, &climbs[0])
+	require.NoError(t, err)
+	require.Equal(t, trackID, detail.Track.Track.ID)
+	require.Equal(t, trackID, query.createdClimb.TrackID)
+	require.Equal(t, int32(1), query.createdClimb.StartIdx)
+	require.True(t, query.createdClimb.IsKingClimb)
+	require.Equal(t, trackID, query.createdRisk.TrackID)
+	require.Equal(t, "steep", query.createdRisk.RiskType)
+	require.JSONEq(t, `{"start_idx":1,"end_idx":4,"gain_m":120,"distance_m":600,"avg_slope_pct":20,"is_king_climb":true}`, string(query.created.KingClimb))
+}
+
+func TestSQLCStoreCreateDetailUsesTransactionRunner(t *testing.T) {
+	query := &mockGPXQuerier{track: databaseTrack(pgtype.UUID{Valid: true}, pgtype.UUID{Valid: true})}
+	runner := &mockGPXTransactionRunner{query: query}
+	store := newTransactionalSQLCStore(query, runner)
+
+	_, err := store.CreateDetail(context.Background(), &Track{TrackType: "point-to-point", Points: []Point{{}, {}}}, &Analysis{}, nil, nil, nil)
+	require.NoError(t, err)
+	require.Equal(t, 1, runner.runs)
+}
+
+func TestSQLCStoreFindByHashScopesDuplicateToUser(t *testing.T) {
+	userID := pgtype.UUID{Bytes: [16]byte{1}, Valid: true}
+	query := &mockGPXQuerier{track: databaseTrack(pgtype.UUID{Bytes: [16]byte{2}, Valid: true}, userID)}
+
+	stored, err := NewSQLCStore(query).FindByHash(context.Background(), userID, "same-hash")
+	require.NoError(t, err)
+	require.Equal(t, userID, query.hashParams.UserID)
+	require.Equal(t, "same-hash", query.hashParams.FileHash)
+	require.Equal(t, query.track.ID, stored.Track.ID)
+}
+
+func TestSQLCStoreGetDetailHydratesChildren(t *testing.T) {
+	userID := pgtype.UUID{Bytes: [16]byte{1}, Valid: true}
+	trackID := pgtype.UUID{Bytes: [16]byte{2}, Valid: true}
+	query := &mockGPXQuerier{
+		track:  databaseTrack(trackID, userID),
+		climbs: []sqlc.GpxClimb{{StartIdx: 1, EndIdx: 3, GainM: numeric(100), IsKingClimb: true}},
+		risks:  []sqlc.GpxRiskZone{{StartIdx: 2, EndIdx: 4, RiskType: "technical", Severity: "medium"}},
+	}
+
+	detail, err := NewSQLCStore(query).GetDetail(context.Background(), userID, trackID)
+	require.NoError(t, err)
+	require.Equal(t, trackID, detail.Track.Track.ID)
+	require.Len(t, detail.Climbs, 1)
+	require.True(t, detail.Climbs[0].IsKingClimb)
+	require.InDelta(t, 100, detail.Climbs[0].GainM, 0.01)
+	require.Len(t, detail.RiskZones, 1)
+	require.Equal(t, "technical", detail.RiskZones[0].RiskType)
 }
 
 func databaseTrack(id, userID pgtype.UUID) sqlc.GpxTrack {

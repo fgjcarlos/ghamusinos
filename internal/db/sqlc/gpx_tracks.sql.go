@@ -130,6 +130,53 @@ func (q *Queries) DeleteGPXTrack(ctx context.Context, arg DeleteGPXTrackParams) 
 	return err
 }
 
+const getGPXTrackByHash = `-- name: GetGPXTrackByHash :one
+SELECT id, user_id, name, file_hash, file_size_bytes, coordinates, distance_m, moving_time_s, d_plus_m, d_minus_m, max_elevation_m, min_elevation_m, avg_slope_pct, max_slope_pct, effort_index, itra_points, leg_breaker_index, estimated_vam, difficulty_score, difficulty_label, runnability_pct, king_climb, track_type, direction, created_at, analyzed_at, updated_at
+FROM gpx_tracks
+WHERE user_id = $1 AND file_hash = $2
+LIMIT 1
+`
+
+type GetGPXTrackByHashParams struct {
+	UserID   pgtype.UUID `json:"user_id"`
+	FileHash string      `json:"file_hash"`
+}
+
+func (q *Queries) GetGPXTrackByHash(ctx context.Context, arg GetGPXTrackByHashParams) (GpxTrack, error) {
+	row := q.db.QueryRow(ctx, getGPXTrackByHash, arg.UserID, arg.FileHash)
+	var i GpxTrack
+	err := row.Scan(
+		&i.ID,
+		&i.UserID,
+		&i.Name,
+		&i.FileHash,
+		&i.FileSizeBytes,
+		&i.Coordinates,
+		&i.DistanceM,
+		&i.MovingTimeS,
+		&i.DPlusM,
+		&i.DMinusM,
+		&i.MaxElevationM,
+		&i.MinElevationM,
+		&i.AvgSlopePct,
+		&i.MaxSlopePct,
+		&i.EffortIndex,
+		&i.ItraPoints,
+		&i.LegBreakerIndex,
+		&i.EstimatedVam,
+		&i.DifficultyScore,
+		&i.DifficultyLabel,
+		&i.RunnabilityPct,
+		&i.KingClimb,
+		&i.TrackType,
+		&i.Direction,
+		&i.CreatedAt,
+		&i.AnalyzedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
 const getGPXTrackByID = `-- name: GetGPXTrackByID :one
 SELECT id, user_id, name, file_hash, file_size_bytes, coordinates, distance_m, moving_time_s, d_plus_m, d_minus_m, max_elevation_m, min_elevation_m, avg_slope_pct, max_slope_pct, effort_index, itra_points, leg_breaker_index, estimated_vam, difficulty_score, difficulty_label, runnability_pct, king_climb, track_type, direction, created_at, analyzed_at, updated_at
 FROM gpx_tracks

@@ -11,6 +11,8 @@ import (
 
 	"github.com/fgjcarlos/ghamusinos/internal/config"
 	"github.com/fgjcarlos/ghamusinos/internal/db/sqlc"
+	"github.com/fgjcarlos/ghamusinos/internal/gpx"
+	"github.com/stretchr/testify/require"
 )
 
 // mockQuerier es un stub minimal para tests sin base de datos.
@@ -219,4 +221,21 @@ func TestRouterAPIUnknownVersion(t *testing.T) {
 	if resp.StatusCode != http.StatusUnauthorized {
 		t.Fatalf("GET /api/v2/foo sin token quería 401, obtuvo %d", resp.StatusCode)
 	}
+}
+
+func TestWithGPXStoresSegregatedDependencies(t *testing.T) {
+	cfg := &config.Config{ClerkJWKSURL: "https://clerk.example.com/.well-known/jwks.json"}
+	store := gpx.NewSQLCStore(nil)
+	server := NewServer(nil, &mockQuerier{}, cfg)
+
+	returned := server.WithGPX(store, gpx.Parser{}, gpx.Validator{}, gpx.Analyzer{}, gpx.ClimbService{}, gpx.RiskService{}, gpx.TrackTypeService{}, gpx.Hasher{})
+
+	require.Same(t, server, returned)
+	require.Same(t, store, server.gpxStore)
+	require.NotNil(t, server.gpxParser)
+	require.NotNil(t, server.gpxAnalyzer)
+	require.NotNil(t, server.gpxClimbDetector)
+	require.NotNil(t, server.gpxRiskDetector)
+	require.NotNil(t, server.gpxTypeDetector)
+	require.NotNil(t, server.gpxHasher)
 }
