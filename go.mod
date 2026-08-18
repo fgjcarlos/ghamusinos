@@ -12,12 +12,11 @@ require (
 	github.com/riverqueue/river v0.42.0
 	github.com/riverqueue/river/riverdriver/riverpgxv5 v0.42.0
 	github.com/sethvargo/go-retry v0.4.0
-	github.com/stretchr/testify v1.11.1
+	github.com/stretchr/testify v1.12.0
 	github.com/twpayne/go-gpx v1.5.0
 )
 
 require (
-	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.4.1 // indirect
 	github.com/goccy/go-json v0.10.6 // indirect
 	github.com/jackc/pgpassfile v1.0.0 // indirect
@@ -29,7 +28,6 @@ require (
 	github.com/lestrrat-go/iter v1.0.2 // indirect
 	github.com/lestrrat-go/option v1.0.1 // indirect
 	github.com/mfridman/interpolate v0.0.2 // indirect
-	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/riverqueue/river/riverdriver v0.42.0 // indirect
 	github.com/riverqueue/river/rivershared v0.42.0 // indirect
 	github.com/riverqueue/river/rivertype v0.42.0 // indirect
