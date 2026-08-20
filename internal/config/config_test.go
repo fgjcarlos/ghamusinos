@@ -575,3 +575,86 @@ func TestLoad_TrustedProxiesParsed(t *testing.T) {
 		t.Errorf("TrustedProxies = %v, quería [10.0.0.0/8 127.0.0.1/32]", cfg.TrustedProxies)
 	}
 }
+
+// ─────────────────────────────────────────────────────────────────────────
+// SecurityHeaders + MaxBodyBytes (issue #26)
+// ─────────────────────────────────────────────────────────────────────────
+
+func TestLoad_SecurityHeadersDefaults(t *testing.T) {
+	t.Setenv("DATABASE_URL", "postgres://test:***@localhost/test")
+	t.Setenv("ENV", "production")
+	t.Setenv("CLERK_JWKS_URL", "https://clerk.example.com/jwks")
+	unsetPoolEnv(t)
+	unsetStravaEnv(t)
+	t.Setenv("SECURITY_HSTS_ENABLED", "")
+	t.Setenv("SECURITY_CSP_REPORT_ONLY", "")
+
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("Load() error: %v", err)
+	}
+	if cfg.Security.HSTSEnabled {
+		t.Errorf("Security.HSTSEnabled = true, quería false (default)")
+	}
+	if cfg.Security.CSPReportOnly {
+		t.Errorf("Security.CSPReportOnly = true, quería false (default)")
+	}
+	if cfg.MaxBodyBytes != 10<<20 {
+		t.Errorf("MaxBodyBytes = %d, quería %d (default 10 MiB)", cfg.MaxBodyBytes, 10<<20)
+	}
+}
+
+func TestLoad_SecurityHeadersHSTSEnabled(t *testing.T) {
+	t.Setenv("DATABASE_URL", "postgres://test:***@localhost/test")
+	t.Setenv("ENV", "production")
+	t.Setenv("CLERK_JWKS_URL", "https://clerk.example.com/jwks")
+	unsetPoolEnv(t)
+	unsetStravaEnv(t)
+	t.Setenv("SECURITY_HSTS_ENABLED", "true")
+	t.Setenv("SECURITY_CSP_REPORT_ONLY", "true")
+
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("Load() error: %v", err)
+	}
+	if !cfg.Security.HSTSEnabled {
+		t.Errorf("Security.HSTSEnabled = false, quería true")
+	}
+	if !cfg.Security.CSPReportOnly {
+		t.Errorf("Security.CSPReportOnly = false, quería true")
+	}
+}
+
+func TestLoad_MaxBodyBytesOverride(t *testing.T) {
+	t.Setenv("DATABASE_URL", "postgres://test:***@localhost/test")
+	t.Setenv("ENV", "production")
+	t.Setenv("CLERK_JWKS_URL", "https://clerk.example.com/jwks")
+	unsetPoolEnv(t)
+	unsetStravaEnv(t)
+	t.Setenv("MAX_BODY_BYTES", "5242880")
+
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("Load() error: %v", err)
+	}
+	if cfg.MaxBodyBytes != 5*1024*1024 {
+		t.Errorf("MaxBodyBytes = %d, quería %d", cfg.MaxBodyBytes, 5*1024*1024)
+	}
+}
+
+func TestLoad_MaxBodyBytesInvalidFallsBackToDefault(t *testing.T) {
+	t.Setenv("DATABASE_URL", "postgres://test:***@localhost/test")
+	t.Setenv("ENV", "production")
+	t.Setenv("CLERK_JWKS_URL", "https://clerk.example.com/jwks")
+	unsetPoolEnv(t)
+	unsetStravaEnv(t)
+	t.Setenv("MAX_BODY_BYTES", "esto no es un número")
+
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("Load() no debería fallar con MAX_BODY_BYTES inválido (usa default): %v", err)
+	}
+	if cfg.MaxBodyBytes != 10<<20 {
+		t.Errorf("MaxBodyBytes = %d, quería default %d tras valor inválido", cfg.MaxBodyBytes, 10<<20)
+	}
+}
