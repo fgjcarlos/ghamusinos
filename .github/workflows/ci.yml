@@ -71,6 +71,22 @@ jobs:
           GOTOOLCHAIN: go1.25.7
         run: golangci-lint run --timeout 5m
 
+      - name: govulncheck
+        env:
+          GOTOOLCHAIN: go1.25.7
+        run: |
+          # Baja el binario precompilado desde el release oficial de Go
+          # (mismo patrón que el step de golangci-lint más arriba).
+          version="v1.1.4"
+          asset="govulncheck-${version}-linux-amd64"
+          curl -sSfL -o "/tmp/${asset}.zip" \
+            "https://github.com/golang/vuln/releases/download/${version}/${asset}.zip"
+          unzip -q -o "/tmp/${asset}.zip" -d /tmp/govulncheck-bin
+          install -m 0755 /tmp/govulncheck-bin/govulncheck "$(go env GOPATH)/bin/govulncheck"
+          echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
+          govulncheck -version
+          govulncheck ./...
+
       - name: go test
         run: go test -race -coverprofile=coverage.out -covermode=atomic ./...
 

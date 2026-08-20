@@ -70,10 +70,9 @@ Ver `.env.example`. Las principales:
 
 ## CI
 
-El workflow `.github/workflows/ci.yml` corre en cada push a `main` y en cada PR:
+`backend` job corre, en este orden: `gofmt`, `golangci-lint`, `govulncheck`, `go test -race -coverprofile`, `go build`, smoke de migraciones contra un servicio Postgres. `frontend` job corre `typecheck` + `build`. Todas las acciones externas (`actions/checkout`, `actions/setup-go`, `actions/setup-node`, `pnpm/action-setup`, `actions/upload-artifact`) están pineadas por SHA con comentario de versión. Dependabot cubre `gomod`, `npm` y `github-actions` semanalmente.
 
-- **backend**: `gofmt`, `go vet`, `go test`, `go build` y un smoke de migraciones contra un PostgreSQL de servicio.
-- **frontend**: `pnpm --dir web install --frozen-lockfile` + `pnpm --dir web build`.
+`govulncheck` (issue #23) corre con la base de datos oficial de vulnerabilidades de Go (`vuln.go.dev`); rompe la CI si alguna dep transitiva tiene un CVE conocido con fix disponible.
 
 ## Flujo de trabajo con ramas y PRs
 
