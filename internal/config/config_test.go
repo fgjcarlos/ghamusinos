@@ -496,3 +496,82 @@ func unsetStravaEnv(t *testing.T) {
 		t.Setenv(k, "")
 	}
 }
+
+// ─────────────────────────────────────────────────────────────────────────
+// TrustedProxies (issue #64)
+// ─────────────────────────────────────────────────────────────────────────
+
+func TestParseTrustedProxies_Empty(t *testing.T) {
+	if got := parseTrustedProxies(""); got != nil {
+		t.Errorf("parseTrustedProxies(\"\") = %v, quería nil (fail-closed)", got)
+	}
+}
+
+func TestParseTrustedProxies_SingleCIDR(t *testing.T) {
+	got := parseTrustedProxies("10.0.0.0/8")
+	if len(got) != 1 || got[0] != "10.0.0.0/8" {
+		t.Errorf("got %v, quería [10.0.0.0/8]", got)
+	}
+}
+
+func TestParseTrustedProxies_MultipleCIDRsTrimmed(t *testing.T) {
+	got := parseTrustedProxies(" 10.0.0.0/8 , 172.16.0.0/12 , 192.168.0.0/16 ")
+	want := []string{"10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16"}
+	if len(got) != len(want) {
+		t.Fatalf("len(got) = %d, quería %d", len(got), len(want))
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Errorf("got[%d] = %q, quería %q", i, got[i], want[i])
+		}
+	}
+}
+
+func TestParseTrustedProxies_SkipsEmptyEntries(t *testing.T) {
+	got := parseTrustedProxies("10.0.0.0/8,,, 172.16.0.0/12 ,")
+	want := []string{"10.0.0.0/8", "172.16.0.0/12"}
+	if len(got) != len(want) {
+		t.Fatalf("len(got) = %d, quería %d (got=%v)", len(got), len(want), got)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Errorf("got[%d] = %q, quería %q", i, got[i], want[i])
+		}
+	}
+}
+
+func TestLoad_TrustedProxiesDefaultEmpty(t *testing.T) {
+	t.Setenv("DATABASE_URL", "postgres://test:***@localhost/test")
+	t.Setenv("ENV", "production")
+	t.Setenv("CLERK_JWKS_URL", "https://clerk.example.com/jwks")
+	unsetPoolEnv(t)
+	unsetStravaEnv(t)
+	t.Setenv("TRUSTED_PROXIES", "")
+
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("Load() error: %v", err)
+	}
+	if len(cfg.TrustedProxies) != 0 {
+		t.Errorf("TrustedProxies por defecto debería estar vacío; got %v", cfg.TrustedProxies)
+	}
+}
+
+func TestLoad_TrustedProxiesParsed(t *testing.T) {
+	t.Setenv("DATABASE_URL", "postgres://test:***@localhost/test")
+	t.Setenv("ENV", "production")
+	t.Setenv("CLERK_JWKS_URL", "https://clerk.example.com/jwks")
+	unsetPoolEnv(t)
+	unsetStravaEnv(t)
+	t.Setenv("TRUSTED_PROXIES", "10.0.0.0/8,127.0.0.1/32")
+
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("Load() error: %v", err)
+	}
+	if len(cfg.TrustedProxies) != 2 ||
+		cfg.TrustedProxies[0] != "10.0.0.0/8" ||
+		cfg.TrustedProxies[1] != "127.0.0.1/32" {
+		t.Errorf("TrustedProxies = %v, quería [10.0.0.0/8 127.0.0.1/32]", cfg.TrustedProxies)
+	}
+}

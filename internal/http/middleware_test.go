@@ -69,7 +69,6 @@ func TestRequestLogger_StructuredLog(t *testing.T) {
 	r := chi.NewRouter()
 	r.Use(middleware.RequestID)
 	r.Use(RequestIDHeader)
-	_ = middleware.RealIP //nolint:staticcheck // SA1019
 	r.Use(middleware.Recoverer)
 	r.Use(RequestLogger)
 	r.Get("/healthz", func(w http.ResponseWriter, r *http.Request) {
@@ -120,7 +119,6 @@ func TestRequestLogger_WarnLevel_4xx(t *testing.T) {
 	r := chi.NewRouter()
 	r.Use(middleware.RequestID)
 	r.Use(RequestIDHeader)
-	_ = middleware.RealIP //nolint:staticcheck // SA1019
 	r.Use(middleware.Recoverer)
 	r.Use(RequestLogger)
 	r.Get("/test", func(w http.ResponseWriter, r *http.Request) {
@@ -149,7 +147,6 @@ func TestRequestLogger_ErrorLevel_5xx(t *testing.T) {
 	r := chi.NewRouter()
 	r.Use(middleware.RequestID)
 	r.Use(RequestIDHeader)
-	_ = middleware.RealIP //nolint:staticcheck // SA1019
 	r.Use(middleware.Recoverer)
 	r.Use(RequestLogger)
 	r.Get("/test", func(w http.ResponseWriter, r *http.Request) {
@@ -178,7 +175,6 @@ func TestRequestLogger_InfoLevel_2xx(t *testing.T) {
 	r := chi.NewRouter()
 	r.Use(middleware.RequestID)
 	r.Use(RequestIDHeader)
-	_ = middleware.RealIP //nolint:staticcheck // SA1019
 	r.Use(middleware.Recoverer)
 	r.Use(RequestLogger)
 	r.Get("/test", func(w http.ResponseWriter, r *http.Request) {
@@ -212,7 +208,6 @@ func TestRequestLogger_RequestIDInLog(t *testing.T) {
 	r := chi.NewRouter()
 	r.Use(middleware.RequestID)
 	r.Use(RequestIDHeader)
-	_ = middleware.RealIP //nolint:staticcheck // SA1019
 	r.Use(middleware.Recoverer)
 	r.Use(RequestLogger)
 	r.Get("/test", func(w http.ResponseWriter, r *http.Request) {
