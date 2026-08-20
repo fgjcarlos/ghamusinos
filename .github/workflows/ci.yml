@@ -41,7 +41,7 @@ jobs:
 
       - uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6.4.0
         with:
-          go-version: "1.25"
+          go-version: "1.25.13"
           cache: true
 
       - name: gofmt
@@ -67,9 +67,22 @@ jobs:
       - name: golangci-lint
         env:
           # Forzar el toolchain que setup-go instalo (v1.25.x) para que el
-          # linter pueda parsear el go.mod que declara go 1.25.7.
-          GOTOOLCHAIN: go1.25.7
+          # linter pueda parsear el go.mod que declara go 1.25.13.
+          GOTOOLCHAIN: go1.25.13
         run: golangci-lint run --timeout 5m
+
+      - name: govulncheck
+        env:
+          GOTOOLCHAIN: go1.25.13
+        run: |
+          # golang/vuln NO publica binarios en sus releases (los assets
+          # están vacíos; bajar el zip siempre devuelve 404). El método
+          # oficial de instalación es `go install`. Pinea a v1.1.4 (último
+          # release estable) en vez de @latest para builds reproducibles.
+          go install golang.org/x/vuln/cmd/govulncheck@v1.1.4
+          echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
+          govulncheck -version
+          govulncheck ./...
 
       - name: go test
         run: go test -race -coverprofile=coverage.out -covermode=atomic ./...
