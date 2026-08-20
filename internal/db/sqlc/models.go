@@ -30,15 +30,18 @@ type Activity struct {
 }
 
 type ActivityEvent struct {
-	ID          pgtype.UUID        `json:"id"`
-	ExternalID  string             `json:"external_id"`
-	UserID      pgtype.UUID        `json:"user_id"`
-	ObjectType  string             `json:"object_type"`
-	AspectType  string             `json:"aspect_type"`
-	ObjectID    int64              `json:"object_id"`
-	ReceivedAt  pgtype.Timestamptz `json:"received_at"`
-	ProcessedAt pgtype.Timestamptz `json:"processed_at"`
-	RawPayload  []byte             `json:"raw_payload"`
+	ID             pgtype.UUID        `json:"id"`
+	ExternalID     string             `json:"external_id"`
+	UserID         pgtype.UUID        `json:"user_id"`
+	ObjectType     string             `json:"object_type"`
+	AspectType     string             `json:"aspect_type"`
+	ObjectID       int64              `json:"object_id"`
+	OwnerID        pgtype.Int8        `json:"owner_id"`
+	SubscriptionID pgtype.Int8        `json:"subscription_id"`
+	EventTime      pgtype.Timestamptz `json:"event_time"`
+	ReceivedAt     pgtype.Timestamptz `json:"received_at"`
+	ProcessedAt    pgtype.Timestamptz `json:"processed_at"`
+	RawPayload     []byte             `json:"raw_payload"`
 }
 
 type ActivityStream struct {

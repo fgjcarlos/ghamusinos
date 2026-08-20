@@ -13,6 +13,7 @@ import (
 	"context"
 	"os"
 	"testing"
+	"time"
 
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -137,4 +138,140 @@ func TestIntegration_CreateInviteAndMarkAccepted(t *testing.T) {
 	t.Cleanup(func() {
 		_, _ = pool.Exec(ctx, "DELETE FROM invites WHERE id = $1", pgtypeUUID(t, invite.ID.String()))
 	})
+}
+
+// TestIntegration_ActivityEventEnqueueAndGet cubre las nuevas queries
+// añadidas en AUD-03 (issue #165), PR A: schema ampliado con
+// event_time, owner_id, subscription_id, y las queries
+// GetActivityEventByID + GetUserIDByAthleteID necesarias para el
+// handler (PR B) y el worker (PR C). El test verifica:
+//   - EnqueueActivityEvent inserta con event_time + owner_id.
+//   - GetActivityEventByID recupera por UUID interno.
+//   - Re-encolar el mismo (object_id, aspect_type, event_time) NO crea
+//     una segunda fila (idempotencia UNIQUE preservada por ahora vía
+//     external_id; el cambio a la UNIQUE real llega en PR B).
+//   - GetUserIDByAthleteID devuelve UUID válido para un atleta conocido.
+func TestIntegration_ActivityEventEnqueueAndGet(t *testing.T) {
+	pool := openTestDB(t)
+	q := sqlc.New(pool)
+	ctx := context.Background()
+
+	// Crear usuario + tokens Strava para que GetUserIDByAthleteID resuelva.
+	clerkID := "clerk_test_" + t.Name() + "_integration"
+	created, err := q.CreateUser(ctx, sqlc.CreateUserParams{
+		ClerkUserID:  clerkID,
+		Email:        "strava-test@example.com",
+		DisplayName:  pgtype.Text{String: "Strava Test", Valid: true},
+		InviteStatus: status.InviteStatusActive,
+	})
+	if err != nil {
+		t.Fatalf("CreateUser: %v", err)
+	}
+	t.Cleanup(func() {
+		_, _ = pool.Exec(ctx, "DELETE FROM users WHERE clerk_user_id = $1", clerkID)
+	})
+
+	athleteID := int64(7777777)
+	if _, err := pool.Exec(ctx, `INSERT INTO strava_tokens
+		(user_id, access_cipher, refresh_cipher, expires_at, athlete_id, scopes, created_at, updated_at)
+		VALUES ($1, $2, $3, now() + interval '1 hour', $4, $5, now(), now())`,
+		created.ID, "dGVzdA==", "dGVzdA==", athleteID, "activity:read"); err != nil {
+		t.Fatalf("insert strava_tokens: %v", err)
+	}
+	t.Cleanup(func() {
+		_, _ = pool.Exec(ctx, "DELETE FROM strava_tokens WHERE user_id = $1", created.ID)
+	})
+
+	// Resolver user_id por athlete_id.
+	uid, err := q.GetUserIDByAthleteID(ctx, athleteID)
+	if err != nil {
+		t.Fatalf("GetUserIDByAthleteID: %v", err)
+	}
+	if !uid.Valid {
+		t.Fatalf("GetUserIDByAthleteID devolvió UUID sin Valid=true; esperaba user_id real")
+	}
+	if uid != created.ID {
+		t.Errorf("GetUserIDByAthleteID = %v, quería %v", uid, created.ID)
+	}
+
+	// Encolar un evento con los campos del payload real.
+	eventTime := pgtype.Timestamptz{Time: time.Now().UTC().Truncate(time.Microsecond), Valid: true}
+	inserted, err := q.EnqueueActivityEvent(ctx, sqlc.EnqueueActivityEventParams{
+		ExternalID:     "evt_test_" + t.Name(),
+		UserID:         created.ID,
+		ObjectType:     "activity",
+		AspectType:     "create",
+		ObjectID:       1234567890,
+		OwnerID:        pgtype.Int8{Int64: athleteID, Valid: true},
+		SubscriptionID: pgtype.Int8{Int64: 99999, Valid: true},
+		EventTime:      eventTime,
+		RawPayload:     []byte(`{"object_type":"activity","aspect_type":"create","object_id":1234567890}`),
+	})
+	if err != nil {
+		t.Fatalf("EnqueueActivityEvent: %v", err)
+	}
+	t.Cleanup(func() {
+		_, _ = pool.Exec(ctx, "DELETE FROM activity_events WHERE id = $1", inserted.ID)
+	})
+
+	// Recuperar por UUID interno.
+	got, err := q.GetActivityEventByID(ctx, inserted.ID)
+	if err != nil {
+		t.Fatalf("GetActivityEventByID: %v", err)
+	}
+	if got.ObjectID != 1234567890 {
+		t.Errorf("ObjectID = %d, quería 1234567890", got.ObjectID)
+	}
+	if got.AspectType != "create" {
+		t.Errorf("AspectType = %q, quería create", got.AspectType)
+	}
+	if !got.OwnerID.Valid || got.OwnerID.Int64 != athleteID {
+		t.Errorf("OwnerID = %+v, quería {Int64:%d Valid:true}", got.OwnerID, athleteID)
+	}
+	if !got.EventTime.Valid {
+		t.Errorf("EventTime debería estar set, es NULL")
+	}
+
+	// Idempotencia por external_id (la UNIQUE actual sigue siendo esa;
+	// la migración a UNIQUE (object_id, aspect_type, event_time) llega
+	// en PR B). Re-encolando el mismo external_id NO crea segunda fila.
+	if _, err := q.EnqueueActivityEvent(ctx, sqlc.EnqueueActivityEventParams{
+		ExternalID:     "evt_test_" + t.Name(),
+		UserID:         created.ID,
+		ObjectType:     "activity",
+		AspectType:     "create",
+		ObjectID:       1234567890,
+		OwnerID:        pgtype.Int8{Int64: athleteID, Valid: true},
+		SubscriptionID: pgtype.Int8{Int64: 99999, Valid: true},
+		EventTime:      eventTime,
+		RawPayload:     []byte(`{"retry":true}`),
+	}); err != nil {
+		t.Fatalf("EnqueueActivityEvent (retry): %v", err)
+	}
+	var count int
+	if err := pool.QueryRow(ctx, "SELECT count(*) FROM activity_events WHERE external_id = $1",
+		"evt_test_"+t.Name()).Scan(&count); err != nil {
+		t.Fatalf("count: %v", err)
+	}
+	if count != 1 {
+		t.Errorf("idempotencia rota: %d filas con el mismo external_id, quería 1", count)
+	}
+}
+
+// TestIntegration_GetUserIDByAthleteID_UnknownAthlete devuelve UUID sin
+// Valid=true cuando el athlete_id no está en strava_tokens. El handler
+// (PR B) lo trata como "no conozco a este atleta" y responde 200 sin
+// encolar el evento.
+func TestIntegration_GetUserIDByAthleteID_UnknownAthlete(t *testing.T) {
+	pool := openTestDB(t)
+	q := sqlc.New(pool)
+	ctx := context.Background()
+
+	uid, err := q.GetUserIDByAthleteID(ctx, 999999999999)
+	if err != nil {
+		t.Fatalf("GetUserIDByAthleteID (unknown): %v", err)
+	}
+	if uid.Valid {
+		t.Errorf("GetUserIDByAthleteID (unknown) devolvió UUID válido; esperaba Valid=false")
+	}
 }

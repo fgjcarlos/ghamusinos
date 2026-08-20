@@ -448,6 +448,14 @@ func (m *activitiesMockQuerier) GetActivityByExternalID(ctx context.Context, arg
 	return sqlc.Activity{}, nil
 }
 
+func (m *activitiesMockQuerier) GetActivityEventByID(ctx context.Context, id pgtype.UUID) (sqlc.ActivityEvent, error) {
+	return sqlc.ActivityEvent{}, nil
+}
+
+func (m *activitiesMockQuerier) GetUserIDByAthleteID(ctx context.Context, athleteID int64) (pgtype.UUID, error) {
+	return pgtype.UUID{}, nil
+}
+
 func (m *activitiesMockQuerier) GetLatestSyncSession(ctx context.Context, userID pgtype.UUID) (sqlc.SyncSession, error) {
 	if m.GetLatestSyncSessionFunc != nil {
 		return m.GetLatestSyncSessionFunc(ctx, userID)
