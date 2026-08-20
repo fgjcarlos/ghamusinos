@@ -1,8 +1,8 @@
 BINARY := bin/ghamusinos
 
-.PHONY: help build run test tidy fmt vet check \
-        web-install web-build \
-        db-up db-down migrate migrate-status generate
+.PHONY: help build run test tidy fmt vet check lint \
+        web-install web-build web-dev web-lint \
+        db-up db-down migrate migrate-down migrate-status generate dev
 
 help: ## Muestra esta ayuda
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | \
@@ -16,6 +16,13 @@ web-install: ## Instala dependencias del frontend (pnpm)
 web-build: ## Compila el frontend y deposita assets en internal/frontend/dist
 	pnpm -C web build
 
+web-dev: ## Servidor de desarrollo de Vite con HMR (puerto 5173)
+	pnpm -C web dev
+
+web-lint: ## Linter y typecheck del frontend (requiere web-install)
+	pnpm -C web lint
+	pnpm -C web typecheck
+
 # ─── Build ───────────────────────────────────────────────────────────────────
 
 build: web-build ## Compila el binario en bin/ghamusinos (incluye build del frontend)
@@ -23,8 +30,11 @@ build: web-build ## Compila el binario en bin/ghamusinos (incluye build del fron
 
 # ─── Dev ─────────────────────────────────────────────────────────────────────
 
-run: ## Ejecuta la aplicación
+run: ## Ejecuta la aplicación (un solo proceso, sin recarga)
 	GOTOOLCHAIN=local go run ./cmd/ghamusinos
+
+dev: ## Backend con hot reload (requiere air: go install github.com/air-verse/air@latest)
+	GOTOOLCHAIN=local air
 
 # ─── Tests y calidad ─────────────────────────────────────────────────────────
 
@@ -44,7 +54,7 @@ fmt: ## Formatea el código
 vet: ## Análisis estático
 	GOTOOLCHAIN=local go vet ./...
 
-lint: ## Ejecuta golangci-lint (requiere binario instalado)
+lint: ## Ejecuta golangci-lint con la config del repo (.golangci.yml)
 	GOTOOLCHAIN=local golangci-lint run ./...
 
 check: fmt vet test ## fmt + vet + test
@@ -59,6 +69,9 @@ db-down: ## Para y elimina los contenedores (los volúmenes se conservan)
 
 migrate: ## Ejecuta las migraciones pendientes (up)
 	GOTOOLCHAIN=local go run ./cmd/migrate up
+
+migrate-down: ## Revierte la última migración aplicada (requiere --allow-destructive)
+	GOTOOLCHAIN=local go run ./cmd/migrate --allow-destructive down
 
 migrate-status: ## Muestra el estado de las migraciones
 	GOTOOLCHAIN=local go run ./cmd/migrate status

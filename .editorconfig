@@ -1,0 +1,29 @@
+# EditorConfig is awesome: https://EditorConfig.org
+# Mantener alineado con las convenciones del repo.
+# Go: tab indent (gofmt). TS/YAML/JSON/MD: 2 spaces. EOL LF.
+
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+
+[*.go]
+indent_style = tab
+indent_size = 4
+
+[*.{ts,tsx,js,jsx,json,yaml,yml}]
+indent_style = space
+indent_size = 2
+
+[*.md]
+# Markdown: trim trailing whitespace (importante para evitar
+# dobles espacios en prosa que rompen el render), pero respeta los
+# saltos de línea duros (>=2 espacios al final).
+trim_trailing_whitespace = false
+indent_size = 2
+
+[Makefile]
+indent_style = tab

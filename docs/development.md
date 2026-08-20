@@ -35,15 +35,23 @@ Healthcheck: `curl http://localhost:8080/healthz` → `{"status":"ok"}`.
 | Comando | Qué hace |
 |---|---|
 | `make help` | Lista los targets disponibles |
+| `make dev` | Backend con hot reload (requiere `air`: `go install github.com/air-verse/air@latest`) |
 | `make run` | Ejecuta la app (`go run`) |
 | `make build` | Compila el binario (depende de `web-build`) |
-| `make test` | Tests Go (`go test ./...`) |
+| `make test` | Tests Go (`go test -race`) |
 | `make check` | `fmt` + `vet` + `test` |
-| `make web-install` | Instala dependencias del frontend |
+| `make lint` | `golangci-lint run` con la config del repo (`.golangci.yml`) |
+| `make coverage` | Genera `coverage.out` (artefacto de CI) |
+| `make fmt` / `make vet` / `make tidy` | Formato / análisis estático / `go mod tidy` |
+| `make web-install` | Instala dependencias del frontend (pnpm) |
 | `make web-build` | Compila el frontend a `internal/frontend/dist` |
-| `make generate` | Regenera el código SQLC (vía Docker) |
+| `make web-dev` | Servidor de desarrollo de Vite con HMR (puerto 5173) |
+| `make web-lint` | Linter y typecheck del frontend |
 | `make db-up` / `make db-down` | Levanta / apaga PostgreSQL |
-| `make migrate` / `make migrate-status` | Aplica / muestra estado de migraciones |
+| `make migrate` | Aplica migraciones pendientes (`up`) |
+| `make migrate-down` | Revierte la última migración (requiere `--allow-destructive`, ver #27) |
+| `make migrate-status` | Muestra el estado de las migraciones |
+| `make generate` | Regenera código SQLC (vía Docker) |
 
 ## Notas de toolchain
 
