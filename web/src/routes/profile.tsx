@@ -62,7 +62,7 @@ export default function Profile() {
           Conectá tu cuenta de Strava para sincronizar automáticamente tus actividades de
           entrenamiento, incluyendo distancia, tiempo, ritmo y zonas de frecuencia cardíaca.
         </p>
-        <ConnectButton connected={false} />
+        <ConnectButton connected={false} token={token} />
       </section>
 
       <section>

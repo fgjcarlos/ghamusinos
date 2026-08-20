@@ -1,44 +1,60 @@
-// Package strava (continuación): handlers OAuth de Fase 1.2 (issue #14).
+// Package strava (continuación): handlers OAuth de Fase 1.2 (issue #14, AUD-02).
 //
 // Estos handlers implementan el flujo "Conectar con Strava" de ADR 0001:
 //
-//	GET /api/v1/strava/connect?user_id=<uuid>
-//	  → redirige al usuario a la pantalla de consentimiento de Strava.
+//	GET /api/v1/strava/connect      (bajo auth)
+//	  → devuelve {"authorize_url": "..."} con un state firmado que contiene
+//	    el user_id. El frontend hace window.location.assign(url).
 //
-//	GET /api/v1/strava/callback?code=...&state=...
-//	  → Strava redirige aquí tras el consentimiento. Intercambiamos
-//	    el code por tokens, los ciframos y los guardamos.
+//	GET /strava/callback            (PÚBLICO, sin auth)
+//	  → Strava redirige aquí tras el consentimiento. Verifica la firma
+//	    HMAC-SHA256 del state, extrae user_id del payload, intercambia
+//	    el code por tokens, los cifra y los guarda.
 //
-// # Alcance de este esqueleto (issue #14, opción A)
+// # Diseño del state firmado (AUD-02, hallazgo C1+C2)
 //
-//   - El handshake OAuth funciona y persiste tokens cifrados.
-//   - El parámetro state se valida no-vacío (CSRF real se delega a Clerk
-//     en producción; ver TODO).
-//   - user_id se recibe por query para evitar acoplar este stub al
-//     middleware de auth — la wiring real se hace en la fase de
-//     autenticación cuando se conecte Clerk.
+// El state es base64url(payload) + "." + base64url(HMAC-SHA256(payload, key)).
+// El payload lleva {uid, nonce, exp}. No hace falta almacén: el HMAC demuestra
+// que el state lo emitió este servidor, la expiración corta (~10 min) limita
+// la ventana de reutilización, y el uid viaja con el state — el callback no
+// necesita autenticación para saber a qué usuario vincular los tokens.
 //
-// # Lo que NO hace este esqueleto
+// El HMAC usa la misma STRAVA_CIPHER_KEY (32 bytes) que ya sirve para cifrar
+// tokens. Reutilizar evita una variable de entorno nueva; el HMAC-SHA256 y
+// el AES-256-GCM son primitivas distintas sobre la misma clave, lo cual es
+// práctica estándar (HKDF sería la versión "correcta", pero aquí el secreto
+// ya está rotando y la superficie de ataque es idéntica).
+//
+// # Lo que NO hace este paquete
 //
 //   - No envía al usuario al frontend tras conectar (front lo resuelve #90).
-//   - No expone endpoints de "desconectar" (se hace con DeleteStravaTokensByUserID,
-//     ya cubierto en sqlc).
+//   - No expone endpoints de "desconectar" (se hace con DeleteStravaTokensByUserID).
 //   - No implementa refresh proactivo (es responsabilidad del job de ingest).
 package strava
 
 import (
 	"context"
+	"crypto/hmac"
 	"crypto/rand"
+	"crypto/sha256"
 	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
+	"strings"
 	"time"
 
 	"github.com/fgjcarlos/ghamusinos/internal/auth"
 	"github.com/fgjcarlos/ghamusinos/internal/crypto"
 )
+
+// stateLifetime es la ventana en la que un state firmado es válido.
+// 10 minutos es más que suficiente para el flujo OAuth humano de Strava
+// (usuario abre navegador → confirma → vuelve) y limita el blast radius
+// si un state se filtra antes de usarse.
+const stateLifetime = 10 * time.Minute
 
 // TokenStore es la interfaz mínima que los handlers OAuth necesitan para
 // persistir tokens cifrados. La implementación concreta envuelve *sqlc.Queries
@@ -59,29 +75,116 @@ type PersistedTokens struct {
 	Scopes        string
 }
 
+// oauthStatePayload es el cuerpo del state firmado. Vive ~10 minutos; no
+// se persiste en ningún sitio (eso es el punto: sin almacén, sin migración,
+// sin purga).
+type oauthStatePayload struct {
+	UserID string `json:"uid"`
+	Nonce  string `json:"n"`
+	Exp    int64  `json:"exp"` // unix seconds
+}
+
+// signState firma el payload con HMAC-SHA256 y devuelve el state
+// codificado como base64url(payload) + "." + base64url(signature).
+// La firma es verificable con verifyState usando la misma clave.
+func signState(payload oauthStatePayload, cipherKey []byte) (string, error) {
+	body, err := json.Marshal(payload)
+	if err != nil {
+		return "", fmt.Errorf("marshal state payload: %w", err)
+	}
+	mac := hmac.New(sha256.New, cipherKey)
+	mac.Write(body)
+	sig := mac.Sum(nil)
+	enc := base64.RawURLEncoding
+	return enc.EncodeToString(body) + "." + enc.EncodeToString(sig), nil
+}
+
+// verifyState valida que el state venga firmado por este servidor y que
+// no haya expirado. Devuelve el payload si todo OK; error tipado si no.
+// Comparación constant-time en la firma para no abrir timing attacks.
+func verifyState(state string, cipherKey []byte, now time.Time) (oauthStatePayload, error) {
+	var zero oauthStatePayload
+	if state == "" {
+		return zero, errors.New("strava: empty state")
+	}
+	dot := strings.Index(state, ".")
+	if dot < 0 {
+		return zero, errors.New("strava: malformed state (no signature separator)")
+	}
+	enc := base64.RawURLEncoding
+	body, err := enc.DecodeString(state[:dot])
+	if err != nil {
+		return zero, fmt.Errorf("strava: decode state body: %w", err)
+	}
+	sig, err := enc.DecodeString(state[dot+1:])
+	if err != nil {
+		return zero, fmt.Errorf("strava: decode state signature: %w", err)
+	}
+	mac := hmac.New(sha256.New, cipherKey)
+	mac.Write(body)
+	if !hmac.Equal(mac.Sum(nil), sig) {
+		return zero, errors.New("strava: state signature mismatch")
+	}
+	var payload oauthStatePayload
+	if err := json.Unmarshal(body, &payload); err != nil {
+		return zero, fmt.Errorf("strava: unmarshal state payload: %w", err)
+	}
+	if payload.Exp == 0 || now.Unix() > payload.Exp {
+		return zero, errors.New("strava: state expired")
+	}
+	if payload.UserID == "" {
+		return zero, errors.New("strava: state missing user_id")
+	}
+	return payload, nil
+}
+
 // ConnectHandler devuelve el handler para /api/v1/strava/connect.
-// El handler genera un state CSRF, construye la URL de Strava y redirige
-// al usuario directo con un 302 (Found).
-func ConnectHandler(client *Client) http.HandlerFunc {
+// Sigue montado detrás del middleware de auth (ruta bajo /api/v1/*). El
+// user_id se obtiene del contexto y se mete dentro del state firmado;
+// el callback no necesita volver a leerlo del contexto porque el state
+// viaja en la query string de la redirección de Strava.
+//
+// Devuelve un JSON con `authorize_url` y `state`. El frontend hace
+// window.location.assign(url) en vez de un <a href>, porque las
+// redirecciones top-level del navegador no envían la cabecera Authorization
+// y por tanto no llegan al handler autenticado. AUD-02, hallazgo C1.
+func ConnectHandler(client *Client, cipherKey []byte) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		state, err := randomState()
+		user := auth.AuthUser(r.Context())
+		if user == nil || user.ID == "" {
+			http.Error(w, "strava: unauthenticated", http.StatusUnauthorized)
+			return
+		}
+		nonce, err := randomNonce()
 		if err != nil {
 			http.Error(w, "strava: state generation failed", http.StatusInternalServerError)
 			return
 		}
-		http.Redirect(w, r, client.AuthorizeURL(state), http.StatusFound)
+		state, err := signState(oauthStatePayload{
+			UserID: user.ID,
+			Nonce:  nonce,
+			Exp:    time.Now().Add(stateLifetime).Unix(),
+		}, cipherKey)
+		if err != nil {
+			http.Error(w, "strava: state signing failed", http.StatusInternalServerError)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		_ = json.NewEncoder(w).Encode(map[string]string{
+			"authorize_url": client.AuthorizeURL(state),
+		})
 	}
 }
 
-// CallbackParams es el cuerpo del POST que el frontend (o un proxy) hace
-// tras recibir el callback de Strava. Aislamos la query string en este
-// struct para hacer el handler testeable sin http.Request.
+// CallbackParams es el cuerpo del callback de Strava. Aislamos la query
+// string en este struct para hacer el handler testeable sin http.Request.
 type CallbackParams struct {
 	Code  string
 	State string
 }
 
-// CallbackResult es lo que el handler devuelve al caller (frontend o test).
+// CallbackResult es lo que el handler devuelve al caller (test).
 type CallbackResult struct {
 	UserID    string `json:"user_id"`
 	AthleteID int64  `json:"athlete_id"`
@@ -89,31 +192,18 @@ type CallbackResult struct {
 }
 
 // CallbackHandler intercambia el code por tokens, los cifra y los persiste.
+// Se monta en /strava/callback (PÚBLICO, sin auth). El user_id sale del
+// state firmado; la cabecera Authorization no se usa en este flujo porque
+// Strava redirige al navegador del usuario, que no lleva cabecera.
 //
-// El user_id se obtiene del contexto de la request (inyectado por el
-// middleware de autenticación ResolveMiddleware). Este handler se monta
-// SIEMPRE detrás del middleware de auth, por lo que puede confiar en
-// que el contexto contiene un usuario resuelto.
-//
-// En éxito, redirige a `{frontendURL}/activities?connected=1`.
-// En error, redirige a `{frontendURL}/?error={urlEncodedError}`.
-//
-// El parámetro state sigue siendo obligatorio (defensa CSRF mínima);
-// la validación completa contra la sesión de Clerk queda fuera de
-// este esqueleto (TODO cuando se conecte el sistema de sesiones).
+// En éxito, redirige a {frontendURL}/activities?connected=1.
+// En error, redirige a {frontendURL}/?error={urlEncodedError}.
 func CallbackHandler(client *Client, store TokenStore, cipherKey []byte, frontendURL string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		user := auth.AuthUser(r.Context())
-		if user == nil || user.ID == "" {
-			http.Redirect(w, r, frontendURL+"/?error=unauthenticated", http.StatusFound)
-			return
-		}
-		userID := user.ID
-
 		q := r.URL.Query()
 		params := CallbackParams{Code: q.Get("code"), State: q.Get("state")}
 
-		_, err := HandleCallback(r.Context(), client, store, cipherKey, userID, params)
+		_, err := HandleCallback(r.Context(), client, store, cipherKey, params, cipherKey, time.Now())
 		if err != nil {
 			http.Redirect(w, r, frontendURL+"/?error="+url.QueryEscape(err.Error()), http.StatusFound)
 			return
@@ -126,18 +216,20 @@ func CallbackHandler(client *Client, store TokenStore, cipherKey []byte, fronten
 // HandleCallback es la lógica pura del callback (sin http). Separar el
 // handler HTTP del procesamiento facilita los tests y deja una función
 // reutilizable cuando llegue un job River que también intercambie codes.
-func HandleCallback(ctx context.Context, client *Client, store TokenStore, cipherKey []byte, userID string, p CallbackParams) (*CallbackResult, error) {
+//
+// stateKey y cipherKey son la misma STRAVA_CIPHER_KEY; los parámetros
+// van separados porque juegan papeles distintos (uno verifica el state,
+// el otro cifra los tokens) y poder mockearlos en tests sin reasignar la
+// clave mejora el aislamiento. En producción son idénticos.
+func HandleCallback(ctx context.Context, client *Client, store TokenStore, cipherKey []byte, p CallbackParams, stateKey []byte, now time.Time) (*CallbackResult, error) {
 	if p.Code == "" {
 		return nil, errOAuth("missing code", http.StatusBadRequest)
 	}
-	if p.State == "" {
-		return nil, errOAuth("missing state", http.StatusBadRequest)
+	payload, err := verifyState(p.State, stateKey, now)
+	if err != nil {
+		return nil, errOAuth(err.Error(), http.StatusBadRequest)
 	}
-	// TODO(clerk): validar state contra la sesión/CSRF store real de Clerk.
-	// En este esqueleto solo exigimos que venga no-vacío.
-	if userID == "" {
-		return nil, errOAuth("missing user_id", http.StatusBadRequest)
-	}
+	userID := payload.UserID
 
 	ts, err := client.ExchangeCode(ctx, p.Code)
 	if err != nil {
@@ -171,11 +263,11 @@ func HandleCallback(ctx context.Context, client *Client, store TokenStore, ciphe
 	}, nil
 }
 
-// randomState genera un state CSRF de 32 bytes codificado en base64 URL-safe.
-// Se devuelve error solo si el sistema de random falla, lo que es
-// excepcional y aborta la operación (no fallback).
-func randomState() (string, error) {
-	b := make([]byte, 32)
+// randomNonce genera 16 bytes aleatorios codificados en base64 URL-safe.
+// 16 bytes (128 bits) bastan: la unicidad es decorativa (defiende contra
+// colisiones de state en la ventana de 10 minutos), no criptográfica.
+func randomNonce() (string, error) {
+	b := make([]byte, 16)
 	if _, err := rand.Read(b); err != nil {
 		return "", err
 	}
@@ -194,16 +286,3 @@ func (e *oauthError) Error() string { return e.msg }
 func errOAuth(msg string, status int) *oauthError {
 	return &oauthError{msg: msg, status: status}
 }
-
-func writeOAuthError(w http.ResponseWriter, err error) {
-	var oe *oauthError
-	if errors.As(err, &oe) {
-		http.Error(w, oe.msg, oe.status)
-		return
-	}
-	http.Error(w, err.Error(), http.StatusBadGateway)
-}
-
-// errOAuthMissingEnv es exported para tests que quieran construir errores
-// sin HTTP (no se usa en runtime).
-var errOAuthMissingEnv = errors.New("strava: STRAVA_CIPHER_KEY debe tener 32 bytes base64")
