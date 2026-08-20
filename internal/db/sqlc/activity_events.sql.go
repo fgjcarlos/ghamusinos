@@ -7,7 +7,9 @@ package sqlc
 
 import (
 	"context"
+	"errors"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
@@ -98,6 +100,13 @@ SELECT user_id FROM strava_tokens WHERE athlete_id = $1 LIMIT 1
 func (q *Queries) GetUserIDByAthleteID(ctx context.Context, athleteID int64) (pgtype.UUID, error) {
 	var user_id pgtype.UUID
 	err := q.db.QueryRow(ctx, getUserIDByAthleteID, athleteID).Scan(&user_id)
+	// sqlc deja ErrNoRows crudo: lo aplanamos a (uuid inválido, nil) para
+	// que el handler del PR B pueda hacer `if !uid.Valid { return }` sin
+	// distinguir entre "atleta desconocido" y un error real de DB.
+	// AUD-03 (issue #165) PR A.
+	if errors.Is(err, pgx.ErrNoRows) {
+		return pgtype.UUID{}, nil
+	}
 	return user_id, err
 }
 
