@@ -1,16 +1,13 @@
-// Comando migrate ejecuta migraciones de base de datos usando goose como
-// librería con migraciones SQL embebidas. No depende del CLI de goose.
-//
-// Uso:
-//
-//	DATABASE_URL=... go run ./cmd/migrate [up|down|status]
-//
-// El argumento por defecto es "up" si no se especifica ninguno.
+// Package main implements the migrate command with an allowlist of safe
+// subcommands. Destructive commands (down, down-to, reset, redo) require
+// the explicit --allow-destructive flag to prevent accidental schema
+// destruction by deploy scripts or operator typos. Issue #27.
 package main
 
 import (
 	"context"
 	"database/sql"
+	"flag"
 	"fmt"
 	"log/slog"
 	"os"
@@ -22,8 +19,25 @@ import (
 	"github.com/fgjcarlos/ghamusinos/internal/logging"
 )
 
+// allowedCommands es el conjunto de subcomandos de goose que el binario
+// acepta sin flag adicional. Cualquier otro subcomando (incluidos los
+// destructivos) se rechaza salvo que se pase --allow-destructive.
+var allowedCommands = map[string]struct{}{
+	"up":        {},
+	"up-by-one": {},
+	"status":    {},
+	"version":   {},
+}
+
+// destructiveCommands requiere --allow-destructive explícito.
+var destructiveCommands = map[string]struct{}{
+	"down":    {},
+	"down-to": {},
+	"reset":   {},
+	"redo":    {},
+}
+
 func main() {
-	// Initialize structured logging
 	logging.Setup(os.Getenv("ENV"), os.Stdout)
 
 	databaseURL := os.Getenv("DATABASE_URL")
@@ -32,15 +46,60 @@ func main() {
 		os.Exit(1)
 	}
 
+	// Parse flags. El primer arg posicional (subcomando de goose) se extrae
+	// de flag.Args() tras el parsing.
+	fs := flag.NewFlagSet("migrate", flag.ContinueOnError)
+	allowDestructive := fs.Bool("allow-destructive", false, "allow destructive goose commands (down, down-to, reset, redo)")
+	if err := fs.Parse(os.Args[1:]); err != nil {
+		// ContinueOnError ya imprime el error; salimos con código no-cero.
+		os.Exit(2)
+	}
+
 	command := "up"
-	if len(os.Args) > 1 {
-		command = os.Args[1]
+	if args := fs.Args(); len(args) > 0 {
+		command = args[0]
+	}
+
+	if err := guardCommand(command, *allowDestructive); err != nil {
+		slog.Error(err.Error())
+		os.Exit(1)
 	}
 
 	if err := run(databaseURL, command); err != nil {
 		slog.Error("migrate failed", slog.String("error", err.Error()))
 		os.Exit(1)
 	}
+}
+
+// guardCommand valida que `command` esté en la allowlist o, si es
+// destructivo, se haya pasado --allow-destructive. Devuelve un error
+// con mensaje claro cuando el comando se rechaza.
+func guardCommand(command string, allowDestructive bool) error {
+	if _, ok := allowedCommands[command]; ok {
+		return nil
+	}
+	if _, destructive := destructiveCommands[command]; destructive {
+		if allowDestructive {
+			return nil
+		}
+		return fmt.Errorf("migrate: subcomando destructivo %q bloqueado — requiere --allow-destructive (issue #27)", command)
+	}
+	return fmt.Errorf("migrate: subcomando %q no está en la allowlist %v (issue #27)", command, mapKeys(allowedCommands))
+}
+
+// mapKeys devuelve las claves de un set como slice ordenado (determinista).
+func mapKeys(m map[string]struct{}) []string {
+	out := make([]string, 0, len(m))
+	for k := range m {
+		out = append(out, k)
+	}
+	// Orden estable para mensajes de error reproducibles.
+	for i := 1; i < len(out); i++ {
+		for j := i; j > 0 && out[j-1] > out[j]; j-- {
+			out[j-1], out[j] = out[j], out[j-1]
+		}
+	}
+	return out
 }
 
 func run(databaseURL, command string) error {
@@ -54,7 +113,6 @@ func run(databaseURL, command string) error {
 		return fmt.Errorf("error al verificar la conexión: %w", err)
 	}
 
-	// Configura goose para usar el FS embebido.
 	goose.SetBaseFS(db.MigrationsFS)
 
 	if err := goose.SetDialect("postgres"); err != nil {
