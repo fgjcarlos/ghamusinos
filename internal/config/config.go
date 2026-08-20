@@ -16,6 +16,17 @@ import (
 	"github.com/fgjcarlos/ghamusinos/internal/db"
 )
 
+// SecurityHeadersConfig configura las cabeceras defensivas aplicadas por
+// internal/http.SecurityHeaders. Issue #26.
+type SecurityHeadersConfig struct {
+	// HSTSEnabled activa Strict-Transport-Security. Apagado por defecto
+	// (binario corre sobre http en local); activar detrás de un proxy TLS.
+	HSTSEnabled bool
+	// CSPReportOnly aplica CSP en modo report-only (monitorizar sin
+	// romper durante despliegue inicial).
+	CSPReportOnly bool
+}
+
 // Config contiene toda la configuración de la aplicación.
 type Config struct {
 	// Env es el entorno de ejecución: "development", "production", etc.
@@ -38,6 +49,10 @@ type Config struct {
 	// TRUSTED_PROXIES="10.0.0.0/8,172.16.0.0/12" en despliegues detrás
 	// de un reverse proxy conocido. Issue #64.
 	TrustedProxies []string
+	Security       SecurityHeadersConfig
+	// MaxBodyBytes es el límite global del cuerpo HTTP en bytes (default
+	// 10 MiB = 10<<20). Configurar con MAX_BODY_BYTES. Issue #26.
+	MaxBodyBytes int64
 	// Strava contiene la configuración de la integración con Strava
 	// (fase 1.2, issue #14). Es nil si las variables de entorno no
 	// están definidas; en ese caso los handlers OAuth no se montan.
@@ -97,6 +112,11 @@ func Load() (*Config, error) {
 		ClerkAudience:  getEnv("CLERK_AUDIENCE", ""),
 		FrontendURL:    getEnv("FRONTEND_URL", "http://localhost:5173"),
 		TrustedProxies: parseTrustedProxies(os.Getenv("TRUSTED_PROXIES")),
+		Security: SecurityHeadersConfig{
+			HSTSEnabled:   getEnv("SECURITY_HSTS_ENABLED", "") == "true",
+			CSPReportOnly: getEnv("SECURITY_CSP_REPORT_ONLY", "") == "true",
+		},
+		MaxBodyBytes: parseMaxBodyBytes(os.Getenv("MAX_BODY_BYTES")),
 	}
 
 	if cfg.DatabaseURL == "" {
@@ -281,4 +301,18 @@ func parseTrustedProxies(raw string) []string {
 		}
 	}
 	return out
+}
+
+// parseMaxBodyBytes lee MAX_BODY_BYTES como entero (bytes). Vacío o
+// valor no numérico → default 10 MiB (10<<20). Issue #26.
+func parseMaxBodyBytes(raw string) int64 {
+	const defaultBytes = 10 << 20 // 10 MiB
+	if raw == "" {
+		return defaultBytes
+	}
+	n, err := strconv.ParseInt(raw, 10, 64)
+	if err != nil || n <= 0 {
+		return defaultBytes
+	}
+	return n
 }

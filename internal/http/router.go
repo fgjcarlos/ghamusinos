@@ -112,6 +112,15 @@ func (s *Server) Router() http.Handler {
 	}
 	r.Use(middleware.Recoverer)
 	r.Use(RequestLogger)
+	// Security headers (CSP, X-Frame-Options, Referrer-Policy,
+	// Permissions-Policy, HSTS opcional). Issue #26.
+	r.Use(SecurityHeaders(SecurityHeadersConfig{
+		HSTSEnabled:   s.cfg.Security.HSTSEnabled,
+		CSPReportOnly: s.cfg.Security.CSPReportOnly,
+	}))
+	// Límite global del cuerpo HTTP. Cada handler que lea r.Body debe
+	// usar handlers.IsBodyLimitError para responder 413. Issue #26.
+	r.Use(BodyLimit(s.cfg.MaxBodyBytes))
 
 	// Liveness: responde sin tocar la base de datos.
 	r.Get("/healthz", handlers.Health)
