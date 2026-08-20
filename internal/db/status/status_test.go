@@ -1,6 +1,7 @@
 package status_test
 
 import (
+	"reflect"
 	"testing"
 
 	"github.com/fgjcarlos/ghamusinos/internal/db/status"
@@ -47,20 +48,24 @@ func TestStatusValues(t *testing.T) {
 	}
 }
 
-// TestInviteStatusType verifica que InviteStatus e Status son tipos distintos
-// y no se pueden mezclar sin una conversión explícita.
+// TestTypesAreDistinct verifica que InviteStatus y Status son tipos
+// distintos y no se pueden mezclar sin una conversión explícita.
+// La garantía se obtiene comparando los tipos reflectantes (que
+// capturan el tipo declarado, no el valor): si InviteStatus y Status
+// fueran el mismo tipo, reflect.TypeOf daría idéntico resultado.
 func TestTypesAreDistinct(t *testing.T) {
-	// Los tipos explícitos son la garantía del test: si el compilador
-	// aceptase `var is = status.InviteStatusPending` y dedujese el tipo,
-	// este test perdería su valor (verificaría trivialmente que el
-	// mismo valor es igual a sí mismo). Por eso se mantiene la
-	// declaración con tipo. Tracked in issue de seguimiento abierta
-	// desde #62.
-	var is status.InviteStatus = status.InviteStatusPending //nolint:staticcheck // SA5009 / ST1023: el tipo explícito ES la garantía del test
-	var s status.Status = status.StatusPending              //nolint:staticcheck // SA5009 / ST1023: el tipo explícito ES la garantía del test
+	// Tipos inferidos del RHS: la garantía de "tipos distintos" ya no
+	// depende de una declaración explícita (que era ST1023), sino de
+	// la comparación de tipos reflectantes.
+	is := status.InviteStatusPending
+	s := status.StatusPending
 
-	// Mismo string subyacente, pero tipos distintos — la conversión explícita
-	// es necesaria; si compilara sin ella sería un bug de tipos.
+	if reflect.TypeOf(is) == reflect.TypeOf(s) {
+		t.Errorf("InviteStatus y Status deberían ser tipos distintos pero reflect.TypeOf los considera iguales: %v",
+			reflect.TypeOf(is))
+	}
+
+	// Sanity check: los valores subyacentes (string) sí son iguales.
 	if string(is) != string(s) {
 		t.Errorf("ambos valores pending deberían ser iguales como string: %q != %q", string(is), string(s))
 	}
