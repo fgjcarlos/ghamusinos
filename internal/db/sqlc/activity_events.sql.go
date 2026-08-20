@@ -13,27 +13,28 @@ import (
 
 const enqueueActivityEvent = `-- name: EnqueueActivityEvent :one
 INSERT INTO activity_events (
-    external_id, user_id, object_type, aspect_type, object_id, raw_payload
+    external_id, user_id, object_type, aspect_type, object_id,
+    owner_id, subscription_id, event_time, raw_payload
+) VALUES (
+    $1, $2, $3, $4, $5, $6, $7, $8, $9
 )
-VALUES ($1, $2, $3, $4, $5, $6)
 ON CONFLICT (external_id) DO UPDATE SET
     external_id = EXCLUDED.external_id
-RETURNING id, external_id, user_id, object_type, aspect_type, object_id, received_at, processed_at, raw_payload
+RETURNING id, external_id, user_id, object_type, aspect_type, object_id, owner_id, subscription_id, event_time, received_at, processed_at, raw_payload
 `
 
 type EnqueueActivityEventParams struct {
-	ExternalID string      `json:"external_id"`
-	UserID     pgtype.UUID `json:"user_id"`
-	ObjectType string      `json:"object_type"`
-	AspectType string      `json:"aspect_type"`
-	ObjectID   int64       `json:"object_id"`
-	RawPayload []byte      `json:"raw_payload"`
+	ExternalID     string             `json:"external_id"`
+	UserID         pgtype.UUID        `json:"user_id"`
+	ObjectType     string             `json:"object_type"`
+	AspectType     string             `json:"aspect_type"`
+	ObjectID       int64              `json:"object_id"`
+	OwnerID        pgtype.Int8        `json:"owner_id"`
+	SubscriptionID pgtype.Int8        `json:"subscription_id"`
+	EventTime      pgtype.Timestamptz `json:"event_time"`
+	RawPayload     []byte             `json:"raw_payload"`
 }
 
-// Encola un evento de Strava (webhook). Devuelve la fila; si external_id
-// ya existe, devuelve la fila previa sin error (idempotencia). Los callers
-// pueden distinguir "nuevo" vs "ya visto" comparando received_at, o vía
-// INSERT ... ON CONFLICT DO NOTHING RETURNING (cuando lo necesitemos).
 func (q *Queries) EnqueueActivityEvent(ctx context.Context, arg EnqueueActivityEventParams) (ActivityEvent, error) {
 	row := q.db.QueryRow(ctx, enqueueActivityEvent,
 		arg.ExternalID,
@@ -41,6 +42,9 @@ func (q *Queries) EnqueueActivityEvent(ctx context.Context, arg EnqueueActivityE
 		arg.ObjectType,
 		arg.AspectType,
 		arg.ObjectID,
+		arg.OwnerID,
+		arg.SubscriptionID,
+		arg.EventTime,
 		arg.RawPayload,
 	)
 	var i ActivityEvent
@@ -51,6 +55,9 @@ func (q *Queries) EnqueueActivityEvent(ctx context.Context, arg EnqueueActivityE
 		&i.ObjectType,
 		&i.AspectType,
 		&i.ObjectID,
+		&i.OwnerID,
+		&i.SubscriptionID,
+		&i.EventTime,
 		&i.ReceivedAt,
 		&i.ProcessedAt,
 		&i.RawPayload,
@@ -58,16 +65,50 @@ func (q *Queries) EnqueueActivityEvent(ctx context.Context, arg EnqueueActivityE
 	return i, err
 }
 
+const getActivityEventByID = `-- name: GetActivityEventByID :one
+SELECT id, external_id, user_id, object_type, aspect_type, object_id, owner_id, subscription_id, event_time, received_at, processed_at, raw_payload
+FROM activity_events
+WHERE id = $1
+`
+
+func (q *Queries) GetActivityEventByID(ctx context.Context, id pgtype.UUID) (ActivityEvent, error) {
+	row := q.db.QueryRow(ctx, getActivityEventByID, id)
+	var i ActivityEvent
+	err := row.Scan(
+		&i.ID,
+		&i.ExternalID,
+		&i.UserID,
+		&i.ObjectType,
+		&i.AspectType,
+		&i.ObjectID,
+		&i.OwnerID,
+		&i.SubscriptionID,
+		&i.EventTime,
+		&i.ReceivedAt,
+		&i.ProcessedAt,
+		&i.RawPayload,
+	)
+	return i, err
+}
+
+const getUserIDByAthleteID = `-- name: GetUserIDByAthleteID :one
+SELECT user_id FROM strava_tokens WHERE athlete_id = $1 LIMIT 1
+`
+
+func (q *Queries) GetUserIDByAthleteID(ctx context.Context, athleteID int64) (pgtype.UUID, error) {
+	var user_id pgtype.UUID
+	err := q.db.QueryRow(ctx, getUserIDByAthleteID, athleteID).Scan(&user_id)
+	return user_id, err
+}
+
 const listPendingActivityEvents = `-- name: ListPendingActivityEvents :many
-SELECT id, external_id, user_id, object_type, aspect_type, object_id, received_at, processed_at, raw_payload
+SELECT id, external_id, user_id, object_type, aspect_type, object_id, owner_id, subscription_id, event_time, received_at, processed_at, raw_payload
 FROM activity_events
 WHERE processed_at IS NULL
 ORDER BY received_at
 LIMIT $1
 `
 
-// Lista los eventos pendientes (processed_at IS NULL) para alimentar un
-// job de procesamiento. LIMIT defensivo para evitar scans descontrolados.
 func (q *Queries) ListPendingActivityEvents(ctx context.Context, limit int32) ([]ActivityEvent, error) {
 	rows, err := q.db.Query(ctx, listPendingActivityEvents, limit)
 	if err != nil {
@@ -84,6 +125,9 @@ func (q *Queries) ListPendingActivityEvents(ctx context.Context, limit int32) ([
 			&i.ObjectType,
 			&i.AspectType,
 			&i.ObjectID,
+			&i.OwnerID,
+			&i.SubscriptionID,
+			&i.EventTime,
 			&i.ReceivedAt,
 			&i.ProcessedAt,
 			&i.RawPayload,
@@ -104,7 +148,6 @@ SET processed_at = now()
 WHERE id = $1
 `
 
-// Marca un evento como procesado una vez consumido por el job.
 func (q *Queries) MarkActivityEventProcessed(ctx context.Context, id pgtype.UUID) error {
 	_, err := q.db.Exec(ctx, markActivityEventProcessed, id)
 	return err

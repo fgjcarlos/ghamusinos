@@ -109,6 +109,12 @@ func (m *mockMeQuerier) GetActiveInviteByEmail(ctx context.Context, email string
 func (m *mockMeQuerier) GetActivityByExternalID(ctx context.Context, arg sqlc.GetActivityByExternalIDParams) (sqlc.Activity, error) {
 	return sqlc.Activity{}, nil
 }
+func (m *mockMeQuerier) GetActivityEventByID(ctx context.Context, id pgtype.UUID) (sqlc.ActivityEvent, error) {
+	return sqlc.ActivityEvent{}, nil
+}
+func (m *mockMeQuerier) GetUserIDByAthleteID(ctx context.Context, athleteID int64) (pgtype.UUID, error) {
+	return pgtype.UUID{}, nil
+}
 func (m *mockMeQuerier) GetInviteByTokenHash(ctx context.Context, tokenHash string) (sqlc.Invite, error) {
 	return sqlc.Invite{}, nil
 }
