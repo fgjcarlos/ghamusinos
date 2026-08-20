@@ -13,6 +13,43 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 )
 
+// TestRequestLogger_QueryStringNotLogged is a regression guard for the OAuth code leak:
+// a request whose path carries a secret (?code=<authorization_code>) must NOT
+// surface the secret in the access log. SPEC: AUD-08.
+func TestRequestLogger_QueryStringNotLogged(t *testing.T) {
+	buf := &bytes.Buffer{}
+	oldDefault := slog.Default()
+	defer slog.SetDefault(oldDefault)
+	slog.SetDefault(slog.New(slog.NewTextHandler(buf, nil)))
+
+	r := chi.NewRouter()
+	r.Use(middleware.RequestID)
+	r.Use(RequestIDHeader)
+	r.Use(middleware.Recoverer)
+	r.Use(RequestLogger)
+	r.Get("/callback", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})
+
+	const secret = "secreto123"
+	req := httptest.NewRequestWithContext(context.Background(), "GET",
+		"/callback?code="+secret+"&state=abc", nil)
+	rec := httptest.NewRecorder()
+
+	r.ServeHTTP(rec, req)
+
+	logOutput := buf.String()
+	if !strings.Contains(logOutput, "path=/callback") {
+		t.Errorf("expected log to contain path=/callback, got: %s", logOutput)
+	}
+	if strings.Contains(logOutput, secret) {
+		t.Errorf("access log leaked the OAuth code; full output: %s", logOutput)
+	}
+	if strings.Contains(logOutput, "?code=") {
+		t.Errorf("access log leaked the query string; full output: %s", logOutput)
+	}
+}
+
 // TestRequestIDHeader_EchoesIncomingHeader tests that the middleware echoes an incoming X-Request-Id header.
 // SPEC: Scenario "ID from incoming header" + "Upstream ID echoed back"
 func TestRequestIDHeader_EchoesIncomingHeader(t *testing.T) {
