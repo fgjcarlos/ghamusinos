@@ -75,14 +75,11 @@ jobs:
         env:
           GOTOOLCHAIN: go1.25.7
         run: |
-          # Baja el binario precompilado desde el release oficial de Go
-          # (mismo patrón que el step de golangci-lint más arriba).
-          version="v1.1.4"
-          asset="govulncheck-${version}-linux-amd64"
-          curl -sSfL -o "/tmp/${asset}.zip" \
-            "https://github.com/golang/vuln/releases/download/${version}/${asset}.zip"
-          unzip -q -o "/tmp/${asset}.zip" -d /tmp/govulncheck-bin
-          install -m 0755 /tmp/govulncheck-bin/govulncheck "$(go env GOPATH)/bin/govulncheck"
+          # golang/vuln NO publica binarios en sus releases (los assets
+          # están vacíos; bajar el zip siempre devuelve 404). El método
+          # oficial de instalación es `go install`. Pinea a v1.1.4 (último
+          # release estable) en vez de @latest para builds reproducibles.
+          go install golang.org/x/vuln/cmd/govulncheck@v1.1.4
           echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
           govulncheck -version
           govulncheck ./...
