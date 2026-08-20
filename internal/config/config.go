@@ -57,6 +57,12 @@ type Config struct {
 	// (fase 1.2, issue #14). Es nil si las variables de entorno no
 	// están definidas; en ese caso los handlers OAuth no se montan.
 	Strava *StravaConfig
+	// AuthDisabled desactiva Clerk + invite gate en /api/* y en su lugar
+	// inyecta un usuario sintético ("dev@local"). SOLO desarrollo local;
+	// el router loguea un warning explícito al arrancar si está activo.
+	// Variable de entorno: AUTH_DISABLED=true|1|yes (cualquier valor
+	// distinto se trata como false). Default: false.
+	AuthDisabled bool
 }
 
 // StravaConfig agrupa las credenciales de la app Strava global (ADR 0001)
@@ -117,6 +123,7 @@ func Load() (*Config, error) {
 			CSPReportOnly: getEnv("SECURITY_CSP_REPORT_ONLY", "") == "true",
 		},
 		MaxBodyBytes: parseMaxBodyBytes(os.Getenv("MAX_BODY_BYTES")),
+		AuthDisabled: parseBool(os.Getenv("AUTH_DISABLED")),
 	}
 
 	if cfg.DatabaseURL == "" {
@@ -325,4 +332,14 @@ func parseMaxBodyBytes(raw string) int64 {
 		return defaultBytes
 	}
 	return n
+}
+
+// parseBool acepta "1", "true", "yes", "on" (case-insensitive). Vacío o
+// cualquier otro valor → false. Usado para flags opt-in como AUTH_DISABLED.
+func parseBool(raw string) bool {
+	switch strings.ToLower(strings.TrimSpace(raw)) {
+	case "1", "true", "yes", "on":
+		return true
+	}
+	return false
 }

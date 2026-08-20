@@ -692,3 +692,46 @@ func TestLoad_MaxBodyBytesInvalidFallsBackToDefault(t *testing.T) {
 		t.Errorf("MaxBodyBytes = %d, quería default %d tras valor inválido", cfg.MaxBodyBytes, 10<<20)
 	}
 }
+
+// ─────────────────────────────────────────────────────────────────────────
+// AUTH_DISABLED (bypass local de Clerk)
+// ─────────────────────────────────────────────────────────────────────────
+
+func TestLoad_AuthDisabledDefaultsFalse(t *testing.T) {
+	t.Setenv("DATABASE_URL", "postgres://test:***@localhost/test")
+	t.Setenv("ENV", "production")
+	t.Setenv("CLERK_JWKS_URL", "https://clerk.example.com/jwks")
+	unsetPoolEnv(t)
+	unsetStravaEnv(t)
+	t.Setenv("AUTH_DISABLED", "")
+
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("Load() error: %v", err)
+	}
+	if cfg.AuthDisabled {
+		t.Errorf("AuthDisabled = true sin env var, quería false (fail-closed)")
+	}
+}
+
+func TestLoad_AuthDisabledTruthyValues(t *testing.T) {
+	cases := []string{"1", "true", "TRUE", "yes", "Yes", "on"}
+	for _, v := range cases {
+		t.Run(v, func(t *testing.T) {
+			t.Setenv("DATABASE_URL", "postgres://test:***@localhost/test")
+			t.Setenv("ENV", "production")
+			t.Setenv("CLERK_JWKS_URL", "https://clerk.example.com/jwks")
+			unsetPoolEnv(t)
+			unsetStravaEnv(t)
+			t.Setenv("AUTH_DISABLED", v)
+
+			cfg, err := Load()
+			if err != nil {
+				t.Fatalf("Load() error: %v", err)
+			}
+			if !cfg.AuthDisabled {
+				t.Errorf("AuthDisabled = false para AUTH_DISABLED=%q, quería true", v)
+			}
+		})
+	}
+}

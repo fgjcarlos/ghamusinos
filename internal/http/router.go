@@ -2,11 +2,13 @@
 package http
 
 import (
+	"log/slog"
 	"net/http"
 	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
+	"github.com/google/uuid"
 
 	"github.com/fgjcarlos/ghamusinos/internal/auth"
 	"github.com/fgjcarlos/ghamusinos/internal/config"
@@ -166,9 +168,17 @@ func (s *Server) Router() http.Handler {
 		validator := auth.NewJWTValidator(jwksCache, s.cfg.ClerkAudience)
 		resolver := auth.NewUserResolver(s.queries)
 
-		r.Use(auth.AuthMiddleware(validator))
-		r.Use(auth.ResolveMiddleware(resolver))
-		r.Use(auth.InviteGateMiddleware(s.queries))
+		if s.cfg.AuthDisabled {
+			// Bypass Clerk: inyecta un usuario sintético y se salta el
+			// invite gate. SOLO desarrollo local — el binario loguea un
+			// warning al arrancar si esto está activo.
+			slog.Warn("AUTH_DISABLED=true: Clerk y invite gate desactivados, /api/* usa usuario sintético dev@local")
+			r.Use(devUserMiddleware())
+		} else {
+			r.Use(auth.AuthMiddleware(validator))
+			r.Use(auth.ResolveMiddleware(resolver))
+			r.Use(auth.InviteGateMiddleware(s.queries))
+		}
 
 		// v1 API routes
 		r.Route("/v1", func(r chi.Router) {
@@ -225,4 +235,30 @@ func (s *Server) Router() http.Handler {
 	r.Handle("/*", frontend.Handler())
 
 	return r
+}
+
+// devUserMiddleware inyecta un usuario sintético en el contexto para
+// saltarse Clerk + invite gate cuando cfg.AuthDisabled=true. Solo se monta
+// en ese caso (router.go línea ~175). El UUID se genera una vez por
+// proceso — los handlers que persistan datos obtendrán un user_id estable
+// dentro de la misma ejecución del binario.
+//
+// ponytail: ID hardcodeado a dev@local; aceptable porque este modo es
+// solo dev y ningún handler hace upsert por user_id sin que el operador
+// lo sepa (logs explícitos al arrancar).
+func devUserMiddleware() func(http.Handler) http.Handler {
+	devID := uuid.New().String()
+	devUser := &auth.User{
+		ID:           devID,
+		ClerkUserID:  "dev_clerk_user",
+		Email:        "dev@local",
+		DisplayName:  "Local Dev",
+		InviteStatus: "active",
+	}
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			ctx := auth.WithAuthUser(r.Context(), devUser)
+			next.ServeHTTP(w, r.WithContext(ctx))
+		})
+	}
 }

@@ -1,7 +1,9 @@
 package http
 
 import (
+	"bytes"
 	"context"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -115,6 +117,23 @@ func nuevoServidor(t *testing.T) *httptest.Server {
 	cfg := &config.Config{
 		ClerkJWKSURL:  "https://clerk.example.com/.well-known/jwks.json",
 		ClerkAudience: "test",
+	}
+	srv := httptest.NewServer(NewServer(nil, &mockQuerier{}, cfg).Router())
+	t.Cleanup(srv.Close)
+	return srv
+}
+
+// nuevoServidorAuthDisabled construye un Server con cfg.AuthDisabled=true.
+// Verifica que /api/v1/me responde 200 sin Authorization y devuelve el
+// usuario sintético dev@local. El test cubre el bypass completo:
+// AuthMiddleware, ResolveMiddleware y InviteGateMiddleware quedan
+// desactivados y se inyecta un User con InviteStatus="active".
+func nuevoServidorAuthDisabled(t *testing.T) *httptest.Server {
+	t.Helper()
+	cfg := &config.Config{
+		ClerkJWKSURL:  "https://clerk.example.com/.well-known/jwks.json",
+		ClerkAudience: "test",
+		AuthDisabled:  true,
 	}
 	srv := httptest.NewServer(NewServer(nil, &mockQuerier{}, cfg).Router())
 	t.Cleanup(srv.Close)
@@ -244,4 +263,38 @@ func TestWithGPXStoresSegregatedDependencies(t *testing.T) {
 	require.NotNil(t, server.gpxRiskDetector)
 	require.NotNil(t, server.gpxTypeDetector)
 	require.NotNil(t, server.gpxHasher)
+}
+
+// TestRouterAPIv1MeBypassAuthDisabled verifica que con cfg.AuthDisabled=true
+// el endpoint /api/v1/me responde 200 SIN Authorization header y devuelve el
+// usuario sintético inyectado por devUserMiddleware. Cubre el bypass completo
+// de AuthMiddleware + ResolveMiddleware + InviteGateMiddleware.
+func TestRouterAPIv1MeBypassAuthDisabled(t *testing.T) {
+	srv := nuevoServidorAuthDisabled(t)
+
+	resp := testGet(t, srv.URL+"/api/v1/me")
+	defer func() { _ = resp.Body.Close() }()
+
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("GET /api/v1/me con AUTH_DISABLED=true quería 200, obtuvo %d", resp.StatusCode)
+	}
+
+	ct := resp.Header.Get("Content-Type")
+	if ct != "application/json" {
+		t.Errorf("Content-Type = %q, quería application/json", ct)
+	}
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		t.Fatalf("read body: %v", err)
+	}
+	// El user sintético viene de devUserMiddleware: email dev@local,
+	// invite_status active. Si esto cambia, falla aquí mismo — no
+	// permitimos que se cuele un bypass silencioso.
+	if !bytes.Contains(body, []byte(`"email":"dev@local"`)) {
+		t.Errorf("body = %s, quería contener \"email\":\"dev@local\"", body)
+	}
+	if !bytes.Contains(body, []byte(`"invite_status":"active"`)) {
+		t.Errorf("body = %s, quería contener \"invite_status\":\"active\"", body)
+	}
 }
