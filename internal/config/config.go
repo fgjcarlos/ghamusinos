@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/joho/godotenv"
@@ -31,6 +32,12 @@ type Config struct {
 	ClerkAudience string
 	// FrontendURL es la URL base del frontend para redirecciones OAuth (default http://localhost:5173).
 	FrontendURL string
+	// TrustedProxies lista de CIDRs de proxies de confianza para parsear
+	// X-Forwarded-For. Si está vacía, NO se monta el middleware de IP real
+	// y los logs usan r.RemoteAddr (fail-closed). Configurar con
+	// TRUSTED_PROXIES="10.0.0.0/8,172.16.0.0/12" en despliegues detrás
+	// de un reverse proxy conocido. Issue #64.
+	TrustedProxies []string
 	// Strava contiene la configuración de la integración con Strava
 	// (fase 1.2, issue #14). Es nil si las variables de entorno no
 	// están definidas; en ese caso los handlers OAuth no se montan.
@@ -82,13 +89,14 @@ func Load() (*Config, error) {
 	}
 
 	cfg := &Config{
-		Env:           getEnv("ENV", "development"),
-		Port:          getEnv("PORT", "8080"),
-		DatabaseURL:   os.Getenv("DATABASE_URL"),
-		Pool:          pool,
-		ClerkJWKSURL:  os.Getenv("CLERK_JWKS_URL"),
-		ClerkAudience: getEnv("CLERK_AUDIENCE", ""),
-		FrontendURL:   getEnv("FRONTEND_URL", "http://localhost:5173"),
+		Env:            getEnv("ENV", "development"),
+		Port:           getEnv("PORT", "8080"),
+		DatabaseURL:    os.Getenv("DATABASE_URL"),
+		Pool:           pool,
+		ClerkJWKSURL:   os.Getenv("CLERK_JWKS_URL"),
+		ClerkAudience:  getEnv("CLERK_AUDIENCE", ""),
+		FrontendURL:    getEnv("FRONTEND_URL", "http://localhost:5173"),
+		TrustedProxies: parseTrustedProxies(os.Getenv("TRUSTED_PROXIES")),
 	}
 
 	if cfg.DatabaseURL == "" {
@@ -255,4 +263,22 @@ func getEnvDuration(key string, defaultVal time.Duration) (time.Duration, error)
 		return 0, fmt.Errorf("config: %s=%q no es una duración válida (espera formato Go, e.g. 5s, 1h30m): %w", key, v, err)
 	}
 	return d, nil
+}
+
+// parseTrustedProxies lee la lista de CIDRs separados por coma. Devuelve
+// slice vacío si la variable está vacía (fail-closed: sin proxies de
+// confianza declarados, no se monta el middleware XFF). Espacios
+// alrededor de cada CIDR se trimean. Issue #64.
+func parseTrustedProxies(raw string) []string {
+	if raw == "" {
+		return nil
+	}
+	parts := strings.Split(raw, ",")
+	out := make([]string, 0, len(parts))
+	for _, p := range parts {
+		if p = strings.TrimSpace(p); p != "" {
+			out = append(out, p)
+		}
+	}
+	return out
 }

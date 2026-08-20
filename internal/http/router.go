@@ -94,7 +94,7 @@ func (s *Server) WithGPX(
 // Middleware base:
 //   - RequestID: identificador de correlación por petición.
 //   - RequestIDHeader: propaga el request ID al header de respuesta.
-//   - RealIP:    IP real del cliente tras proxies.
+//   - ClientIPFromXFF (opcional): solo si TRUSTED_PROXIES está configurado.
 //   - Recoverer: recupera ante panics y devuelve 500 sin tumbar el servidor.
 //   - RequestLogger: log de cada petición con estructura JSON.
 func (s *Server) Router() http.Handler {
@@ -102,19 +102,14 @@ func (s *Server) Router() http.Handler {
 
 	r.Use(middleware.RequestID)
 	r.Use(RequestIDHeader)
-	// RealIP confía en X-Forwarded-For / X-Real-IP. Asume que el binario se
-	// despliega DETRÁS de un reverse proxy de confianza (plataforma o Nginx).
-	// Si en algún momento se expone directo a internet, restringir o quitar.
-	//
-	// SA1019 (staticcheck) marca `middleware.RealIP` como deprecated por
-	// vulnerabilidad a IP spoofing (GHSA-3fxj-6jh8-hvhx, GHSA-rjr7-jggh-pgcp,
-	// GHSA-9g5q-2w5x-hmxf): muta r.RemoteAddr al primer valor de
-	// X-Forwarded-For aunque la cadena de proxies no sea de confianza.
-	// Se mantiene temporalmente mientras se evalúa la alternativa (p.ej.
-	// `middleware.ForwardedHeader` con lista de IPs de proxy, o quitar
-	// y derivar la IP del log desde el peer directo). Tracked in issue
-	// de seguimiento abierta desde #62.
-	r.Use(middleware.RealIP) //nolint:staticcheck // SA1019: deprecated por IP spoofing, fix trackeado en issue de seguimiento
+	// IP del cliente: usa middleware.ClientIPFromXFF si hay proxies de
+	// confianza declarados en TRUSTED_PROXIES (CIDRs separados por coma);
+	// si no, no monta nada y los logs usan r.RemoteAddr (fail-closed).
+	// Reemplaza middleware.RealIP (SA1019: vulnerable a IP spoofing,
+	// GHSA-3fxj-6jh8-hvhx). Issue #64.
+	if len(s.cfg.TrustedProxies) > 0 {
+		r.Use(middleware.ClientIPFromXFF(s.cfg.TrustedProxies...))
+	}
 	r.Use(middleware.Recoverer)
 	r.Use(RequestLogger)
 
