@@ -1,0 +1,21 @@
+# Build outputs
+dist
+build
+
+# Dependencias
+node_modules
+.pnpm-store
+
+# Cache
+.eslintcache
+.vite
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Editor
+.vscode
+.idea

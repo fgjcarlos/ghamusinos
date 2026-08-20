@@ -75,7 +75,7 @@ export interface PaginatedActivities {
 export interface SyncSession {
   id: string;
   user_id: string;
-  status: "pending" | "running" | "completed" | "failed" | "cancelled";
+  status: 'pending' | 'running' | 'completed' | 'failed' | 'cancelled';
   window_days: number;
   total_activities: number;
   imported: number;
@@ -92,10 +92,10 @@ export interface SyncSession {
 export class ApiError extends Error {
   constructor(
     public status: number,
-    message: string
+    message: string,
   ) {
     super(message);
-    this.name = "ApiError";
+    this.name = 'ApiError';
     Object.setPrototypeOf(this, ApiError.prototype);
   }
 }

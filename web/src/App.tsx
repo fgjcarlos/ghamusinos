@@ -1,25 +1,27 @@
-import { Link } from 'react-router-dom'
+import { Link } from 'react-router-dom';
 
 function App() {
   return (
     <main style={styles.main}>
       <div style={styles.card}>
         <h1 style={styles.title}>Ghamusinos</h1>
-        <p style={styles.subtitle}>
-          Análisis y planificación para trail running
-        </p>
+        <p style={styles.subtitle}>Análisis y planificación para trail running</p>
         <hr style={styles.divider} />
         <p style={styles.note}>
-          El área privada (conexión con Strava, análisis de entrenamientos y
-          planificación de carreras) llegará en fases posteriores.
+          El área privada (conexión con Strava, análisis de entrenamientos y planificación de
+          carreras) llegará en fases posteriores.
         </p>
         <div style={styles.navigation}>
-          <Link to="/activities" style={styles.navLink}>Mis actividades</Link>
-          <Link to="/profile" style={styles.navLink}>Perfil</Link>
+          <Link to="/activities" style={styles.navLink}>
+            Mis actividades
+          </Link>
+          <Link to="/profile" style={styles.navLink}>
+            Perfil
+          </Link>
         </div>
       </div>
     </main>
-  )
+  );
 }
 
 const styles: Record<string, React.CSSProperties> = {
@@ -84,6 +86,6 @@ const styles: Record<string, React.CSSProperties> = {
     borderRadius: '6px',
     transition: 'all 0.2s ease',
   },
-}
+};
 
-export default App
+export default App;

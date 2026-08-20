@@ -4,9 +4,9 @@
  * Auto-closes when sync completes or fails.
  */
 
-import { useState, useEffect } from "react";
-import { SyncSession } from "../../lib/api/types";
-import { getSyncStatus } from "../../lib/api/strava";
+import { useState, useEffect } from 'react';
+import { SyncSession } from '../../lib/api/types';
+import { getSyncStatus } from '../../lib/api/strava';
 
 interface SyncProgressModalProps {
   token: string;
@@ -18,9 +18,9 @@ interface SyncProgressModalProps {
  * Format a timestamp string to a readable date-time.
  */
 function formatDateTime(isoString: string | null): string {
-  if (!isoString) return "–";
+  if (!isoString) return '–';
   const date = new Date(isoString);
-  return date.toLocaleString("es-ES");
+  return date.toLocaleString('es-ES');
 }
 
 /**
@@ -28,11 +28,11 @@ function formatDateTime(isoString: string | null): string {
  */
 function getStatusLabel(status: string): string {
   const labels: Record<string, string> = {
-    pending: "Pendiente",
-    running: "Sincronizando...",
-    completed: "Completado",
-    failed: "Error",
-    cancelled: "Cancelado",
+    pending: 'Pendiente',
+    running: 'Sincronizando...',
+    completed: 'Completado',
+    failed: 'Error',
+    cancelled: 'Cancelado',
   };
   return labels[status] || status;
 }
@@ -42,20 +42,16 @@ function getStatusLabel(status: string): string {
  */
 function getStatusColor(status: string): string {
   const colors: Record<string, string> = {
-    pending: "#fbbf24",
-    running: "#3b82f6",
-    completed: "#10b981",
-    failed: "#ef4444",
-    cancelled: "#6b7280",
+    pending: '#fbbf24',
+    running: '#3b82f6',
+    completed: '#10b981',
+    failed: '#ef4444',
+    cancelled: '#6b7280',
   };
-  return colors[status] || "#64748b";
+  return colors[status] || '#64748b';
 }
 
-export function SyncProgressModal({
-  token,
-  isOpen,
-  onClose,
-}: SyncProgressModalProps) {
+export function SyncProgressModal({ token, isOpen, onClose }: SyncProgressModalProps) {
   const [syncSession, setSyncSession] = useState<SyncSession | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -74,16 +70,15 @@ export function SyncProgressModal({
 
         // Stop polling if status is terminal
         if (
-          session.status === "completed" ||
-          session.status === "failed" ||
-          session.status === "cancelled"
+          session.status === 'completed' ||
+          session.status === 'failed' ||
+          session.status === 'cancelled'
         ) {
           if (intervalId) clearInterval(intervalId);
           intervalId = null;
         }
       } catch (err) {
-        const errorMessage =
-          err instanceof Error ? err.message : "Unknown error";
+        const errorMessage = err instanceof Error ? err.message : 'Unknown error';
         setError(`No se pudo obtener el estado: ${errorMessage}`);
       } finally {
         setLoading(false);
@@ -104,7 +99,7 @@ export function SyncProgressModal({
 
   if (!isOpen) return null;
 
-  const statusColor = syncSession ? getStatusColor(syncSession.status) : "#64748b";
+  const statusColor = syncSession ? getStatusColor(syncSession.status) : '#64748b';
   const progress = syncSession
     ? (syncSession.imported / Math.max(1, syncSession.total_activities)) * 100
     : 0;
@@ -112,44 +107,44 @@ export function SyncProgressModal({
   return (
     <div
       style={{
-        position: "fixed",
+        position: 'fixed',
         inset: 0,
-        backgroundColor: "rgba(0, 0, 0, 0.5)",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
+        backgroundColor: 'rgba(0, 0, 0, 0.5)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
         zIndex: 1000,
       }}
       onClick={onClose}
     >
       <div
         style={{
-          backgroundColor: "white",
-          borderRadius: "8px",
-          boxShadow: "0 10px 40px rgba(0, 0, 0, 0.2)",
-          padding: "24px",
-          maxWidth: "500px",
-          width: "90%",
-          maxHeight: "80vh",
-          overflowY: "auto",
+          backgroundColor: 'white',
+          borderRadius: '8px',
+          boxShadow: '0 10px 40px rgba(0, 0, 0, 0.2)',
+          padding: '24px',
+          maxWidth: '500px',
+          width: '90%',
+          maxHeight: '80vh',
+          overflowY: 'auto',
         }}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
         <div
           style={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            marginBottom: "20px",
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            marginBottom: '20px',
           }}
         >
           <h2
             style={{
-              margin: "0",
-              fontSize: "18px",
-              fontWeight: "700",
-              color: "#1e293b",
+              margin: '0',
+              fontSize: '18px',
+              fontWeight: '700',
+              color: '#1e293b',
             }}
           >
             Estado de sincronización
@@ -157,12 +152,12 @@ export function SyncProgressModal({
           <button
             onClick={onClose}
             style={{
-              background: "none",
-              border: "none",
-              fontSize: "24px",
-              cursor: "pointer",
-              padding: "0",
-              color: "#64748b",
+              background: 'none',
+              border: 'none',
+              fontSize: '24px',
+              cursor: 'pointer',
+              padding: '0',
+              color: '#64748b',
             }}
           >
             ✕
@@ -173,13 +168,13 @@ export function SyncProgressModal({
         {error && (
           <div
             style={{
-              marginBottom: "16px",
-              padding: "12px",
-              backgroundColor: "#fee2e2",
-              border: "1px solid #fecaca",
-              borderRadius: "6px",
-              color: "#991b1b",
-              fontSize: "13px",
+              marginBottom: '16px',
+              padding: '12px',
+              backgroundColor: '#fee2e2',
+              border: '1px solid #fecaca',
+              borderRadius: '6px',
+              color: '#991b1b',
+              fontSize: '13px',
             }}
           >
             {error}
@@ -190,12 +185,12 @@ export function SyncProgressModal({
         {loading && !syncSession && (
           <div
             style={{
-              textAlign: "center",
-              padding: "40px 20px",
-              color: "#64748b",
+              textAlign: 'center',
+              padding: '40px 20px',
+              color: '#64748b',
             }}
           >
-            <div style={{ fontSize: "24px", marginBottom: "12px" }}>⟳</div>
+            <div style={{ fontSize: '24px', marginBottom: '12px' }}>⟳</div>
             Cargando...
           </div>
         )}
@@ -206,23 +201,23 @@ export function SyncProgressModal({
             {/* Status badge */}
             <div
               style={{
-                marginBottom: "20px",
-                padding: "12px",
+                marginBottom: '20px',
+                padding: '12px',
                 backgroundColor: `${statusColor}20`,
                 border: `1px solid ${statusColor}40`,
-                borderRadius: "6px",
-                textAlign: "center",
+                borderRadius: '6px',
+                textAlign: 'center',
               }}
             >
               <div
                 style={{
-                  display: "inline-block",
-                  padding: "6px 12px",
+                  display: 'inline-block',
+                  padding: '6px 12px',
                   backgroundColor: statusColor,
-                  color: "white",
-                  borderRadius: "4px",
-                  fontSize: "12px",
-                  fontWeight: "600",
+                  color: 'white',
+                  borderRadius: '4px',
+                  fontSize: '12px',
+                  fontWeight: '600',
                 }}
               >
                 {getStatusLabel(syncSession.status)}
@@ -230,14 +225,14 @@ export function SyncProgressModal({
             </div>
 
             {/* Progress bar */}
-            <div style={{ marginBottom: "20px" }}>
+            <div style={{ marginBottom: '20px' }}>
               <div
                 style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  marginBottom: "8px",
-                  fontSize: "13px",
-                  color: "#64748b",
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  marginBottom: '8px',
+                  fontSize: '13px',
+                  color: '#64748b',
                 }}
               >
                 <span>Progreso</span>
@@ -247,19 +242,19 @@ export function SyncProgressModal({
               </div>
               <div
                 style={{
-                  width: "100%",
-                  height: "8px",
-                  backgroundColor: "#e2e8f0",
-                  borderRadius: "4px",
-                  overflow: "hidden",
+                  width: '100%',
+                  height: '8px',
+                  backgroundColor: '#e2e8f0',
+                  borderRadius: '4px',
+                  overflow: 'hidden',
                 }}
               >
                 <div
                   style={{
                     width: `${progress}%`,
-                    height: "100%",
+                    height: '100%',
                     backgroundColor: statusColor,
-                    transition: "width 0.3s ease",
+                    transition: 'width 0.3s ease',
                   }}
                 />
               </div>
@@ -268,42 +263,42 @@ export function SyncProgressModal({
             {/* Details grid */}
             <div
               style={{
-                display: "grid",
-                gridTemplateColumns: "1fr 1fr",
-                gap: "16px",
-                fontSize: "13px",
-                marginBottom: "20px",
+                display: 'grid',
+                gridTemplateColumns: '1fr 1fr',
+                gap: '16px',
+                fontSize: '13px',
+                marginBottom: '20px',
               }}
             >
               <div>
-                <div style={{ fontWeight: "600", color: "#475569", marginBottom: "4px" }}>
+                <div style={{ fontWeight: '600', color: '#475569', marginBottom: '4px' }}>
                   Importadas
                 </div>
-                <div style={{ color: "#10b981", fontSize: "18px", fontWeight: "700" }}>
+                <div style={{ color: '#10b981', fontSize: '18px', fontWeight: '700' }}>
                   {syncSession.imported}
                 </div>
               </div>
               <div>
-                <div style={{ fontWeight: "600", color: "#475569", marginBottom: "4px" }}>
+                <div style={{ fontWeight: '600', color: '#475569', marginBottom: '4px' }}>
                   Omitidas
                 </div>
-                <div style={{ color: "#64748b", fontSize: "18px", fontWeight: "700" }}>
+                <div style={{ color: '#64748b', fontSize: '18px', fontWeight: '700' }}>
                   {syncSession.skipped}
                 </div>
               </div>
               <div>
-                <div style={{ fontWeight: "600", color: "#475569", marginBottom: "4px" }}>
+                <div style={{ fontWeight: '600', color: '#475569', marginBottom: '4px' }}>
                   Iniciado
                 </div>
-                <div style={{ fontSize: "12px", color: "#64748b" }}>
+                <div style={{ fontSize: '12px', color: '#64748b' }}>
                   {formatDateTime(syncSession.started_at)}
                 </div>
               </div>
               <div>
-                <div style={{ fontWeight: "600", color: "#475569", marginBottom: "4px" }}>
+                <div style={{ fontWeight: '600', color: '#475569', marginBottom: '4px' }}>
                   Finalizado
                 </div>
-                <div style={{ fontSize: "12px", color: "#64748b" }}>
+                <div style={{ fontSize: '12px', color: '#64748b' }}>
                   {formatDateTime(syncSession.finished_at)}
                 </div>
               </div>
@@ -313,14 +308,14 @@ export function SyncProgressModal({
             {syncSession.error && (
               <div
                 style={{
-                  marginBottom: "16px",
-                  padding: "12px",
-                  backgroundColor: "#fee2e2",
-                  border: "1px solid #fecaca",
-                  borderRadius: "6px",
-                  color: "#991b1b",
-                  fontSize: "12px",
-                  wordBreak: "break-word",
+                  marginBottom: '16px',
+                  padding: '12px',
+                  backgroundColor: '#fee2e2',
+                  border: '1px solid #fecaca',
+                  borderRadius: '6px',
+                  color: '#991b1b',
+                  fontSize: '12px',
+                  wordBreak: 'break-word',
                 }}
               >
                 <strong>Error:</strong> {syncSession.error}
@@ -331,22 +326,21 @@ export function SyncProgressModal({
             <button
               onClick={onClose}
               style={{
-                width: "100%",
-                padding: "10px 16px",
+                width: '100%',
+                padding: '10px 16px',
                 backgroundColor:
-                  syncSession.status === "completed" ||
-                  syncSession.status === "failed"
-                    ? "#475569"
-                    : "#cbd5e1",
-                color: "white",
-                border: "none",
-                borderRadius: "6px",
-                fontSize: "14px",
-                fontWeight: "600",
-                cursor: "pointer",
+                  syncSession.status === 'completed' || syncSession.status === 'failed'
+                    ? '#475569'
+                    : '#cbd5e1',
+                color: 'white',
+                border: 'none',
+                borderRadius: '6px',
+                fontSize: '14px',
+                fontWeight: '600',
+                cursor: 'pointer',
               }}
             >
-              {syncSession.status === "running" ? "Mantener abierto" : "Cerrar"}
+              {syncSession.status === 'running' ? 'Mantener abierto' : 'Cerrar'}
             </button>
           </div>
         )}

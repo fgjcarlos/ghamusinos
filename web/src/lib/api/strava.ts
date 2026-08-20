@@ -8,14 +8,9 @@
  * TODO(#90): Integrate Clerk React SDK for production auth.
  */
 
-import {
-  Activity,
-  PaginatedActivities,
-  SyncSession,
-  ApiError,
-} from "./types";
+import { Activity, PaginatedActivities, SyncSession, ApiError } from './types';
 
-const BASE_URL = "/api/v1";
+const BASE_URL = '/api/v1';
 
 /**
  * makeAuthHeader creates an Authorization header with Bearer token.
@@ -23,7 +18,7 @@ const BASE_URL = "/api/v1";
 function makeAuthHeader(token: string): HeadersInit {
   return {
     Authorization: `Bearer ${token}`,
-    "Content-Type": "application/json",
+    'Content-Type': 'application/json',
   };
 }
 
@@ -47,14 +42,14 @@ async function handleResponse<T>(response: Response): Promise<T> {
 export async function listActivities(
   token: string,
   page: number = 1,
-  limit: number = 20
+  limit: number = 20,
 ): Promise<PaginatedActivities> {
   const params = new URLSearchParams({
     page: String(page),
     limit: String(limit),
   });
   const response = await fetch(`${BASE_URL}/activities?${params}`, {
-    method: "GET",
+    method: 'GET',
     headers: makeAuthHeader(token),
   });
   return handleResponse<PaginatedActivities>(response);
@@ -65,12 +60,9 @@ export async function listActivities(
  * @param token Bearer token for authorization
  * @param id Activity ID (UUID as string, or the full pgtype.UUID object converted to string)
  */
-export async function getActivity(
-  token: string,
-  id: string
-): Promise<Activity> {
+export async function getActivity(token: string, id: string): Promise<Activity> {
   const response = await fetch(`${BASE_URL}/activities/${id}`, {
-    method: "GET",
+    method: 'GET',
     headers: makeAuthHeader(token),
   });
   return handleResponse<Activity>(response);
@@ -81,7 +73,7 @@ export async function getActivity(
  */
 export async function getSyncStatus(token: string): Promise<SyncSession> {
   const response = await fetch(`${BASE_URL}/sync/status`, {
-    method: "GET",
+    method: 'GET',
     headers: makeAuthHeader(token),
   });
   return handleResponse<SyncSession>(response);
