@@ -119,8 +119,11 @@ CREATE TABLE sync_sessions (
 CREATE INDEX idx_sync_sessions_user_started ON sync_sessions (user_id, started_at DESC);
 
 -- Zonas de entrenamiento de frecuencia cardíaca (HR zones).
--- Calculadas a partir de streams HR usando el método Friel/Coggan
--- (5 zonas a 50/60/70/80/90% del hrMax del usuario).
+-- Calculadas a partir de streams HR usando el método Friel/Coggan con
+-- los umbrales efectivos en el código: 60/70/80/90% del hrMax del usuario
+-- (Z1 <60%, Z2 [60%,70%), Z3 [70%,80%), Z4 [80%,90%), Z5 >=90%).
+-- El comentario original decía 50/60/70/80/90; AUD-05 (issue #166) corrige
+-- el comentario para que el contrato documente lo que el código hace.
 CREATE TABLE hr_zones (
     activity_id     UUID        PRIMARY KEY REFERENCES activities(id) ON DELETE CASCADE,
     z1_seconds      INTEGER     NOT NULL DEFAULT 0 CHECK (z1_seconds >= 0),
