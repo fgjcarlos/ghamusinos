@@ -64,7 +64,9 @@ func RequestLogger(next http.Handler) http.Handler {
 		slog.LogAttrs(r.Context(), level, "request",
 			slog.String("request_id", requestID),
 			slog.String("method", r.Method),
-			slog.String("path", r.RequestURI),
+			// ponytail: r.URL.Path only — never log the query string. OAuth callback
+			// receives ?code=<authorization_code>, which is a single-use credential.
+			slog.String("path", r.URL.Path),
 			slog.Int("status", wrapped.statusCode),
 			slog.Int64("latency_ms", latencyMs),
 		)
