@@ -109,12 +109,24 @@ func TestBuildRouter_StravaOptionalRoutesWhenConfigured(t *testing.T) {
 	got := collectRoutes(t, h)
 
 	stravaSubset := []string{
-		"GET /api/v1/strava/callback",
+		// /api/v1/strava/connect stays under /api because the frontend calls
+		// it with fetch() and carries the Authorization header. AUD-02 (#163)
+		// moved it out of an r.Route("/strava") group but kept it inside /api.
 		"GET /api/v1/strava/connect",
+		// /strava/callback moved OUT of /api (AUD-02, finding C1): the
+		// browser-top-level redirect from Strava does not carry an
+		// Authorization header, so the handler must be reachable without
+		// going through AuthMiddleware. The user_id rides inside the
+		// signed state.
+		"GET /strava/callback",
 	}
 	for _, want := range stravaSubset {
 		require.Contains(t, got, want, "expected Strava route %q to be mounted when cfg.Strava is configured", want)
 	}
+
+	// /api/v1/strava/callback used to be in this list (the old design put
+	// the callback under /api too); assert it is NOT mounted there now.
+	require.NotContains(t, got, "GET /api/v1/strava/callback", "callback must live outside /api (AUD-02)")
 
 	// Webhook routes must NOT be present: buildRouter does not call WithWebhooks.
 	// AUD-03 (issue #165) is the issue that wires them. When it lands, this

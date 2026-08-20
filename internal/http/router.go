@@ -136,6 +136,15 @@ func (s *Server) Router() http.Handler {
 		r.Post("/strava/webhook", strava.WebhookHandler(s.cfg.Strava.WebhookSecret, s.webhookStore))
 	}
 
+	// Strava OAuth callback (AUD-02, issue #163): también se monta FUERA de /api
+	// porque la redirección de Strava es una navegación top-level del navegador,
+	// que no envía la cabecera Authorization. El user_id viaja dentro del state
+	// firmado (HMAC-SHA256 sobre {uid, nonce, exp}); el handler verifica la
+	// firma antes de actuar.
+	if s.stravaClient != nil && s.stravaStore != nil && s.stravaCipherKey != nil {
+		r.Get("/strava/callback", strava.CallbackHandler(s.stravaClient, s.stravaStore, s.stravaCipherKey, s.cfg.FrontendURL))
+	}
+
 	// Grupo de API. TODAS las rutas /api/* están protegidas por autenticación.
 	// Las rutas específicas de cada versión (v1, v2, etc.) se definen dentro.
 	r.Route("/api", func(r chi.Router) {
@@ -162,15 +171,13 @@ func (s *Server) Router() http.Handler {
 				})
 			}
 
-			// Strava OAuth (issue #14, fase 1.2): se monta solo si el wiring
-			// inyectó dependencias (cliente + store + cipher key). Las rutas
-			// quedan detrás del middleware de auth: el user_id se toma del
-			// contexto (inyectado por ResolveMiddleware) en vez de query string.
+			// Strava OAuth connect (AUD-02, issue #163): sigue bajo /api porque
+			// el frontend lo llama con fetch() y lleva Authorization. Devuelve
+			// JSON con authorize_url (el state firmado lleva el user_id por dentro)
+			// y el frontend hace window.location.assign(url).
+			// El callback está montado arriba, fuera de /api.
 			if s.stravaClient != nil && s.stravaStore != nil && s.stravaCipherKey != nil {
-				r.Route("/strava", func(r chi.Router) {
-					r.Get("/connect", strava.ConnectHandler(s.stravaClient))
-					r.Get("/callback", strava.CallbackHandler(s.stravaClient, s.stravaStore, s.stravaCipherKey, s.cfg.FrontendURL))
-				})
+				r.Get("/strava/connect", strava.ConnectHandler(s.stravaClient, s.stravaCipherKey))
 			}
 
 			// Custom NotFound and MethodNotAllowed for v1 API (RFC 9457 ProblemDetail)

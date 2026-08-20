@@ -78,3 +78,26 @@ export async function getSyncStatus(token: string): Promise<SyncSession> {
   });
   return handleResponse<SyncSession>(response);
 }
+
+/**
+ * getStravaAuthorizeURL asks the backend for the URL the browser should
+ * navigate to in order to start the Strava OAuth flow.
+ *
+ * The backend returns {"authorize_url": "https://www.strava.com/oauth/authorize?..."}.
+ * The user_id is embedded inside the signed state (HMAC-SHA256, AUD-02), so
+ * the browser-top-level redirect that follows does not need to carry any
+ * session cookie or Authorization header.
+ *
+ * The caller is expected to do window.location.assign(url) — NOT to set the
+ * URL as <a href>, because a navigation top-level does not carry headers and
+ * the old /api/v1/strava/connect (which used to 302) was unreachable from a
+ * plain anchor for that reason.
+ */
+export async function getStravaAuthorizeURL(token: string): Promise<string> {
+  const response = await fetch(`${BASE_URL}/strava/connect`, {
+    method: 'GET',
+    headers: makeAuthHeader(token),
+  });
+  const body = await handleResponse<{ authorize_url: string }>(response);
+  return body.authorize_url;
+}
