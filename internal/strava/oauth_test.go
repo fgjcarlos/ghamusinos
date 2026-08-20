@@ -402,7 +402,7 @@ func TestHandleCallback_GoldenPath(t *testing.T) {
 	res, err := HandleCallback(context.Background(), c, store, key, CallbackParams{
 		Code:  "valid-code",
 		State: state,
-	}, key, now)
+	}, key, now, nil)
 	if err != nil {
 		t.Fatalf("HandleCallback: %v", err)
 	}
@@ -457,7 +457,7 @@ func TestHandleCallback_StateUserIDWinsOverContext(t *testing.T) {
 	res, err := HandleCallback(context.Background(), c, store, key, CallbackParams{
 		Code:  "valid-code",
 		State: state,
-	}, key, now)
+	}, key, now, nil)
 	if err != nil {
 		t.Fatalf("HandleCallback: %v", err)
 	}
@@ -476,7 +476,7 @@ func TestHandleCallback_MissingCode(t *testing.T) {
 	defer srv.Close()
 
 	_, err := HandleCallback(context.Background(), c, &fakeTokenStore{}, key32(t),
-		CallbackParams{Code: "", State: "any"}, key32(t), time.Now())
+		CallbackParams{Code: "", State: "any"}, key32(t), time.Now(), nil)
 	if err == nil || !strings.Contains(err.Error(), "missing code") {
 		t.Errorf("err = %v, esperaba 'missing code'", err)
 	}
@@ -497,7 +497,7 @@ func TestHandleCallback_TamperedStateRejected(t *testing.T) {
 	tampered := state[:dot] + "." + strings.Repeat("A", 43) // 43 chars ≈ HMAC-SHA256 base64
 
 	_, err := HandleCallback(context.Background(), c, &fakeTokenStore{}, key,
-		CallbackParams{Code: "c", State: tampered}, key, now)
+		CallbackParams{Code: "c", State: tampered}, key, now, nil)
 	if err == nil || !strings.Contains(err.Error(), "signature") {
 		t.Errorf("err = %v, esperaba 'signature'", err)
 	}
@@ -518,7 +518,7 @@ func TestHandleCallback_ExpiredStateRejected(t *testing.T) {
 	// Simulamos "ahora" más tarde que exp
 	later := time.Unix(signedAt.Add(stateLifetime).Unix(), 0).Add(time.Second)
 	_, err := HandleCallback(context.Background(), c, &fakeTokenStore{}, key,
-		CallbackParams{Code: "c", State: state}, key, later)
+		CallbackParams{Code: "c", State: state}, key, later, nil)
 	if err == nil || !strings.Contains(err.Error(), "expired") {
 		t.Errorf("err = %v, esperaba 'expired'", err)
 	}
@@ -542,13 +542,13 @@ func TestHandleCallback_StateReuseAccepted(t *testing.T) {
 	params := CallbackParams{Code: "valid-code", State: state}
 
 	// Primera llamada: OK
-	if _, err := HandleCallback(context.Background(), c, store, key, params, key, now); err != nil {
+	if _, err := HandleCallback(context.Background(), c, store, key, params, key, now, nil); err != nil {
 		t.Fatalf("primer HandleCallback: %v", err)
 	}
 	// Segunda llamada con el mismo state: aceptamos por la decisión del AC #6.
 	// Si en algún momento esto se cierra con un seen-store, este test será
 	// el sitio para invertir la aserción.
-	if _, err := HandleCallback(context.Background(), c, store, key, params, key, now); err != nil {
+	if _, err := HandleCallback(context.Background(), c, store, key, params, key, now, nil); err != nil {
 		t.Fatalf("segundo HandleCallback (reuso deliberado): %v", err)
 	}
 	if got := store.calls; got != 2 {
@@ -570,7 +570,7 @@ func TestHandleCallback_StoreError(t *testing.T) {
 	}, key)
 
 	_, err := HandleCallback(context.Background(), c, store, key,
-		CallbackParams{Code: "c", State: state}, key, now)
+		CallbackParams{Code: "c", State: state}, key, now, nil)
 	if err == nil || !strings.Contains(err.Error(), "persist tokens") {
 		t.Errorf("err = %v, esperaba envolver 'persist tokens'", err)
 	}
@@ -590,7 +590,7 @@ func TestCallbackHandler_RedirectsOnSuccess(t *testing.T) {
 	key, _ := crypto.GenerateKey()
 	store := &fakeTokenStore{}
 	frontendURL := "http://localhost:5173"
-	handler := CallbackHandler(c, store, key, frontendURL)
+	handler := CallbackHandler(c, store, nil, key, frontendURL)
 
 	now := time.Now()
 	state, _ := signState(oauthStatePayload{
@@ -624,7 +624,7 @@ func TestCallbackHandler_NoAuthHeaderRequired(t *testing.T) {
 
 	key, _ := crypto.GenerateKey()
 	store := &fakeTokenStore{}
-	handler := CallbackHandler(c, store, key, "http://localhost:5173")
+	handler := CallbackHandler(c, store, nil, key, "http://localhost:5173")
 
 	now := time.Now()
 	state, _ := signState(oauthStatePayload{
@@ -649,7 +649,7 @@ func TestCallbackHandler_BadRequestRedirects(t *testing.T) {
 	defer srv.Close()
 
 	store := &fakeTokenStore{}
-	handler := CallbackHandler(c, store, key32(t), "http://localhost:5173")
+	handler := CallbackHandler(c, store, nil, key32(t), "http://localhost:5173")
 
 	cases := []struct {
 		name  string
@@ -676,8 +676,105 @@ func TestCallbackHandler_BadRequestRedirects(t *testing.T) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────
-// sanity: firma HMAC correcta para un payload arbitrario
+// AUD-04 AC: "Conectar Strava encola un ImportStravaArgs" — el callback
+// llama a RiverEnqueuer.EnqueueImportStrava con el userID del state tras
+// un SaveTokens exitoso.
 // ─────────────────────────────────────────────────────────────────────────
+
+// fakeRiverEnqueuer registra la última llamada a EnqueueImportStrava.
+type fakeRiverEnqueuer struct {
+	mu         sync.Mutex
+	calls      int
+	lastUserID string
+	failOnEnq  error // si está set, EnqueueImportStrava devuelve este error
+}
+
+func (f *fakeRiverEnqueuer) EnqueueImportStrava(_ context.Context, userID string) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.calls++
+	f.lastUserID = userID
+	return f.failOnEnq
+}
+
+// TestHandleCallback_EnqueuesImportStravaOnSuccess: AUD-04 AC #6.
+// Cuando SaveTokens tiene éxito, HandleCallback encola un ImportStravaArgs
+// con el userID que viene del state firmado. Si falla, HandleCallback
+// propaga el error.
+func TestHandleCallback_EnqueuesImportStravaOnSuccess(t *testing.T) {
+	c, srv := stravaSrvForOAuth(t)
+	defer srv.Close()
+
+	key, _ := crypto.GenerateKey()
+	store := &fakeTokenStore{}
+	enqueuer := &fakeRiverEnqueuer{}
+	now := time.Now()
+	state, err := signState(oauthStatePayload{
+		UserID: "user-enq", Nonce: "n", Exp: now.Add(stateLifetime).Unix(),
+	}, key)
+	if err != nil {
+		t.Fatalf("signState: %v", err)
+	}
+
+	if _, err := HandleCallback(context.Background(), c, store, key, CallbackParams{
+		Code: "valid-code", State: state,
+	}, key, now, enqueuer); err != nil {
+		t.Fatalf("HandleCallback: %v", err)
+	}
+	if enqueuer.calls != 1 {
+		t.Errorf("EnqueueImportStrava calls = %d, want 1", enqueuer.calls)
+	}
+	if enqueuer.lastUserID != "user-enq" {
+		t.Errorf("EnqueueImportStrava lastUserID = %q, want user-enq", enqueuer.lastUserID)
+	}
+}
+
+// TestHandleCallback_EnqueueErrorPropagates: si el enqueuer devuelve error
+// (p.ej. la DB está caída), HandleCallback lo envuelve y propaga.
+func TestHandleCallback_EnqueueErrorPropagates(t *testing.T) {
+	c, srv := stravaSrvForOAuth(t)
+	defer srv.Close()
+
+	key, _ := crypto.GenerateKey()
+	store := &fakeTokenStore{}
+	enqueuer := &fakeRiverEnqueuer{failOnEnq: errors.New("river down")}
+	now := time.Now()
+	state, _ := signState(oauthStatePayload{
+		UserID: "u", Nonce: "n", Exp: now.Add(stateLifetime).Unix(),
+	}, key)
+
+	_, err := HandleCallback(context.Background(), c, store, key, CallbackParams{
+		Code: "valid-code", State: state,
+	}, key, now, enqueuer)
+	if err == nil || !strings.Contains(err.Error(), "enqueue import_strava") {
+		t.Errorf("err = %v, esperaba envolver 'enqueue import_strava'", err)
+	}
+}
+
+// TestHandleCallback_NilEnqueuerDoesNotEnqueue: por compatibilidad con tests
+// que no quieren ejercitar el enqueuer, HandleCallback acepta un nil y omite
+// la llamada. La persistencia de tokens sigue funcionando.
+func TestHandleCallback_NilEnqueuerDoesNotEnqueue(t *testing.T) {
+	c, srv := stravaSrvForOAuth(t)
+	defer srv.Close()
+
+	key, _ := crypto.GenerateKey()
+	store := &fakeTokenStore{}
+	now := time.Now()
+	state, _ := signState(oauthStatePayload{
+		UserID: "u-nil", Nonce: "n", Exp: now.Add(stateLifetime).Unix(),
+	}, key)
+
+	if _, err := HandleCallback(context.Background(), c, store, key, CallbackParams{
+		Code: "valid-code", State: state,
+	}, key, now, nil); err != nil {
+		t.Fatalf("HandleCallback con enqueuer=nil: %v", err)
+	}
+	saved, ok := store.last()
+	if !ok || saved.UserID != "u-nil" {
+		t.Error("SaveTokens no se llamó o guardó el userID equivocado")
+	}
+}
 
 // TestHMAC_KnownVector: HMAC-SHA256("hola", "llave") debe dar el mismo
 // resultado que el cálculo manual. Es el sanity check mínimo para que

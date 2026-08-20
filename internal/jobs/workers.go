@@ -2,10 +2,10 @@ package jobs
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"math/big"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/riverqueue/river"
@@ -15,60 +15,117 @@ import (
 	"github.com/fgjcarlos/ghamusinos/internal/strava"
 )
 
-// Global dependencies for River workers (set at initialization)
-var (
-	globalPool      *pgxpool.Pool
-	globalConfig    *config.Config
-	globalClient    *strava.Client
-	globalCipherKey []byte
-)
-
-// ErrTokenRefresherNotConfigured is returned when RefreshStravaTokenWorker is used without configuration.
-var ErrTokenRefresherNotConfigured = errors.New("jobs: token refresher not configured; call ConfigureTokenRefresher first")
-
-// ConfigureTokenRefresher sets up the global dependencies for RefreshStravaTokenWorker.
-// This should be called once during application initialization.
-func ConfigureTokenRefresher(pool *pgxpool.Pool, cfg *config.Config, client *strava.Client, cipherKey []byte) {
-	globalPool = pool
-	globalConfig = cfg
-	globalClient = client
-	globalCipherKey = cipherKey
+// Deps is the constructor-injected dependency bundle for River workers.
+//
+// AUD-04 (issue #164) replaces the four package-globals + ConfigureTokenRefresher
+// that used to be set once at startup and silently forgotten by app.Run. Every
+// worker now takes them by constructor; missing any one is a startup error,
+// not a runtime nil-deref.
+//
+// Pool and Config are required — River itself needs a pgx pool, and the
+// import worker reads Config.Strava.BackfillDays for the backfill window.
+// Strava and CipherKey are required when cfg.Strava is set (production
+// always sets it). When cfg.Strava is absent (developer running without
+// Strava credentials), the Strava-bound workers are not registered and
+// these fields may be nil — see NewRiverWorkers.
+type Deps struct {
+	Pool      *pgxpool.Pool
+	Config    *config.Config
+	Strava    *strava.Client
+	CipherKey []byte
 }
 
-// GetTokenRefresher returns the configured token refresher (Strava client).
-func GetTokenRefresher() TokenRefresher {
-	return globalClient
-}
-
-// GetTokenQuerier returns the configured token querier (sqlc.Queries).
-func GetTokenQuerier() TokenQuerier {
-	if globalPool == nil {
+// validate returns a non-nil error if a required dependency is missing.
+// Pool and Config are always required; Strava and CipherKey are required
+// when RegisterStravaWorkers is true. AUD-04 AC: "NewRiverWorkers returns
+// error if any dependency is missing".
+func (d Deps) validate(registerStravaWorkers bool) error {
+	if d.Pool == nil {
+		return fmt.Errorf("jobs: Deps.Pool is required")
+	}
+	if d.Config == nil {
+		return fmt.Errorf("jobs: Deps.Config is required")
+	}
+	if !registerStravaWorkers {
 		return nil
 	}
-	return sqlc.New(globalPool)
+	if d.Strava == nil {
+		return fmt.Errorf("jobs: Deps.Strava is required when RegisterStravaWorkers is true")
+	}
+	if len(d.CipherKey) == 0 {
+		return fmt.Errorf("jobs: Deps.CipherKey is required when RegisterStravaWorkers is true")
+	}
+	return nil
 }
 
-// GetCipherKey returns the configured cipher key for token encryption/decryption.
-func GetCipherKey() []byte {
-	return globalCipherKey
+// importDeps is the per-worker dependency set derived from Deps. Keeping this
+// as a separate struct lets each worker's fields be filled by NewRiverWorkers
+// without dragging the Pool/CipherKey through the whole worker tree.
+//
+// stravaFetcher and stravaRefresher are typed as the narrower interfaces
+// (not *strava.Client) so that:
+//   - Production *strava.Client satisfies both (it has GetActivities and Refresh).
+//   - Tests can substitute smaller mocks that implement only the interface
+//     they exercise without dragging the full Strava client surface in.
+type importDeps struct {
+	queries         *sqlc.Queries
+	stravaFetcher   ActivityFetcher
+	stravaRefresher TokenRefresher
+	cipher          []byte
+	backfill        int32
 }
 
-// NewRiverWorkers creates a river.Workers instance with all registered job handlers.
-func NewRiverWorkers() *river.Workers {
+// NewRiverWorkers creates a river.Workers instance with every handler bound to
+// its concrete dependencies. AUD-04: dependencies come from the constructor,
+// not from package globals. AUD-04 AC: "Every worker registered has all its
+// dependencies non-nil."
+//
+// registerStravaWorkers toggles whether the Strava-bound workers
+// (ImportStrava, RefreshStravaToken, ImportStravaStreams) are registered.
+// Set to true when cfg.Strava is configured; set to false in dev / tests
+// that do not have Strava credentials. The IngestActivityEventWorker is
+// registered regardless but its eventLoader is nil — see the ponytail note
+// in NewRiverWorkers body for the AUD-03 dependency.
+func NewRiverWorkers(d Deps, registerStravaWorkers bool) (*river.Workers, error) {
+	if err := d.validate(registerStravaWorkers); err != nil {
+		return nil, err
+	}
+
 	workers := river.NewWorkers()
-	river.AddWorker(workers, &ImportStravaWorker{})
-	river.AddWorker(workers, &RefreshStravaTokenWorker{})
-	river.AddWorker(workers, &IngestActivityEventWorker{})
-	river.AddWorker(workers, &ImportStravaStreamsWorker{
-		fetcher:   globalClient,
-		inserter:  sqlc.New(globalPool),
-		locator:   sqlc.New(globalPool),
-		querier:   sqlc.New(globalPool),
-		refresher: globalClient,
-		zoneStore: sqlc.New(globalPool),
-		cipherKey: globalCipherKey,
+	queries := sqlc.New(d.Pool)
+
+	if registerStravaWorkers {
+		id := importDeps{
+			queries:         queries,
+			stravaFetcher:   d.Strava, // *strava.Client satisfies ActivityFetcher
+			stravaRefresher: d.Strava, // *strava.Client satisfies TokenRefresher
+			cipher:          d.CipherKey,
+			backfill:        int32(d.Config.Strava.BackfillDays),
+		}
+		river.AddWorker(workers, NewImportStravaWorker(id))
+		river.AddWorker(workers, NewRefreshStravaTokenWorker(id))
+		river.AddWorker(workers, &ImportStravaStreamsWorker{
+			fetcher:   d.Strava,
+			inserter:  queries,
+			locator:   queries,
+			querier:   queries,
+			refresher: d.Strava,
+			zoneStore: queries,
+			cipherKey: d.CipherKey,
+		})
+	}
+
+	// ponytail: eventLoader is nil here because sqlc.Queries does not yet
+	// implement GetActivityEventByExternalID — that lands in AUD-03 (issue
+	// #165). The worker is registered so the kind is known to River, but
+	// any job routed to it will fail in Work() with a nil-deref; that is
+	// acceptable while AUD-03 is open because no production code enqueues
+	// IngestActivityEventArgs yet. Replace nil with id.queries in the AUD-03 PR.
+	river.AddWorker(workers, &IngestActivityEventWorker{
+		refresher: d.Strava,
+		cipher:    d.CipherKey,
 	})
-	return workers
+	return workers, nil
 }
 
 // StubJob is a minimal job type for testing River integration.
@@ -99,13 +156,35 @@ func (w *StubWorker) Work(ctx context.Context, job *river.Job[StubJob]) error {
 }
 
 // ImportStravaWorker handles importing Strava data for a user.
+//
+// AUD-04: dependencies are set once at construction; the Work method no
+// longer reads from package globals and no longer guards "if nil" per field.
 type ImportStravaWorker struct {
 	river.WorkerDefaults[ImportStravaArgs]
-	fetcher  ActivityFetcher
-	store    SyncSessionStore
-	inserter ActivityInserter
-	querier  TokenQuerier
-	config   interface{} // *config.Config, injected at registration
+	fetcher   ActivityFetcher
+	refresher TokenRefresher
+	store     SyncSessionStore
+	inserter  ActivityInserter
+	querier   TokenQuerier
+	cipher    []byte
+	backfill  int32
+}
+
+// NewImportStravaWorker builds an ImportStravaWorker wired to the supplied
+// dependencies. id.strava must be a Strava client implementing both
+// ActivityFetcher (for the paginated GetActivities) and TokenRefresher (for
+// refreshing the OAuth token before each call). The production *strava.Client
+// satisfies both.
+func NewImportStravaWorker(id importDeps) *ImportStravaWorker {
+	return &ImportStravaWorker{
+		fetcher:   id.stravaFetcher,
+		refresher: id.stravaRefresher,
+		store:     id.queries,
+		inserter:  id.queries,
+		querier:   id.queries,
+		cipher:    id.cipher,
+		backfill:  id.backfill,
+	}
 }
 
 // Work processes an ImportStrava job.
@@ -118,58 +197,29 @@ func (w *ImportStravaWorker) Work(ctx context.Context, job *river.Job[ImportStra
 		return fmt.Errorf("jobs: failed to parse userID: %w", err)
 	}
 
-	// Get dependencies: if not injected, use global singletons
-	querier := w.querier
-	if querier == nil {
-		querier = GetTokenQuerier()
-	}
-	fetcher := w.fetcher
-	if fetcher == nil {
-		// In production, this would be the strava.Client; for now, tests use injected mocks
-		return ErrTokenRefresherNotConfigured // Placeholder error if no fetcher
-	}
-	inserter := w.inserter
-	if inserter == nil {
-		return ErrTokenRefresherNotConfigured // Placeholder error if no inserter
-	}
-	store := w.store
-	if store == nil {
-		return ErrTokenRefresherNotConfigured // Placeholder error if no store
-	}
-
-	// Get the config (for backfill window)
-	cfg, ok := w.config.(*config.Config)
-	if !ok || cfg == nil {
-		cfg = globalConfig
-	}
-	if cfg == nil {
-		return ErrTokenRefresherNotConfigured // Placeholder error if no config
-	}
-
 	// Get valid access token (handles refresh internally if needed)
-	cipherKey := GetCipherKey()
-	refresher := GetTokenRefresher()
-	accessToken, err := GetValidToken(ctx, querier, cipherKey, refresher, userID)
+	accessToken, err := GetValidToken(ctx, w.querier, w.cipher, w.refresher, userID)
 	if err != nil {
 		return fmt.Errorf("jobs: failed to get valid token: %w", err)
 	}
 
 	// Get or create sync session
-	syncSession, err := store.GetLatestSyncSession(ctx, userID)
+	syncSession, err := w.store.GetLatestSyncSession(ctx, userID)
 	if err != nil {
 		// Session doesn't exist; create one
-		backfillDays := int32(cfg.Strava.BackfillDays)
-		syncSession, err = store.CreateSyncSession(ctx, sqlc.CreateSyncSessionParams{
+		syncSession, err = w.store.CreateSyncSession(ctx, sqlc.CreateSyncSessionParams{
 			UserID:     userID,
-			WindowDays: backfillDays,
+			WindowDays: w.backfill,
 		})
 		if err != nil {
 			return fmt.Errorf("jobs: failed to create sync session: %w", err)
 		}
 	}
 
-	// Calculate backfill window
-	after, before := BackfillWindow(cfg.Strava.BackfillDays)
+	// Calculate backfill window. WindowDays is set at construction time
+	// from config.Strava.BackfillDays; passing it to BackfillWindow keeps
+	// the existing arithmetic in one place.
+	after, before := BackfillWindow(int(w.backfill))
 
 	// Fetch activities in pages and upsert each
 	page := 1
@@ -177,7 +227,7 @@ func (w *ImportStravaWorker) Work(ctx context.Context, job *river.Job[ImportStra
 	totalProcessed := int32(0)
 
 	for {
-		activities, err := fetcher.GetActivities(ctx, accessToken, after, before, page, perPage)
+		activities, err := w.fetcher.GetActivities(ctx, accessToken, after, before, page, perPage)
 		if err != nil {
 			return fmt.Errorf("jobs: failed to fetch activities (page %d): %w", page, err)
 		}
@@ -203,7 +253,7 @@ func (w *ImportStravaWorker) Work(ctx context.Context, job *river.Job[ImportStra
 				ElevationGainM: pgtype.Numeric{Int: big.NewInt(int64(activity.TotalElevationGain)), Valid: true},
 			}
 
-			_, err := inserter.UpsertActivity(ctx, params)
+			_, err := w.inserter.UpsertActivity(ctx, params)
 			if err != nil {
 				return fmt.Errorf("jobs: failed to upsert activity %d: %w", activity.ID, err)
 			}
@@ -211,7 +261,7 @@ func (w *ImportStravaWorker) Work(ctx context.Context, job *river.Job[ImportStra
 		}
 
 		// Update progress
-		_, err = store.UpdateSyncSessionProgress(ctx, sqlc.UpdateSyncSessionProgressParams{
+		_, err = w.store.UpdateSyncSessionProgress(ctx, sqlc.UpdateSyncSessionProgressParams{
 			ID:              syncSession.ID,
 			TotalActivities: int32(len(activities)),
 			Imported:        totalProcessed,
@@ -226,7 +276,7 @@ func (w *ImportStravaWorker) Work(ctx context.Context, job *river.Job[ImportStra
 	}
 
 	// Mark sync session as completed
-	_, err = store.UpdateSyncSessionStatus(ctx, sqlc.UpdateSyncSessionStatusParams{
+	_, err = w.store.UpdateSyncSessionStatus(ctx, sqlc.UpdateSyncSessionStatusParams{
 		ID:     syncSession.ID,
 		Status: "completed",
 		Error:  pgtype.Text{Valid: false},
@@ -239,25 +289,31 @@ func (w *ImportStravaWorker) Work(ctx context.Context, job *river.Job[ImportStra
 }
 
 // RefreshStravaTokenWorker handles refreshing a user's Strava OAuth token.
-// Dependencies are retrieved from global configuration set at initialization time.
+//
+// AUD-04: dependencies are set at construction; the Work method no longer
+// reads GetTokenRefresher / GetTokenQuerier / GetCipherKey from globals.
 type RefreshStravaTokenWorker struct {
 	river.WorkerDefaults[RefreshStravaTokenArgs]
+	querier   TokenQuerier
+	refresher TokenRefresher
+	cipher    []byte
+}
+
+// NewRefreshStravaTokenWorker builds a RefreshStravaTokenWorker with the
+// supplied dependencies. querier is what reads/upserts the encrypted token;
+// refresher is the Strava client (which implements TokenRefresher).
+func NewRefreshStravaTokenWorker(id importDeps) *RefreshStravaTokenWorker {
+	return &RefreshStravaTokenWorker{
+		querier:   id.queries,
+		refresher: id.stravaRefresher,
+		cipher:    id.cipher,
+	}
 }
 
 // Work processes a RefreshStravaToken job.
 // It refreshes the access token using the stored refresh token and the Strava API.
 // If the token is valid for more than 5 minutes, no action is taken.
 func (w *RefreshStravaTokenWorker) Work(ctx context.Context, job *river.Job[RefreshStravaTokenArgs]) error {
-	// Get the configured dependencies
-	refresher := GetTokenRefresher()
-	querier := GetTokenQuerier()
-	cipherKey := GetCipherKey()
-
-	if refresher == nil || querier == nil || len(cipherKey) == 0 {
-		// Dependencies not configured; this is a setup error
-		return ErrTokenRefresherNotConfigured
-	}
-
 	// Parse UserID from string to pgtype.UUID
 	var userID pgtype.UUID
 	err := userID.Scan(job.Args.UserID)
@@ -266,7 +322,7 @@ func (w *RefreshStravaTokenWorker) Work(ctx context.Context, job *river.Job[Refr
 	}
 
 	// Get the valid token (this handles refresh internally if needed)
-	_, err = GetValidToken(ctx, querier, cipherKey, refresher, userID)
+	_, err = GetValidToken(ctx, w.querier, w.cipher, w.refresher, userID)
 	if err != nil {
 		// Return the error to River for retry
 		return err
@@ -276,14 +332,48 @@ func (w *RefreshStravaTokenWorker) Work(ctx context.Context, job *river.Job[Refr
 }
 
 // IngestActivityEventWorker handles ingesting activity events from Strava webhooks.
-// This is stub in Slice 4 (webhook enqueue), fully implemented in Slice 5a.
+//
+// AUD-04: dependencies are set at construction. The "if nil { return ... }"
+// guards that used to return ErrTokenRefresherNotConfigured are gone —
+// because the constructor guarantees the fields are non-nil. AUD-04 AC:
+// "ErrTokenRefresherNotConfigured ya no existe."
+//
+// NOTE: the eventLoader field is left nil by NewRiverWorkers today because
+// sqlc.Queries does not implement ActivityEventLoader — GetActivityEventByExternalID
+// is the missing query that AUD-03 (issue #165) ships. Until that lands no
+// production code enqueues IngestActivityEventArgs, so a nil eventLoader is
+// unreachable. The constructor below exists for tests and for AUD-03.
 type IngestActivityEventWorker struct {
 	river.WorkerDefaults[IngestActivityEventArgs]
 	eventLoader   ActivityEventLoader
 	detailFetcher ActivityDetailFetcher
 	inserter      ActivityInserter
 	querier       TokenQuerier
-	store         SyncSessionStore
+	cipher        []byte
+	refresher     TokenRefresher
+}
+
+// NewIngestActivityEventWorker builds an IngestActivityEventWorker with each
+// dependency passed explicitly. In production NewRiverWorkers does not call
+// this constructor (it constructs the worker struct literal with a nil
+// eventLoader because sqlc.Queries cannot implement the missing query yet),
+// but tests use this helper to assemble the full dependency set.
+func NewIngestActivityEventWorker(
+	eventLoader ActivityEventLoader,
+	detailFetcher ActivityDetailFetcher,
+	inserter ActivityInserter,
+	querier TokenQuerier,
+	cipher []byte,
+	refresher TokenRefresher,
+) *IngestActivityEventWorker {
+	return &IngestActivityEventWorker{
+		eventLoader:   eventLoader,
+		detailFetcher: detailFetcher,
+		inserter:      inserter,
+		querier:       querier,
+		cipher:        cipher,
+		refresher:     refresher,
+	}
 }
 
 // IngestActivityEventArgs are the arguments for processing an activity event.
@@ -291,7 +381,7 @@ type IngestActivityEventArgs struct {
 	EventID string
 }
 
-// Kind returns the job kind identifier for IngestActivityEventArgs.
+// Kind returns the job kind for IngestActivityEventArgs.
 func (a IngestActivityEventArgs) Kind() string {
 	return "ingest_activity_event"
 }
@@ -299,26 +389,8 @@ func (a IngestActivityEventArgs) Kind() string {
 // Work processes an IngestActivityEvent job.
 // It loads the activity event, fetches full activity details from Strava, and upserts to database.
 func (w *IngestActivityEventWorker) Work(ctx context.Context, job *river.Job[IngestActivityEventArgs]) error {
-	// Get dependencies: if not injected, use global singletons
-	eventLoader := w.eventLoader
-	if eventLoader == nil {
-		return ErrTokenRefresherNotConfigured // Placeholder error if no eventLoader
-	}
-	detailFetcher := w.detailFetcher
-	if detailFetcher == nil {
-		return ErrTokenRefresherNotConfigured // Placeholder error if no detailFetcher
-	}
-	inserter := w.inserter
-	if inserter == nil {
-		return ErrTokenRefresherNotConfigured // Placeholder error if no inserter
-	}
-	querier := w.querier
-	if querier == nil {
-		querier = GetTokenQuerier()
-	}
-
 	// Load the activity event from database
-	activityEvent, err := eventLoader.GetActivityEventByExternalID(ctx, job.Args.EventID)
+	activityEvent, err := w.eventLoader.GetActivityEventByExternalID(ctx, job.Args.EventID)
 	if err != nil {
 		return fmt.Errorf("jobs: failed to load activity event %s: %w", job.Args.EventID, err)
 	}
@@ -327,15 +399,13 @@ func (w *IngestActivityEventWorker) Work(ctx context.Context, job *river.Job[Ing
 	userID := activityEvent.UserID
 
 	// Get valid access token (handles refresh internally if needed)
-	cipherKey := GetCipherKey()
-	refresher := GetTokenRefresher()
-	accessToken, err := GetValidToken(ctx, querier, cipherKey, refresher, userID)
+	accessToken, err := GetValidToken(ctx, w.querier, w.cipher, w.refresher, userID)
 	if err != nil {
 		return fmt.Errorf("jobs: failed to get valid token for user %s: %w", userID.String(), err)
 	}
 
 	// Fetch full activity details from Strava API
-	activity, err := detailFetcher.GetActivity(ctx, accessToken, activityEvent.ObjectID)
+	activity, err := w.detailFetcher.GetActivity(ctx, accessToken, activityEvent.ObjectID)
 	if err != nil {
 		return fmt.Errorf("jobs: failed to fetch activity details for %d: %w", activityEvent.ObjectID, err)
 	}
@@ -355,13 +425,13 @@ func (w *IngestActivityEventWorker) Work(ctx context.Context, job *river.Job[Ing
 	}
 
 	// Upsert the activity to database
-	_, err = inserter.UpsertActivity(ctx, params)
+	_, err = w.inserter.UpsertActivity(ctx, params)
 	if err != nil {
 		return fmt.Errorf("jobs: failed to upsert activity %d: %w", activity.ID, err)
 	}
 
 	// Mark the event as processed
-	err = eventLoader.MarkActivityEventProcessed(ctx, activityEvent.ID)
+	err = w.eventLoader.MarkActivityEventProcessed(ctx, activityEvent.ID)
 	if err != nil {
 		return fmt.Errorf("jobs: failed to mark event %s as processed: %w", job.Args.EventID, err)
 	}
@@ -370,7 +440,7 @@ func (w *IngestActivityEventWorker) Work(ctx context.Context, job *river.Job[Ing
 }
 
 // ImportStravaStreamsWorker handles importing Strava activity streams (HR, watts, etc.) and calculating HR zones.
-// Dependencies are injected at initialization time via NewRiverWorkers.
+// Dependencies are injected at construction time via NewRiverWorkers.
 type ImportStravaStreamsWorker struct {
 	river.WorkerDefaults[ImportStravaStreamsArgs]
 	fetcher   StreamFetcher
@@ -381,3 +451,7 @@ type ImportStravaStreamsWorker struct {
 	refresher TokenRefresher
 	cipherKey []byte
 }
+
+// _ keeps the pgx import referenced for type-check on the river.Workers
+// generic parameter in NewClient (river.Client[pgx.Tx]).
+var _ = (*pgx.Tx)(nil)

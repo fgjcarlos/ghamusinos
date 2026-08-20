@@ -64,6 +64,21 @@ type TokenStore interface {
 	SaveTokens(ctx context.Context, t PersistedTokens) error
 }
 
+// RiverEnqueuer es el seam que el callback OAuth usa para encolar el job
+// de backfill tras un intercambio de tokens exitoso. AUD-04 AC:
+// "Conectar Strava encola un ImportStravaArgs".
+//
+// Mantener la interfaz aquí (en lugar de importar el paquete jobs)
+// preserva la dirección del grafo: strava no depende de jobs. La
+// implementación en producción la provee internal/app cuando construye
+// el TokenStore SQLC y registra el River client.
+type RiverEnqueuer interface {
+	// EnqueueImportStrava encola un job ImportStravaArgs para el usuario.
+	// Devuelve error si la encolación falla; HandleCallback propaga el
+	// error al caller.
+	EnqueueImportStrava(ctx context.Context, userID string) error
+}
+
 // PersistedTokens es el sobre que SaveTokens recibe: los ciphertexts
 // ya en base64 y los metadatos que NO se cifran.
 type PersistedTokens struct {
@@ -198,12 +213,12 @@ type CallbackResult struct {
 //
 // En éxito, redirige a {frontendURL}/activities?connected=1.
 // En error, redirige a {frontendURL}/?error={urlEncodedError}.
-func CallbackHandler(client *Client, store TokenStore, cipherKey []byte, frontendURL string) http.HandlerFunc {
+func CallbackHandler(client *Client, store TokenStore, enqueuer RiverEnqueuer, cipherKey []byte, frontendURL string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		q := r.URL.Query()
 		params := CallbackParams{Code: q.Get("code"), State: q.Get("state")}
 
-		_, err := HandleCallback(r.Context(), client, store, cipherKey, params, cipherKey, time.Now())
+		_, err := HandleCallback(r.Context(), client, store, cipherKey, params, cipherKey, time.Now(), enqueuer)
 		if err != nil {
 			http.Redirect(w, r, frontendURL+"/?error="+url.QueryEscape(err.Error()), http.StatusFound)
 			return
@@ -221,7 +236,11 @@ func CallbackHandler(client *Client, store TokenStore, cipherKey []byte, fronten
 // van separados porque juegan papeles distintos (uno verifica el state,
 // el otro cifra los tokens) y poder mockearlos en tests sin reasignar la
 // clave mejora el aislamiento. En producción son idénticos.
-func HandleCallback(ctx context.Context, client *Client, store TokenStore, cipherKey []byte, p CallbackParams, stateKey []byte, now time.Time) (*CallbackResult, error) {
+//
+// enqueuer es opcional: si es nil, HandleCallback omite el encolado del
+// job de backfill (útil en tests que solo quieren cubrir el intercambio
+// de tokens). En producción app.Run siempre lo provee.
+func HandleCallback(ctx context.Context, client *Client, store TokenStore, cipherKey []byte, p CallbackParams, stateKey []byte, now time.Time, enqueuer RiverEnqueuer) (*CallbackResult, error) {
 	if p.Code == "" {
 		return nil, errOAuth("missing code", http.StatusBadRequest)
 	}
@@ -254,6 +273,17 @@ func HandleCallback(ctx context.Context, client *Client, store TokenStore, ciphe
 		Scopes:        ts.Scopes,
 	}); err != nil {
 		return nil, fmt.Errorf("persist tokens: %w", err)
+	}
+
+	// AUD-04 AC: "Conectar Strava encola un ImportStravaArgs".
+	// El encolado se hace tras SaveTokens exitoso. Si falla, devolvemos
+	// error para que el caller (el handler HTTP) sepa reintentar; los
+	// tokens ya están persistidos, lo cual no es problema porque el job
+	// los re-leería en su próxima ejecución.
+	if enqueuer != nil {
+		if err := enqueuer.EnqueueImportStrava(ctx, userID); err != nil {
+			return nil, fmt.Errorf("enqueue import_strava: %w", err)
+		}
 	}
 
 	return &CallbackResult{
