@@ -540,6 +540,40 @@ func TestParseTrustedProxies_SkipsEmptyEntries(t *testing.T) {
 	}
 }
 
+func TestLoad_PortNonNumericFails(t *testing.T) {
+	t.Setenv("DATABASE_URL", "postgres://test:***@localhost/test")
+	t.Setenv("ENV", "production")
+	t.Setenv("CLERK_JWKS_URL", "https://clerk.example.com/jwks")
+	unsetPoolEnv(t)
+	unsetStravaEnv(t)
+	t.Setenv("PORT", "abc")
+
+	_, err := Load()
+	if err == nil {
+		t.Fatal("Load() debería fallar con PORT=abc")
+	}
+	if !strings.Contains(err.Error(), "PORT") {
+		t.Errorf("error = %q, debería mencionar PORT", err.Error())
+	}
+}
+
+func TestLoad_PortOutOfRangeFails(t *testing.T) {
+	t.Setenv("DATABASE_URL", "postgres://test:***@localhost/test")
+	t.Setenv("ENV", "production")
+	t.Setenv("CLERK_JWKS_URL", "https://clerk.example.com/jwks")
+	unsetPoolEnv(t)
+	unsetStravaEnv(t)
+	t.Setenv("PORT", "99999")
+
+	_, err := Load()
+	if err == nil {
+		t.Fatal("Load() debería fallar con PORT=99999 (> 65535)")
+	}
+	if !strings.Contains(err.Error(), "fuera de rango") {
+		t.Errorf("error = %q, debería mencionar 'fuera de rango'", err.Error())
+	}
+}
+
 func TestLoad_TrustedProxiesDefaultEmpty(t *testing.T) {
 	t.Setenv("DATABASE_URL", "postgres://test:***@localhost/test")
 	t.Setenv("ENV", "production")
