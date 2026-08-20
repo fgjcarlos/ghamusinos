@@ -99,3 +99,102 @@ export class ApiError extends Error {
     Object.setPrototypeOf(this, ApiError.prototype);
   }
 }
+
+// ─────────────────────────────────────────────────────────────────
+// GPX / Laboratorio
+// ─────────────────────────────────────────────────────────────────
+
+/**
+ * Análisis numérico de un track GPX. Mismas reglas que el resto del
+ * repo: pgtype wrappers se respetan para no introducir el bug que ya
+ * tenían los endpoints de Strava (TODO #90 sobre flatten en backend).
+ */
+export interface GpxAnalysis {
+  distance_m: number;
+  moving_time_s: number;
+  d_plus_m: number;
+  d_minus_m: number;
+  max_elevation_m: number | null;
+  min_elevation_m: number | null;
+  avg_slope_pct: number;
+  max_slope_pct: number;
+  effort_index: number;
+  itra_points: number;
+  leg_breaker_index: number;
+  estimated_vam: number;
+  difficulty_score: number;
+  difficulty_label: 'easy' | 'moderate' | 'hard' | 'extreme';
+  runnability_pct: number;
+}
+
+export interface GpxClimb {
+  id: PgTypeUUID;
+  start_idx: number;
+  end_idx: number;
+  gain_m: number;
+  distance_m: number;
+  avg_slope_pct: number;
+  is_king_climb: boolean;
+  vam: number | null;
+}
+
+export interface GpxRiskZone {
+  // El shape exacto depende de internal/gpx/types.go:RiskZone; este
+  // stub evita acoplar el cliente al backend hasta que #125 lo pida.
+  start_idx: number;
+  end_idx: number;
+  category: 'steep' | 'technical' | 'exposure';
+  severity: number;
+}
+
+/**
+ * Track resumido: lo que devuelve ListGPX (cada item de data).
+ * No incluye climbs ni risk_zones — están en StoredTrackDetail.
+ */
+export interface GpxTrackSummary {
+  track: {
+    id: PgTypeUUID;
+    user_id: PgTypeUUID;
+    name: string;
+    file_hash: string;
+    file_size_bytes: number;
+    points: unknown[]; // omitido por la API en List; array vacío para no chocar tipos
+    track_type: string;
+    uploaded_at: string;
+  };
+  analysis: GpxAnalysis;
+}
+
+/**
+ * Track con detalle: lo que devuelve GetGPX/{id}.
+ */
+export interface StoredTrackDetail {
+  track: GpxTrackSummary;
+  climbs: GpxClimb[];
+  risk_zones: GpxRiskZone[];
+}
+
+export interface PaginatedTracks {
+  data: GpxTrackSummary[];
+  total: number;
+  limit: number;
+  offset: number;
+  has_next: boolean;
+}
+
+/**
+ * Diff de compareGPX: una métrica por key (distance_m, d_plus_m,
+ * etc.) con sus valores por track (mismo orden que el array de IDs)
+ * y el índice del "mejor" track. El shape está definido en
+ * internal/http/handlers/gpx_compare.go (computeDiff).
+ */
+export interface CompareMetric {
+  values: number[];
+  best_track: number;
+  unit: string;
+}
+
+export interface CompareResponse {
+  tracks: StoredTrackDetail[];
+  diff: Record<string, CompareMetric>;
+}
