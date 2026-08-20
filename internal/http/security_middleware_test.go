@@ -26,10 +26,10 @@ func TestSecurityHeaders_AplicaTodasLasCabeceras(t *testing.T) {
 
 	want := map[string]string{
 		"X-Content-Type-Options":    "nosniff",
-		"X-Frame-Options":            "DENY",
-		"Referrer-Policy":            "strict-origin-when-cross-origin",
-		"Content-Security-Policy":    "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'",
-		"Permissions-Policy":         "camera=(), geolocation=(), microphone=(), payment=()",
+		"X-Frame-Options":           "DENY",
+		"Referrer-Policy":           "strict-origin-when-cross-origin",
+		"Content-Security-Policy":   "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'",
+		"Permissions-Policy":        "camera=(), geolocation=(), microphone=(), payment=()",
 		"Strict-Transport-Security": "", // apagado por defecto
 	}
 	for k, v := range want {
