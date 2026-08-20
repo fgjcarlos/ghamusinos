@@ -60,6 +60,12 @@ Healthcheck: `curl http://localhost:8080/healthz` → `{"status":"ok"}`.
 - **goose** se usa como librería dentro de `cmd/migrate` (no el CLI); las migraciones se embeben con `embed.FS`.
 - El frontend se compila a `internal/frontend/dist` (no a `web/dist`) porque `go:embed` no admite rutas con `..`.
 
+## TimescaleDB
+
+La imagen base (`timescale/timescaledb:2.27.2-pg16`) trae la extensión pre-instalada pero **no la activa por defecto**. La migración `00007_timescaledb_extension.sql` la activa con `CREATE EXTENSION IF NOT EXISTS timescaledb` en el primer arranque. Esto es requisito para futuras hypertables (fase 1.4+ — `training_load_daily`). **Issue #28.**
+
+Paridad CI ↔ local: tanto `docker-compose.yml` como el servicio Postgres de CI usan la misma imagen y tag fijo (no `latest`). Si actualizás la versión de TimescaleDB, mantené ambos en sincronía.
+
 ## Variables de entorno
 
 Ver `.env.example`. Las principales:
