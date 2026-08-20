@@ -36,6 +36,12 @@ type ActivityLocator interface {
 
 // Work implements the River worker interface for ImportStravaStreamsWorker.
 // The struct is defined in workers.go for registration with River.
+//
+// AUD-05 (issue #166): the previous version looked up the activity by
+// (userID, externalID) without specifying external_source, so the SQL query
+// (which has external_source = $2 in the WHERE) never matched and zero
+// streams ever landed in the database. The fix adds ExternalSource: "strava"
+// to the lookup.
 func (w *ImportStravaStreamsWorker) Work(ctx context.Context, job *river.Job[ImportStravaStreamsArgs]) error {
 	args := job.Args
 	// Parse user ID using pgtype helper
@@ -44,10 +50,15 @@ func (w *ImportStravaStreamsWorker) Work(ctx context.Context, job *river.Job[Imp
 		return fmt.Errorf("parse user ID: %w", err)
 	}
 
-	// Get activity by external ID
+	// Get activity by external ID. AUD-05 (issue #166): the query
+	// (queries/activities.sql:1-9) requires external_source in the WHERE
+	// clause; passing an empty string here meant the row never matched and
+	// every Strava stream was effectively dropped. Strava activities are
+	// always tagged with source="strava" in this codebase.
 	activity, err := w.locator.GetActivityByExternalID(ctx, sqlc.GetActivityByExternalIDParams{
-		UserID:     userID,
-		ExternalID: args.StravaActivityID,
+		UserID:         userID,
+		ExternalSource: "strava",
+		ExternalID:     args.StravaActivityID,
 	})
 	if err != nil {
 		return fmt.Errorf("get activity by external ID: %w", err)
@@ -59,7 +70,10 @@ func (w *ImportStravaStreamsWorker) Work(ctx context.Context, job *river.Job[Imp
 		return fmt.Errorf("get valid token: %w", err)
 	}
 
-	// Fetch streams from Strava
+	// Fetch streams from Strava. We ask for the high-resolution time-based
+	// streams; the API returns them with Resolution = seconds per sample.
+	// With Resolution = 1 each sample is 1s; with higher values the data
+	// has been downsampled (rare for HR, common for latlng).
 	streamTypes := []string{"heartrate", "watts", "cadence", "altitude", "latlng"}
 	streams, err := w.fetcher.GetStreams(ctx, accessToken, args.StravaActivityID, streamTypes)
 	if err != nil {
@@ -67,7 +81,6 @@ func (w *ImportStravaStreamsWorker) Work(ctx context.Context, job *river.Job[Imp
 	}
 
 	// Upsert each stream
-	var hrData []float64
 	for _, frame := range streams {
 		// Convert stream data to JSON
 		dataJSON, err := json.Marshal(frame.Data)
@@ -84,15 +97,26 @@ func (w *ImportStravaStreamsWorker) Work(ctx context.Context, job *river.Job[Imp
 		if err != nil {
 			return fmt.Errorf("upsert stream: %w", err)
 		}
+	}
 
-		// Collect HR data if present
-		if frame.Type == "heartrate" {
-			for _, v := range frame.Data {
-				if f, ok := v.(float64); ok {
-					hrData = append(hrData, f)
-				}
-			}
+	// Build the HR sample list from the frames we already fetched. AUD-05
+	// (issue #166): calcHRZones counts samples as 1s each, which is wrong
+	// when the Strava API down-samples (Resolution > 1). We multiply by
+	// Resolution so zone seconds reflect real durations. Resolution
+	// defaults to 1 second-per-sample when the API returns 0 (Strava's
+	// convention for "1 Hz"). When the frame is nil we leave Resolution
+	// at its zero value (also 1) — no HR stream means no HR zones anyway.
+	var hrFrame *strava.StreamFrame
+	for i := range streams {
+		if streams[i].Type == "heartrate" {
+			hrFrame = &streams[i]
+			break
 		}
+	}
+	hrData := hrSamplesFromFrame(hrFrame)
+	secondsPerSample := 1
+	if hrFrame != nil && hrFrame.Resolution > 0 {
+		secondsPerSample = hrFrame.Resolution
 	}
 
 	// Calculate and upsert HR zones if hr_max is set
@@ -102,7 +126,7 @@ func (w *ImportStravaStreamsWorker) Work(ctx context.Context, job *river.Job[Imp
 	}
 
 	if hrMax.Valid && hrMax.Int16 > 0 && len(hrData) > 0 {
-		zones := calcHRZones(hrData, int(hrMax.Int16))
+		zones := calcHRZonesScaled(hrData, int(hrMax.Int16), secondsPerSample)
 		_, err = w.zoneStore.UpsertHRZones(ctx, sqlc.UpsertHRZonesParams{
 			ActivityID: activity.ID,
 			Z1Seconds:  int32(zones.Z1),
@@ -129,12 +153,53 @@ type HRZoneSeconds struct {
 	Z5 int
 }
 
-// calcHRZones computes HR zones using Friel/Coggan 5-zone model.
-// Zones: z1 <60%, z2 [60%,70%), z3 [70%,80%), z4 [80%,90%), z5 [90%,∞)
-// Each sample is assumed to be 1 second.
+// hrSamplesFromFrame flattens a StreamFrame's Data ([]interface{}) into a
+// []float64 of HR values. If the frame is nil or empty the result is nil.
+//
+// AUD-05 (issue #166): the returned slice intentionally does NOT multiply
+// by Resolution. calcHRZones takes a secondsPerSample parameter so the
+// same scaling path applies to any future time-based stream (watts, cadence).
+func hrSamplesFromFrame(frame *strava.StreamFrame) []float64 {
+	if frame == nil || len(frame.Data) == 0 {
+		return nil
+	}
+	out := make([]float64, 0, len(frame.Data))
+	for _, v := range frame.Data {
+		if f, ok := v.(float64); ok {
+			out = append(out, f)
+		}
+	}
+	return out
+}
+
+// calcHRZonesSecondsPerSample is the number of seconds each HR sample
+// represents. Strava returns streams with Resolution = seconds-per-sample
+// (Resolution = 1 means 1Hz).
+//
+// Zone thresholds: 60/70/80/90 % of hrMax. The schema comment for hr_zones
+// used to say "50/60/70/80/90" but the original code used 60/70/80/90, so
+// AUD-05 keeps the code and updates the schema comment (see migration
+// 00004_strava_activities.sql — the "Calculadas a partir de streams HR"
+// block). Z1 starts at the lowest threshold so the 5-zone shape is preserved.
 func calcHRZones(hrStream []float64, hrMax int) HRZoneSeconds {
+	return calcHRZonesScaled(hrStream, hrMax, 1)
+}
+
+// calcHRZonesScaled is the workhorse; passing secondsPerSample > 1 handles
+// Strava's down-sampled streams (Resolution > 1). Each sample contributes
+// secondsPerSample seconds to the matching zone.
+//
+// AUD-05 AC: "Las zonas de FC de un stream con resolution: 'medium' dan los
+// mismos segundos que el mismo esfuerzo en high". The medium Resolution
+// doubles the sample interval, so each sample represents more seconds; the
+// math must reflect that or the totals will be wrong by the down-sampling
+// factor.
+func calcHRZonesScaled(hrStream []float64, hrMax int, secondsPerSample int) HRZoneSeconds {
 	if hrMax <= 0 || len(hrStream) == 0 {
 		return HRZoneSeconds{}
+	}
+	if secondsPerSample < 1 {
+		secondsPerSample = 1
 	}
 
 	zones := HRZoneSeconds{}
@@ -144,16 +209,17 @@ func calcHRZones(hrStream []float64, hrMax int) HRZoneSeconds {
 	threshold90 := float64(hrMax) * 0.90
 
 	for _, hr := range hrStream {
-		if hr < threshold60 {
-			zones.Z1++
-		} else if hr < threshold70 {
-			zones.Z2++
-		} else if hr < threshold80 {
-			zones.Z3++
-		} else if hr < threshold90 {
-			zones.Z4++
-		} else {
-			zones.Z5++
+		switch {
+		case hr < threshold60:
+			zones.Z1 += secondsPerSample
+		case hr < threshold70:
+			zones.Z2 += secondsPerSample
+		case hr < threshold80:
+			zones.Z3 += secondsPerSample
+		case hr < threshold90:
+			zones.Z4 += secondsPerSample
+		default:
+			zones.Z5 += secondsPerSample
 		}
 	}
 

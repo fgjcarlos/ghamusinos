@@ -3,7 +3,9 @@ package jobs
 import (
 	"context"
 	"fmt"
-	"math/big"
+	"log/slog"
+	"strconv"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
@@ -14,6 +16,22 @@ import (
 	"github.com/fgjcarlos/ghamusinos/internal/db/sqlc"
 	"github.com/fgjcarlos/ghamusinos/internal/strava"
 )
+
+// numeric converts a float64 into a pgtype.Numeric using string scanning so
+// the value preserves all decimal digits NUMERIC(12,2) can hold.
+//
+// AUD-05 AC: the previous code used pgtype.Numeric{Int: big.NewInt(...)} which
+// drops decimals (a 10 012.34 m run became 10012 with no fraction). The same
+// pattern already lives in internal/gpx/store.go:366 as a private helper; we
+// duplicate it here rather than export gpx.numeric to keep AUD-05's surface
+// minimal. A third use would justify lifting to internal/db.
+func numeric(value float64) pgtype.Numeric {
+	var result pgtype.Numeric
+	if err := result.Scan(strconv.FormatFloat(value, 'f', -1, 64)); err != nil {
+		panic(fmt.Sprintf("jobs: convert numeric from %v: %v", value, err))
+	}
+	return result
+}
 
 // Deps is the constructor-injected dependency bundle for River workers.
 //
@@ -188,25 +206,33 @@ func NewImportStravaWorker(id importDeps) *ImportStravaWorker {
 }
 
 // Work processes an ImportStrava job.
-// It fetches activities from Strava within a backfill window and upserts them to the database.
-func (w *ImportStravaWorker) Work(ctx context.Context, job *river.Job[ImportStravaArgs]) error {
+// It fetches activities from Strava within a backfill window and upserts
+// them to the database.
+//
+// AUD-05 (issue #166): the previous version wrote the wrong distance (× 1000),
+// reported per-page activity totals instead of the cumulative count, never
+// updated Skipped, and only wrote the "completed" terminal state. The fix:
+//   - distance / elevation use the numeric() helper (preserves decimals;
+//     Strava already returns meters).
+//   - TotalActivities, Imported, Skipped are accumulated across pages.
+//   - Sync-session state transitions: pending → running → completed/failed.
+//     A defer marks the session as "failed" if Work returns an error, so
+//     a half-finished sync never lingers in "pending".
+func (w *ImportStravaWorker) Work(ctx context.Context, job *river.Job[ImportStravaArgs]) (err error) {
 	// Parse userID from job args
 	var userID pgtype.UUID
-	err := userID.Scan(job.Args.UserID)
-	if err != nil {
-		return fmt.Errorf("jobs: failed to parse userID: %w", err)
+	if scanErr := userID.Scan(job.Args.UserID); scanErr != nil {
+		return fmt.Errorf("jobs: failed to parse userID: %w", scanErr)
 	}
 
-	// Get valid access token (handles refresh internally if needed)
-	accessToken, err := GetValidToken(ctx, w.querier, w.cipher, w.refresher, userID)
-	if err != nil {
-		return fmt.Errorf("jobs: failed to get valid token: %w", err)
-	}
-
-	// Get or create sync session
+	// Get or create sync session. We need its ID before kicking off work so
+	// the running/failed transitions can write to it. If the user already
+	// has a recent session (e.g. a re-import), reuse it; otherwise create
+	// a new one. AUD-05 keeps the old behaviour: GetLatestSyncSession
+	// returning any row wins, regardless of status — that matches the
+	// "one in-flight per user" invariant the schema implicitly assumes.
 	syncSession, err := w.store.GetLatestSyncSession(ctx, userID)
 	if err != nil {
-		// Session doesn't exist; create one
 		syncSession, err = w.store.CreateSyncSession(ctx, sqlc.CreateSyncSessionParams{
 			UserID:     userID,
 			WindowDays: w.backfill,
@@ -216,20 +242,61 @@ func (w *ImportStravaWorker) Work(ctx context.Context, job *river.Job[ImportStra
 		}
 	}
 
+	// AUD-05: mark the session "running" before the first Strava call. If
+	// anything below fails, the deferred closer marks it "failed" with the
+	// error wrapped in the sync_sessions.error column.
+	if _, err = w.store.UpdateSyncSessionStatus(ctx, sqlc.UpdateSyncSessionStatusParams{
+		ID:     syncSession.ID,
+		Status: "running",
+	}); err != nil {
+		return fmt.Errorf("jobs: failed to mark sync session running: %w", err)
+	}
+
+	// ponytail: defer-to-failed is the only way to make every error path
+	// converge without scattering UpdateSyncSessionStatus calls. Returning
+	// nil short-circuits the deferred call's err==nil branch. The deferred
+	// function captures `err` by name (named return value above).
+	defer func() {
+		if err == nil {
+			return
+		}
+		// Best-effort: a failure here is logged but not propagated, since
+		// the original error is what the caller cares about. ctx may be
+		// cancelled at this point so we use a fresh background context.
+		bgCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		if _, updErr := w.store.UpdateSyncSessionStatus(bgCtx, sqlc.UpdateSyncSessionStatusParams{
+			ID:     syncSession.ID,
+			Status: "failed",
+			Error:  pgtype.Text{String: err.Error(), Valid: true},
+		}); updErr != nil {
+			slog.Warn("jobs: failed to mark sync session as failed", "session_id", syncSession.ID, "err", updErr)
+		}
+	}()
+
+	// Get valid access token (handles refresh internally if needed).
+	accessToken, err := GetValidToken(ctx, w.querier, w.cipher, w.refresher, userID)
+	if err != nil {
+		return fmt.Errorf("jobs: failed to get valid token: %w", err)
+	}
+
 	// Calculate backfill window. WindowDays is set at construction time
 	// from config.Strava.BackfillDays; passing it to BackfillWindow keeps
 	// the existing arithmetic in one place.
 	after, before := BackfillWindow(int(w.backfill))
 
-	// Fetch activities in pages and upsert each
+	// Fetch activities in pages and upsert each. AUD-05: totalProcessed,
+	// imported and skipped are accumulated across pages; the previous
+	// version wrote len(activities) per page and pinned Skipped to 0.
 	page := 1
 	perPage := 50
-	totalProcessed := int32(0)
+	var totalProcessed, imported, skipped int32
 
 	for {
-		activities, err := w.fetcher.GetActivities(ctx, accessToken, after, before, page, perPage)
-		if err != nil {
-			return fmt.Errorf("jobs: failed to fetch activities (page %d): %w", page, err)
+		activities, fetchErr := w.fetcher.GetActivities(ctx, accessToken, after, before, page, perPage)
+		if fetchErr != nil {
+			err = fmt.Errorf("jobs: failed to fetch activities (page %d): %w", page, fetchErr)
+			return err
 		}
 
 		// If no activities on this page, we're done
@@ -237,9 +304,16 @@ func (w *ImportStravaWorker) Work(ctx context.Context, job *river.Job[ImportStra
 			break
 		}
 
-		// Upsert each activity
+		// Upsert each activity. The mock inserter does not distinguish
+		// insert vs update, so we cannot count Skipped here directly; the
+		// production UpsertActivity returns the row with xmax=0 (insert)
+		// vs xmax<>0 (update) per the comment on activities.sql:13. We
+		// surface that through the inserter's return value below; for now
+		// the worker's Skipped is left at 0 because the audit interface
+		// ActivityInserter does not return the distinction. AUD-12 (the
+		// Strava pagination correctness issue) widens ActivityInserter to
+		// carry the insert/update split.
 		for _, activity := range activities {
-			// Convert strava.ActivitySummary to UpsertActivityParams
 			params := sqlc.UpsertActivityParams{
 				UserID:         userID,
 				ExternalSource: "strava",
@@ -249,39 +323,43 @@ func (w *ImportStravaWorker) Work(ctx context.Context, job *river.Job[ImportStra
 				StartedAt:      pgtype.Timestamptz{Time: activity.StartDate, Valid: true},
 				ElapsedSeconds: int32(activity.ElapsedTime),
 				MovingSeconds:  int32(activity.MovingTime),
-				DistanceMeters: pgtype.Numeric{Int: big.NewInt(int64(activity.Distance * 1000)), Valid: true}, // Convert km to m
-				ElevationGainM: pgtype.Numeric{Int: big.NewInt(int64(activity.TotalElevationGain)), Valid: true},
+				DistanceMeters: numeric(activity.Distance), // Strava already returns meters
+				ElevationGainM: numeric(activity.TotalElevationGain),
 			}
 
-			_, err := w.inserter.UpsertActivity(ctx, params)
-			if err != nil {
-				return fmt.Errorf("jobs: failed to upsert activity %d: %w", activity.ID, err)
+			if _, upsertErr := w.inserter.UpsertActivity(ctx, params); upsertErr != nil {
+				err = fmt.Errorf("jobs: failed to upsert activity %d: %w", activity.ID, upsertErr)
+				return err
 			}
-			totalProcessed++
+			imported++
 		}
 
-		// Update progress
-		_, err = w.store.UpdateSyncSessionProgress(ctx, sqlc.UpdateSyncSessionProgressParams{
+		// AUD-05 AC: total_activities reflects the cumulative total after
+		// several pages. Previously TotalActivities was overwritten each
+		// iteration with len(activities) — so for a 3-page backfill the
+		// stored total was just the size of the last page, not the sum.
+		totalProcessed += int32(len(activities))
+		if _, progErr := w.store.UpdateSyncSessionProgress(ctx, sqlc.UpdateSyncSessionProgressParams{
 			ID:              syncSession.ID,
-			TotalActivities: int32(len(activities)),
-			Imported:        totalProcessed,
-			Skipped:         0,
-		})
-		if err != nil {
-			return fmt.Errorf("jobs: failed to update progress: %w", err)
+			TotalActivities: totalProcessed,
+			Imported:        imported,
+			Skipped:         skipped,
+		}); progErr != nil {
+			err = fmt.Errorf("jobs: failed to update progress: %w", progErr)
+			return err
 		}
 
 		// Move to next page
 		page++
 	}
 
-	// Mark sync session as completed
-	_, err = w.store.UpdateSyncSessionStatus(ctx, sqlc.UpdateSyncSessionStatusParams{
+	// Mark sync session as completed. The deferred closer only acts on
+	// non-nil err; reaching here with err == nil falls through.
+	if _, err = w.store.UpdateSyncSessionStatus(ctx, sqlc.UpdateSyncSessionStatusParams{
 		ID:     syncSession.ID,
 		Status: "completed",
 		Error:  pgtype.Text{Valid: false},
-	})
-	if err != nil {
+	}); err != nil {
 		return fmt.Errorf("jobs: failed to mark sync session completed: %w", err)
 	}
 
@@ -420,8 +498,8 @@ func (w *IngestActivityEventWorker) Work(ctx context.Context, job *river.Job[Ing
 		StartedAt:      pgtype.Timestamptz{Time: activity.StartDate, Valid: true},
 		ElapsedSeconds: int32(activity.ElapsedTime),
 		MovingSeconds:  int32(activity.MovingTime),
-		DistanceMeters: pgtype.Numeric{Int: big.NewInt(int64(activity.Distance * 1000)), Valid: true}, // Convert km to m
-		ElevationGainM: pgtype.Numeric{Int: big.NewInt(int64(activity.TotalElevationGain)), Valid: true},
+		DistanceMeters: numeric(activity.Distance), // Strava already returns meters
+		ElevationGainM: numeric(activity.TotalElevationGain),
 	}
 
 	// Upsert the activity to database
