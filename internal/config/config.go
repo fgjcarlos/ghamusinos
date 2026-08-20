@@ -122,8 +122,8 @@ func Load() (*Config, error) {
 			HSTSEnabled:   getEnv("SECURITY_HSTS_ENABLED", "") == "true",
 			CSPReportOnly: getEnv("SECURITY_CSP_REPORT_ONLY", "") == "true",
 		},
-		MaxBodyBytes:   parseMaxBodyBytes(os.Getenv("MAX_BODY_BYTES")),
-		AuthDisabled:   parseBool(os.Getenv("AUTH_DISABLED")),
+		MaxBodyBytes: parseMaxBodyBytes(os.Getenv("MAX_BODY_BYTES")),
+		AuthDisabled: parseBool(os.Getenv("AUTH_DISABLED")),
 	}
 
 	if cfg.DatabaseURL == "" {
