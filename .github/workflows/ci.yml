@@ -110,6 +110,11 @@ jobs:
           go run ./cmd/migrate up
           go run ./cmd/migrate status
 
+      - name: integration tests (SQLC queries)
+        env:
+          DATABASE_URL: postgres://postgres:postgres@localhost:5432/ghamusinos?sslmode=disable
+        run: go test -tags integration -race -count=1 ./internal/db/sqlc/...
+
   frontend:
     name: Frontend (build)
     runs-on: ubuntu-latest

@@ -105,7 +105,7 @@ func Load() (*Config, error) {
 
 	cfg := &Config{
 		Env:            getEnv("ENV", "development"),
-		Port:           getEnv("PORT", "8080"),
+		Port:           getEnv("PORT", "8080"), // validado abajo: debe ser entero positivo
 		DatabaseURL:    os.Getenv("DATABASE_URL"),
 		Pool:           pool,
 		ClerkJWKSURL:   os.Getenv("CLERK_JWKS_URL"),
@@ -124,6 +124,16 @@ func Load() (*Config, error) {
 	}
 	if cfg.ClerkJWKSURL == "" {
 		return nil, errors.New("config: CLERK_JWKS_URL es obligatoria y está vacía")
+	}
+	// PORT debe ser un entero válido entre 1 y 65535 (issue #34).
+	// Sin esta validación, PORT="abc" pasaba sin error y luego fallaba
+	// al levantar el http.Server con un mensaje menos claro.
+	if _, err := strconv.Atoi(cfg.Port); err != nil {
+		return nil, fmt.Errorf("config: PORT %q no es un entero válido: %w", cfg.Port, err)
+	}
+	portNum, _ := strconv.Atoi(cfg.Port)
+	if portNum < 1 || portNum > 65535 {
+		return nil, fmt.Errorf("config: PORT=%d fuera de rango (1-65535)", portNum)
 	}
 
 	strava, err := loadStravaConfig()
