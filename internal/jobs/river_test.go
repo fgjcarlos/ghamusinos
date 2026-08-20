@@ -4,14 +4,25 @@ import (
 	"context"
 	"testing"
 
-	"github.com/jackc/pgx/v5/pgtype"
-	"github.com/riverqueue/river"
+	"github.com/jackc/pgx/v5/pgxpool"
+
+	"github.com/fgjcarlos/ghamusinos/internal/config"
 )
 
 // TestNewClient verifies that NewRiverWorkers creates a configured workers instance.
+// AUD-04: NewRiverWorkers takes a Deps bundle and a registerStravaWorkers flag.
 func TestNewClient(t *testing.T) {
 	t.Run("returns river.Workers instance", func(t *testing.T) {
-		workers := NewRiverWorkers()
+		// registerStravaWorkers=false because we have no Strava client in tests;
+		// this is the "no Strava configured" branch. Pool and Config must still
+		// be non-nil because they are always required.
+		workers, err := NewRiverWorkers(Deps{
+			Pool:   &pgxpool.Pool{},
+			Config: &config.Config{},
+		}, false)
+		if err != nil {
+			t.Fatalf("NewRiverWorkers returned error: %v", err)
+		}
 		if workers == nil {
 			t.Fatal("NewRiverWorkers returned nil")
 		}
@@ -37,38 +48,9 @@ func TestClientStubJobEnqueue(t *testing.T) {
 	})
 }
 
-// TestImportStravaWorker verifies ImportStravaWorker is properly configured.
-func TestImportStravaWorker(t *testing.T) {
-	ctx := context.Background()
-	worker := &ImportStravaWorker{}
-
-	// Use a valid UUID for userID
-	validUUID := pgtype.UUID{Bytes: [16]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16}, Valid: true}
-
-	// Verify worker embeds WorkerDefaults correctly
-	job := &river.Job[ImportStravaArgs]{
-		Args: ImportStravaArgs{UserID: validUUID.String()},
-	}
-
-	err := worker.Work(ctx, job)
-	// Expect an error since no dependencies are injected (fetcher, store, inserter all nil)
-	if err != ErrTokenRefresherNotConfigured {
-		t.Errorf("ImportStravaWorker.Work() expected ErrTokenRefresherNotConfigured, got %v", err)
-	}
-}
-
-// TestRefreshStravaTokenWorker verifies RefreshStravaTokenWorker is properly configured.
-func TestRefreshStravaTokenWorker(t *testing.T) {
-	ctx := context.Background()
-	worker := &RefreshStravaTokenWorker{}
-
-	job := &river.Job[RefreshStravaTokenArgs]{
-		Args: RefreshStravaTokenArgs{UserID: "test-user"},
-	}
-
-	err := worker.Work(ctx, job)
-	// Expect ErrTokenRefresherNotConfigured since ConfigureTokenRefresher was not called
-	if err != ErrTokenRefresherNotConfigured {
-		t.Errorf("RefreshStravaTokenWorker.Work() expected ErrTokenRefresherNotConfigured, got %v", err)
-	}
-}
+// AUD-04 removed ErrTokenRefresherNotConfigured and made worker construction
+// require explicit deps. The "Work() on an empty worker returns the config
+// error" tests that used to live here were asserting a behavior that AUD-04
+// makes unreachable: a worker with zero deps cannot be built in production.
+// The validation moved to NewRiverWorkers; see backfill_test.go for the
+// TestNewRiverWorkers_Requires* tests that now cover the contract.

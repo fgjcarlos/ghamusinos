@@ -54,7 +54,7 @@ func TestBuildRouter_DefaultRoutesAreWired(t *testing.T) {
 	cfg := &config.Config{
 		ClerkJWKSURL: "https://clerk.example.com/jwks",
 	}
-	h := buildRouter(cfg, nil, nil)
+	h := buildRouter(cfg, nil, nil, nil)
 
 	got := collectRoutes(t, h)
 
@@ -104,7 +104,7 @@ func TestBuildRouter_StravaOptionalRoutesWhenConfigured(t *testing.T) {
 			CipherKey:    bytes32(t),
 		},
 	}
-	h := buildRouter(cfg, nil, nil)
+	h := buildRouter(cfg, nil, nil, nil)
 
 	got := collectRoutes(t, h)
 

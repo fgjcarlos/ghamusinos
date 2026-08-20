@@ -7,6 +7,8 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
+
+	"github.com/fgjcarlos/ghamusinos/internal/config"
 )
 
 // TestRiverIntegration verifies that River can enqueue and process jobs.
@@ -32,8 +34,12 @@ func TestRiverIntegration(t *testing.T) {
 	}
 	defer pool.Close()
 
-	// Create the River client
-	client, err := NewClient(ctx, pool)
+	// Create the River client. AUD-04: pass Deps; registerStravaWorkers=false
+	// because integration tests don't have Strava credentials wired.
+	client, err := NewClient(ctx, pool, Deps{
+		Pool:   pool,
+		Config: &config.Config{},
+	}, false)
 	if err != nil {
 		t.Fatalf("failed to create River client: %v", err)
 	}

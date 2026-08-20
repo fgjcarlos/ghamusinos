@@ -29,6 +29,11 @@ type Server struct {
 	stravaClient    *strava.Client
 	stravaStore     strava.TokenStore
 	stravaCipherKey []byte
+	// stravaEnqueuer encola el job de backfill tras un OAuth exitoso.
+	// AUD-04 AC: "Conectar Strava encola un ImportStravaArgs". El seam
+	// lo provee app.Run; aquí lo aceptamos como interfaz para mantener
+	// la dirección del grafo (strava no importa jobs).
+	stravaEnqueuer strava.RiverEnqueuer
 	// Webhook store (opcional, fase 1.2 issue #86): para webhooks de Strava.
 	// Se monta antes del middleware de auth, es signature-gated.
 	webhookStore strava.ActivityEventStore
@@ -53,9 +58,13 @@ func NewServer(pool handlers.DBPinger, queries sqlc.Querier, cfg *config.Config)
 // WithStrava cablea los handlers de OAuth Strava al router.
 // Se devuelve *Server para fluent chaining. cipherKey debe tener 32 bytes;
 // si no, los handlers devolverán error en runtime al primer callback.
-func (s *Server) WithStrava(client *strava.Client, store strava.TokenStore, cipherKey []byte) *Server {
+// AUD-04: el enqueuer (RiverEnqueuer) lo provee app.Run; si es nil el
+// callback no encola el backfill (útil en tests que solo ejercitan el
+// intercambio de tokens).
+func (s *Server) WithStrava(client *strava.Client, store strava.TokenStore, enqueuer strava.RiverEnqueuer, cipherKey []byte) *Server {
 	s.stravaClient = client
 	s.stravaStore = store
+	s.stravaEnqueuer = enqueuer
 	s.stravaCipherKey = cipherKey
 	return s
 }
@@ -141,8 +150,12 @@ func (s *Server) Router() http.Handler {
 	// que no envía la cabecera Authorization. El user_id viaja dentro del state
 	// firmado (HMAC-SHA256 sobre {uid, nonce, exp}); el handler verifica la
 	// firma antes de actuar.
+	//
+	// AUD-04: tras un intercambio de tokens exitoso el callback encola un
+	// ImportStravaArgs (River backfill). El enqueuer lo provee app.go.
 	if s.stravaClient != nil && s.stravaStore != nil && s.stravaCipherKey != nil {
-		r.Get("/strava/callback", strava.CallbackHandler(s.stravaClient, s.stravaStore, s.stravaCipherKey, s.cfg.FrontendURL))
+		r.Get("/strava/callback", strava.CallbackHandler(
+			s.stravaClient, s.stravaStore, s.stravaEnqueuer, s.stravaCipherKey, s.cfg.FrontendURL))
 	}
 
 	// Grupo de API. TODAS las rutas /api/* están protegidas por autenticación.

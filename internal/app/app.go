@@ -43,11 +43,45 @@ func Run() error {
 
 	slog.Info("conexión a base de datos establecida")
 
-	// Initialize River client for job queue
-	riverClient, err := jobs.NewClient(ctx, pool)
+	// Initialize River client for job queue. AUD-04 (issue #164): the workers
+	// are constructed from a Deps bundle instead of package globals; NewClient
+	// returns an error if any required dependency is missing so the binary fails
+	// fast at startup rather than at the first job. The Strava-bound workers
+	// are only registered when cfg.Strava is populated.
+	registerStravaWorkers := cfg.Strava != nil
+	var stravaForWorkers *strava.Client
+	var cipherForWorkers []byte
+	if registerStravaWorkers {
+		// Build the same Strava client buildRouter uses, so both the HTTP
+		// handlers and the workers share one instance.
+		sc, scErr := strava.NewClient(strava.Config{
+			ClientID:     cfg.Strava.ClientID,
+			ClientSecret: cfg.Strava.ClientSecret,
+			RedirectURL:  cfg.Strava.RedirectURL,
+			Scopes:       cfg.Strava.Scopes,
+		})
+		if scErr != nil {
+			slog.Warn("strava: cliente no inicializado, workers Strava deshabilitados", "err", scErr)
+			registerStravaWorkers = false
+		} else {
+			stravaForWorkers = sc
+			cipherForWorkers = cfg.Strava.CipherKey
+		}
+	}
+	riverClient, err := jobs.NewClient(ctx, pool, jobs.Deps{
+		Pool:      pool,
+		Config:    cfg,
+		Strava:    stravaForWorkers,
+		CipherKey: cipherForWorkers,
+	}, registerStravaWorkers)
 	if err != nil {
 		return err
 	}
+
+	// AUD-04 AC: el callback OAuth encola el backfill con este adapter.
+	// Se construye aquí (no en buildRouter) porque necesita el *river.Client
+	// que acabamos de crear; buildRouter solo recibe la Server.
+	stravaEnqueuer := &jobs.RiverEnqueuerAdapter{Client: riverClient}
 	defer func() {
 		shutdownCtx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
 		defer cancel()
@@ -64,7 +98,7 @@ func Run() error {
 	addr := ":" + cfg.Port
 	srv := &http.Server{
 		Addr:              addr,
-		Handler:           buildRouter(cfg, pool, queries),
+		Handler:           buildRouter(cfg, pool, queries, stravaEnqueuer),
 		ReadHeaderTimeout: 5 * time.Second,
 		ReadTimeout:       15 * time.Second,
 		WriteTimeout:      15 * time.Second,
@@ -106,7 +140,12 @@ func Run() error {
 // Strava (issue #14, fase 1.2) se monta solo si cfg.Strava != nil
 // (vars de entorno presentes). En su ausencia, /api/v1/strava/* no
 // existe como ruta — comportamiento correcto bajo el NotFound del grupo v1.
-func buildRouter(cfg *config.Config, pool *pgxpool.Pool, queries sqlc.Querier) http.Handler {
+//
+// stravaEnqueuer is the RiverEnqueuer that the OAuth callback uses to
+// schedule the backfill after a successful token exchange (AUD-04 AC:
+// "Conectar Strava encola un ImportStravaArgs"). It is non-nil because
+// app.Run always wires it before calling buildRouter.
+func buildRouter(cfg *config.Config, pool *pgxpool.Pool, queries sqlc.Querier, stravaEnqueuer strava.RiverEnqueuer) http.Handler {
 	server := apphttp.NewServer(pool, queries, cfg)
 	server.WithGPX(
 		gpx.NewTransactionalSQLCStore(pool),
@@ -133,7 +172,7 @@ func buildRouter(cfg *config.Config, pool *pgxpool.Pool, queries sqlc.Querier) h
 			slog.Warn("strava: cliente no inicializado, rutas OAuth deshabilitadas", "err", err)
 		} else {
 			store := strava.NewSQLCTokenStore(queries)
-			server.WithStrava(stravaClient, store, cfg.Strava.CipherKey)
+			server.WithStrava(stravaClient, store, stravaEnqueuer, cfg.Strava.CipherKey)
 			slog.Info("strava: rutas OAuth habilitadas", "redirect", cfg.Strava.RedirectURL)
 		}
 	}

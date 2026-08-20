@@ -21,7 +21,7 @@ func TestBuildRouter_WithoutStrava(t *testing.T) {
 	cfg := &config.Config{
 		ClerkJWKSURL: "https://clerk.example.com/jwks",
 	}
-	h := buildRouter(cfg, nil, nil)
+	h := buildRouter(cfg, nil, nil, nil)
 
 	for _, path := range []string{
 		"/api/v1/strava/connect",
@@ -46,7 +46,7 @@ func TestBuildRouter_HealthzAliveWithoutPool(t *testing.T) {
 	cfg := &config.Config{
 		ClerkJWKSURL: "https://clerk.example.com/jwks",
 	}
-	h := buildRouter(cfg, nil, nil)
+	h := buildRouter(cfg, nil, nil, nil)
 
 	rec := httptest.NewRecorder()
 	req := httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/healthz", nil)
@@ -85,7 +85,7 @@ func TestBuildRouter_ConnectHandlerMountedWhenStravaConfigured(t *testing.T) {
 	// montamos un router equivalente con un store fake. Esto valida el
 	// wiring del handler, no la persistencia.
 	server := apphttp.NewServer(nil, nil, cfg)
-	server.WithStrava(client, store, key)
+	server.WithStrava(client, store, nil, key)
 	h := server.Router()
 
 	req := httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/api/v1/strava/connect", nil)
