@@ -155,7 +155,10 @@ func (s *Server) Router() http.Handler {
 			if s.gpxStore != nil {
 				r.Route("/gpx", func(r chi.Router) {
 					r.Post("/upload", handlers.UploadGPX(s.gpxStore, s.gpxParser, s.gpxValidator, s.gpxAnalyzer, s.gpxClimbDetector, s.gpxRiskDetector, s.gpxTypeDetector, s.gpxHasher).ServeHTTP)
+					r.Get("/", handlers.ListGPX(s.gpxStore).ServeHTTP)
 					r.Get("/{id}", handlers.GetGPX(s.gpxStore).ServeHTTP)
+					r.Delete("/{id}", handlers.DeleteGPX(s.gpxStore).ServeHTTP)
+					r.Post("/compare", handlers.CompareGPX(s.gpxStore).ServeHTTP)
 				})
 			}
 
