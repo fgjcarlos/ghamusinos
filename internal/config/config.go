@@ -72,18 +72,17 @@ type Config struct {
 // que la integración funcione. STRAVA_REDIRECT_URL debe coincidir con la
 // URL configurada en la app de Strava. STRAVA_CIPHER_KEY es la clave
 // AES-256 (32 bytes) codificada en base64 estándar.
-// STRAVA_WEBHOOK_SECRET es el secreto compartido para validar firmas
-// HMAC-SHA256 en los webhooks de Strava.
+// STRAVA_WEBHOOK_VERIFY_TOKEN authenticates Strava's subscription handshake.
 // STRAVA_BACKFILL_DAYS es el número de días atrás para la sincronización inicial
 // (default 42, aproximadamente 6 semanas).
 type StravaConfig struct {
-	ClientID      string
-	ClientSecret  string
-	RedirectURL   string
-	Scopes        string
-	CipherKey     []byte
-	WebhookSecret string
-	BackfillDays  int
+	ClientID           string
+	ClientSecret       string
+	RedirectURL        string
+	Scopes             string
+	CipherKey          []byte
+	WebhookVerifyToken string
+	BackfillDays       int
 }
 
 // Load lee las variables de entorno y devuelve un Config validado.
@@ -175,9 +174,9 @@ func loadStravaConfig() (*StravaConfig, error) {
 		return nil, fmt.Errorf("config: STRAVA_CIPHER_KEY debe decodificar a 32 bytes (AES-256), got %d", len(key))
 	}
 
-	webhookSecret := os.Getenv("STRAVA_WEBHOOK_SECRET")
-	if webhookSecret == "" {
-		return nil, errors.New("config: STRAVA_WEBHOOK_SECRET es obligatoria cuando STRAVA_CLIENT_ID/SECRET están definidas")
+	webhookVerifyToken := os.Getenv("STRAVA_WEBHOOK_VERIFY_TOKEN")
+	if webhookVerifyToken == "" {
+		return nil, errors.New("config: STRAVA_WEBHOOK_VERIFY_TOKEN es obligatoria cuando STRAVA_CLIENT_ID/SECRET están definidas")
 	}
 
 	backfillDays, err := getEnvInt32("STRAVA_BACKFILL_DAYS", 42)
@@ -186,13 +185,13 @@ func loadStravaConfig() (*StravaConfig, error) {
 	}
 
 	return &StravaConfig{
-		ClientID:      id,
-		ClientSecret:  secret,
-		RedirectURL:   os.Getenv("STRAVA_REDIRECT_URL"),
-		Scopes:        getEnv("STRAVA_SCOPES", "read,activity:read"),
-		CipherKey:     key,
-		WebhookSecret: webhookSecret,
-		BackfillDays:  int(backfillDays),
+		ClientID:           id,
+		ClientSecret:       secret,
+		RedirectURL:        os.Getenv("STRAVA_REDIRECT_URL"),
+		Scopes:             getEnv("STRAVA_SCOPES", "read,activity:read"),
+		CipherKey:          key,
+		WebhookVerifyToken: webhookVerifyToken,
+		BackfillDays:       int(backfillDays),
 	}, nil
 }
 

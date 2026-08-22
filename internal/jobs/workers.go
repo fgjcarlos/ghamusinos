@@ -2,6 +2,7 @@ package jobs
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log/slog"
 	"strconv"
@@ -101,9 +102,9 @@ type importDeps struct {
 // registerStravaWorkers toggles whether the Strava-bound workers
 // (ImportStrava, RefreshStravaToken, ImportStravaStreams) are registered.
 // Set to true when cfg.Strava is configured; set to false in dev / tests
-// that do not have Strava credentials. The IngestActivityEventWorker is
-// registered regardless but its eventLoader is nil — see the ponytail note
-// in NewRiverWorkers body for the AUD-03 dependency.
+// that do not have Strava credentials. The production path registers every
+// Strava worker with complete dependencies; the disabled path registers only
+// StubWorker to keep the test client usable.
 func NewRiverWorkers(d Deps, registerStravaWorkers bool) (*river.Workers, error) {
 	if err := d.validate(registerStravaWorkers); err != nil {
 		return nil, err
@@ -131,18 +132,19 @@ func NewRiverWorkers(d Deps, registerStravaWorkers bool) (*river.Workers, error)
 			zoneStore: queries,
 			cipherKey: d.CipherKey,
 		})
+		river.AddWorker(workers, NewIngestActivityEventWorker(
+			queries,
+			d.Strava,
+			queries,
+			queries,
+			d.CipherKey,
+			d.Strava,
+		))
+	} else {
+		// NewClient is retained as a usable test seam when Strava is disabled.
+		// Production skips River entirely in this mode.
+		river.AddWorker(workers, &StubWorker{})
 	}
-
-	// ponytail: eventLoader is nil here because sqlc.Queries does not yet
-	// implement GetActivityEventByExternalID — that lands in AUD-03 (issue
-	// #165). The worker is registered so the kind is known to River, but
-	// any job routed to it will fail in Work() with a nil-deref; that is
-	// acceptable while AUD-03 is open because no production code enqueues
-	// IngestActivityEventArgs yet. Replace nil with id.queries in the AUD-03 PR.
-	river.AddWorker(workers, &IngestActivityEventWorker{
-		refresher: d.Strava,
-		cipher:    d.CipherKey,
-	})
 	return workers, nil
 }
 
@@ -416,11 +418,8 @@ func (w *RefreshStravaTokenWorker) Work(ctx context.Context, job *river.Job[Refr
 // because the constructor guarantees the fields are non-nil. AUD-04 AC:
 // "ErrTokenRefresherNotConfigured ya no existe."
 //
-// NOTE: the eventLoader field is left nil by NewRiverWorkers today because
-// sqlc.Queries does not implement ActivityEventLoader — GetActivityEventByExternalID
-// is the missing query that AUD-03 (issue #165) ships. Until that lands no
-// production code enqueues IngestActivityEventArgs, so a nil eventLoader is
-// unreachable. The constructor below exists for tests and for AUD-03.
+// NewRiverWorkers registers this worker only with its complete production
+// dependency set.
 type IngestActivityEventWorker struct {
 	river.WorkerDefaults[IngestActivityEventArgs]
 	eventLoader   ActivityEventLoader
@@ -432,10 +431,7 @@ type IngestActivityEventWorker struct {
 }
 
 // NewIngestActivityEventWorker builds an IngestActivityEventWorker with each
-// dependency passed explicitly. In production NewRiverWorkers does not call
-// this constructor (it constructs the worker struct literal with a nil
-// eventLoader because sqlc.Queries cannot implement the missing query yet),
-// but tests use this helper to assemble the full dependency set.
+// dependency passed explicitly. Tests and production use the same boundary.
 func NewIngestActivityEventWorker(
 	eventLoader ActivityEventLoader,
 	detailFetcher ActivityDetailFetcher,
@@ -467,8 +463,12 @@ func (a IngestActivityEventArgs) Kind() string {
 // Work processes an IngestActivityEvent job.
 // It loads the activity event, fetches full activity details from Strava, and upserts to database.
 func (w *IngestActivityEventWorker) Work(ctx context.Context, job *river.Job[IngestActivityEventArgs]) error {
-	// Load the activity event from database
-	activityEvent, err := w.eventLoader.GetActivityEventByExternalID(ctx, job.Args.EventID)
+	var eventID pgtype.UUID
+	if err := eventID.Scan(job.Args.EventID); err != nil {
+		return fmt.Errorf("jobs: invalid activity event ID %q: %w", job.Args.EventID, err)
+	}
+
+	activityEvent, err := w.eventLoader.GetActivityEventByID(ctx, eventID)
 	if err != nil {
 		return fmt.Errorf("jobs: failed to load activity event %s: %w", job.Args.EventID, err)
 	}
@@ -487,6 +487,10 @@ func (w *IngestActivityEventWorker) Work(ctx context.Context, job *river.Job[Ing
 	if err != nil {
 		return fmt.Errorf("jobs: failed to fetch activity details for %d: %w", activityEvent.ObjectID, err)
 	}
+	rawPayload, err := json.Marshal(activity)
+	if err != nil {
+		return fmt.Errorf("jobs: failed to marshal activity %d: %w", activity.ID, err)
+	}
 
 	// Convert strava.ActivityDetail to UpsertActivityParams
 	params := sqlc.UpsertActivityParams{
@@ -500,6 +504,7 @@ func (w *IngestActivityEventWorker) Work(ctx context.Context, job *river.Job[Ing
 		MovingSeconds:  int32(activity.MovingTime),
 		DistanceMeters: numeric(activity.Distance), // Strava already returns meters
 		ElevationGainM: numeric(activity.TotalElevationGain),
+		RawPayload:     rawPayload,
 	}
 
 	// Upsert the activity to database

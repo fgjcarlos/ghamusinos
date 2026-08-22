@@ -3,211 +3,173 @@ package strava
 import (
 	"bytes"
 	"context"
-	"crypto/hmac"
-	"crypto/sha256"
-	"encoding/hex"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
+
+	"github.com/jackc/pgx/v5/pgtype"
+	"github.com/stretchr/testify/require"
 
 	"github.com/fgjcarlos/ghamusinos/internal/db/sqlc"
 )
 
-// T4.1: POST /api/v1/strava/webhook returns 401 if X-Strava-Signature header missing
-func TestWebhook_MissingSignature(t *testing.T) {
-	body := []byte(`{"object_type":"activity","aspect_type":"create","object_id":123,"external_id":"evt_123"}`)
-	mockStore := &mockActivityEventStore{}
-	handler := WebhookHandler("test-secret", mockStore)
+// This is Strava's documented Webhook Events API sample payload. Issue #165
+// still requires a captured production event before it can be closed.
+const documentedWebhookPayload = `{
+    "aspect_type": "update",
+    "event_time": 1516126040,
+    "object_id": 1360128428,
+    "object_type": "activity",
+    "owner_id": 134815,
+    "subscription_id": 120475,
+    "updates": {"title": "Messy"}
+}`
 
-	req := httptest.NewRequestWithContext(context.Background(), "POST", "/webhook", bytes.NewReader(body))
-	req.Header.Set("Content-Type", "application/json")
-	// Missing X-Strava-Signature header
-	w := httptest.NewRecorder()
+func TestWebhookHandler_PersistsDocumentedEventWithoutSignature(t *testing.T) {
+	store := newKnownAthleteStore()
+	handler := WebhookHandler(store)
+	req := httptest.NewRequestWithContext(context.Background(), http.MethodPost, "/strava/webhook", bytes.NewBufferString(documentedWebhookPayload))
+	recorder := httptest.NewRecorder()
 
-	handler.ServeHTTP(w, req)
+	handler.ServeHTTP(recorder, req)
 
-	if w.Code != http.StatusUnauthorized {
-		t.Errorf("expected 401, got %d", w.Code)
+	require.Equal(t, http.StatusOK, recorder.Code)
+	require.True(t, store.enqueued)
+	require.True(t, store.jobEnqueued)
+	require.Equal(t, int64(1360128428), store.params.ObjectID)
+	require.Equal(t, "update", store.params.AspectType)
+	require.Equal(t, int64(134815), store.params.OwnerID.Int64)
+	require.Equal(t, int64(120475), store.params.SubscriptionID.Int64)
+	require.Equal(t, time.Unix(1516126040, 0).UTC(), store.params.EventTime.Time)
+	require.JSONEq(t, documentedWebhookPayload, string(store.params.RawPayload))
+}
+
+func TestWebhookHandler_UnknownAthleteAcknowledgesWithoutPersisting(t *testing.T) {
+	store := &mockActivityEventStore{}
+	handler := WebhookHandler(store)
+	req := httptest.NewRequestWithContext(context.Background(), http.MethodPost, "/strava/webhook", bytes.NewBufferString(documentedWebhookPayload))
+	recorder := httptest.NewRecorder()
+
+	handler.ServeHTTP(recorder, req)
+
+	require.Equal(t, http.StatusOK, recorder.Code)
+	require.False(t, store.enqueued)
+	require.False(t, store.jobEnqueued)
+}
+
+func TestWebhookHandler_RejectsMalformedPayloads(t *testing.T) {
+	tests := []struct {
+		name string
+		body string
+	}{
+		{name: "invalid JSON", body: `{`},
+		{name: "missing event time", body: `{"object_type":"activity","object_id":1,"aspect_type":"create","owner_id":2,"subscription_id":3}`},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			handler := WebhookHandler(newKnownAthleteStore())
+			req := httptest.NewRequestWithContext(context.Background(), http.MethodPost, "/strava/webhook", bytes.NewBufferString(tt.body))
+			recorder := httptest.NewRecorder()
+
+			handler.ServeHTTP(recorder, req)
+
+			require.Equal(t, http.StatusBadRequest, recorder.Code)
+		})
 	}
 }
 
-// T4.2: POST /api/v1/strava/webhook returns 401 if HMAC-SHA256 signature mismatches
-func TestWebhook_InvalidSignature(t *testing.T) {
-	body := []byte(`{"object_type":"activity","aspect_type":"create","object_id":123,"external_id":"evt_123"}`)
-	mockStore := &mockActivityEventStore{}
-	handler := WebhookHandler("test-secret", mockStore)
+func TestWebhookHandler_StoreFailuresReturnServerError(t *testing.T) {
+	tests := []struct {
+		name  string
+		store *mockActivityEventStore
+	}{
+		{name: "athlete lookup", store: &mockActivityEventStore{resolveErr: errors.New("lookup failed")}},
+		{name: "event persistence", store: &mockActivityEventStore{userID: testUserID(), enqueueErr: errors.New("insert failed")}},
+		{name: "job enqueue", store: &mockActivityEventStore{userID: testUserID(), jobErr: errors.New("queue failed")}},
+	}
 
-	req := httptest.NewRequestWithContext(context.Background(), "POST", "/webhook", bytes.NewReader(body))
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("X-Strava-Signature", "v0=invalid_signature_hex")
-	w := httptest.NewRecorder()
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			handler := WebhookHandler(tt.store)
+			req := httptest.NewRequestWithContext(context.Background(), http.MethodPost, "/strava/webhook", bytes.NewBufferString(documentedWebhookPayload))
+			recorder := httptest.NewRecorder()
 
-	handler.ServeHTTP(w, req)
+			handler.ServeHTTP(recorder, req)
 
-	if w.Code != http.StatusUnauthorized {
-		t.Errorf("expected 401, got %d", w.Code)
+			require.Equal(t, http.StatusInternalServerError, recorder.Code)
+		})
 	}
 }
 
-// T4.3: POST /api/v1/strava/webhook validates HMAC-SHA256 with STRAVA_WEBHOOK_SECRET correctly
-func TestWebhook_ValidSignature(t *testing.T) {
-	body := []byte(`{"object_type":"activity","aspect_type":"create","object_id":123,"external_id":"evt_123"}`)
-	secret := "test-secret"
-	mockStore := &mockActivityEventStore{}
-	handler := WebhookHandler(secret, mockStore)
+func TestWebhookChallengeHandler(t *testing.T) {
+	tests := []struct {
+		name       string
+		query      string
+		wantStatus int
+		wantBody   string
+	}{
+		{
+			name:       "valid token returns JSON challenge",
+			query:      "?hub.mode=subscribe&hub.challenge=test-challenge&hub.verify_token=test-token",
+			wantStatus: http.StatusOK,
+			wantBody:   `{"hub.challenge":"test-challenge"}`,
+		},
+		{
+			name:       "invalid token is forbidden",
+			query:      "?hub.mode=subscribe&hub.challenge=test-challenge&hub.verify_token=wrong",
+			wantStatus: http.StatusForbidden,
+		},
+	}
 
-	// Calculate correct signature
-	h := hmac.New(sha256.New, []byte(secret))
-	h.Write(body)
-	expectedSig := "v0=" + hex.EncodeToString(h.Sum(nil))
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			handler := WebhookChallengeHandler("test-token")
+			req := httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/strava/webhook"+tt.query, nil)
+			recorder := httptest.NewRecorder()
 
-	req := httptest.NewRequestWithContext(context.Background(), "POST", "/webhook", bytes.NewReader(body))
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("X-Strava-Signature", expectedSig)
-	w := httptest.NewRecorder()
+			handler.ServeHTTP(recorder, req)
 
-	handler.ServeHTTP(w, req)
-
-	// Should not return 401
-	if w.Code == http.StatusUnauthorized {
-		t.Errorf("expected non-401 status with valid signature, got %d", w.Code)
+			require.Equal(t, tt.wantStatus, recorder.Code)
+			if tt.wantBody != "" {
+				require.Equal(t, "application/json", recorder.Header().Get("Content-Type"))
+				require.JSONEq(t, tt.wantBody, recorder.Body.String())
+			}
+		})
 	}
 }
 
-// T4.5: GET /api/v1/strava/webhook?hub.mode=subscribe&hub.challenge=...&hub.verify_token=... returns challenge
-func TestWebhookChallenge_ValidChallenge(t *testing.T) {
-	handler := WebhookChallengeHandler("test-verify-token")
-
-	req := httptest.NewRequestWithContext(context.Background(), "GET", "/webhook?hub.mode=subscribe&hub.challenge=test-challenge&hub.verify_token=test-verify-token", nil)
-	w := httptest.NewRecorder()
-
-	handler.ServeHTTP(w, req)
-
-	if w.Code != http.StatusOK {
-		t.Errorf("expected 200, got %d", w.Code)
-	}
-
-	if w.Body.String() != "test-challenge" {
-		t.Errorf("expected body 'test-challenge', got %q", w.Body.String())
-	}
-}
-
-// T4.7: webhook persists valid event via queries.EnqueueActivityEvent
-func TestWebhook_PersistsEvent(t *testing.T) {
-	body := []byte(`{"object_type":"activity","aspect_type":"create","object_id":123,"external_id":"evt_123","athlete":{"id":456}}`)
-	secret := "test-secret"
-	mockStore := &mockActivityEventStore{}
-	handler := WebhookHandler(secret, mockStore)
-
-	// Calculate correct signature
-	h := hmac.New(sha256.New, []byte(secret))
-	h.Write(body)
-	expectedSig := "v0=" + hex.EncodeToString(h.Sum(nil))
-
-	req := httptest.NewRequestWithContext(context.Background(), "POST", "/webhook", bytes.NewReader(body))
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("X-Strava-Signature", expectedSig)
-	w := httptest.NewRecorder()
-
-	handler.ServeHTTP(w, req)
-
-	if w.Code != http.StatusOK && w.Code != http.StatusAccepted && w.Code != http.StatusNoContent {
-		t.Errorf("expected 200/202/204 for valid webhook, got %d", w.Code)
-	}
-
-	if !mockStore.enqueued {
-		t.Error("expected EnqueueActivityEvent to be called")
-	}
-}
-
-// T4.9: idempotency — replaying the same event_id returns 200 OK but does NOT create a duplicate row
-func TestWebhook_Idempotency(t *testing.T) {
-	body := []byte(`{"object_type":"activity","aspect_type":"create","object_id":123,"external_id":"evt_same","athlete":{"id":456}}`)
-	secret := "test-secret"
-	mockStore := &mockActivityEventStore{}
-	handler := WebhookHandler(secret, mockStore)
-
-	// Calculate correct signature
-	h := hmac.New(sha256.New, []byte(secret))
-	h.Write(body)
-	expectedSig := "v0=" + hex.EncodeToString(h.Sum(nil))
-
-	// First request
-	req1 := httptest.NewRequestWithContext(context.Background(), "POST", "/webhook", bytes.NewReader(body))
-	req1.Header.Set("Content-Type", "application/json")
-	req1.Header.Set("X-Strava-Signature", expectedSig)
-	w1 := httptest.NewRecorder()
-	handler.ServeHTTP(w1, req1)
-
-	if w1.Code < 200 || w1.Code >= 300 {
-		t.Errorf("first request failed with status %d", w1.Code)
-	}
-
-	// Second request with same event_id
-	mockStore.reset()
-	req2 := httptest.NewRequestWithContext(context.Background(), "POST", "/webhook", bytes.NewReader(body))
-	req2.Header.Set("Content-Type", "application/json")
-	req2.Header.Set("X-Strava-Signature", expectedSig)
-	w2 := httptest.NewRecorder()
-	handler.ServeHTTP(w2, req2)
-
-	if w2.Code < 200 || w2.Code >= 300 {
-		t.Errorf("second request failed with status %d", w2.Code)
-	}
-}
-
-// T4.11: successful POST enqueues a River job (stub IngestActivityEventWorker) for the event
-func TestWebhook_EnqueuesRiverJob(t *testing.T) {
-	body := []byte(`{"object_type":"activity","aspect_type":"create","object_id":123,"external_id":"evt_123","athlete":{"id":456}}`)
-	secret := "test-secret"
-	mockStore := &mockActivityEventStore{}
-	handler := WebhookHandler(secret, mockStore)
-
-	// Calculate correct signature
-	h := hmac.New(sha256.New, []byte(secret))
-	h.Write(body)
-	expectedSig := "v0=" + hex.EncodeToString(h.Sum(nil))
-
-	req := httptest.NewRequestWithContext(context.Background(), "POST", "/webhook", bytes.NewReader(body))
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("X-Strava-Signature", expectedSig)
-	w := httptest.NewRecorder()
-
-	handler.ServeHTTP(w, req)
-
-	if w.Code < 200 || w.Code >= 300 {
-		t.Errorf("expected 2xx status, got %d", w.Code)
-	}
-
-	if !mockStore.jobEnqueued {
-		t.Error("expected River job to be enqueued")
-	}
-}
-
-// Mock ActivityEventStore for testing
 type mockActivityEventStore struct {
+	userID      pgtype.UUID
+	resolveErr  error
+	enqueueErr  error
+	jobErr      error
+	params      sqlc.EnqueueActivityEventParams
 	enqueued    bool
 	jobEnqueued bool
 }
 
-func (m *mockActivityEventStore) EnqueueActivityEvent(ctx context.Context, arg sqlc.EnqueueActivityEventParams) (sqlc.ActivityEvent, error) {
+func newKnownAthleteStore() *mockActivityEventStore {
+	return &mockActivityEventStore{userID: testUserID()}
+}
+
+func testUserID() pgtype.UUID {
+	return pgtype.UUID{Bytes: [16]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16}, Valid: true}
+}
+
+func (m *mockActivityEventStore) GetUserIDByAthleteID(context.Context, int64) (pgtype.UUID, error) {
+	return m.userID, m.resolveErr
+}
+
+func (m *mockActivityEventStore) EnqueueActivityEvent(_ context.Context, arg sqlc.EnqueueActivityEventParams) (sqlc.ActivityEvent, error) {
 	m.enqueued = true
-	return sqlc.ActivityEvent{
-		ExternalID: arg.ExternalID,
-		UserID:     arg.UserID,
-		ObjectType: arg.ObjectType,
-		AspectType: arg.AspectType,
-		ObjectID:   arg.ObjectID,
-		RawPayload: arg.RawPayload,
-	}, nil
+	m.params = arg
+	return sqlc.ActivityEvent{ID: testUserID()}, m.enqueueErr
 }
 
-func (m *mockActivityEventStore) EnqueueRiverJob(ctx context.Context, jobArgs interface{}) error {
+func (m *mockActivityEventStore) EnqueueActivityEventJob(context.Context, string) error {
 	m.jobEnqueued = true
-	return nil
-}
-
-func (m *mockActivityEventStore) reset() {
-	m.enqueued = false
-	m.jobEnqueued = false
+	return m.jobErr
 }

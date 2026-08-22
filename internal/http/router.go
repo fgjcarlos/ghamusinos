@@ -36,8 +36,8 @@ type Server struct {
 	// lo provee app.Run; aquí lo aceptamos como interfaz para mantener
 	// la dirección del grafo (strava no importa jobs).
 	stravaEnqueuer strava.RiverEnqueuer
-	// Webhook store (opcional, fase 1.2 issue #86): para webhooks de Strava.
-	// Se monta antes del middleware de auth, es signature-gated.
+	// Webhook store (optional, phase 1.2 issue #86). Routes are mounted before
+	// authentication because Strava calls them directly.
 	webhookStore strava.ActivityEventStore
 	// GPX Lab dependencies are optional so focused router tests and commands that
 	// do not initialize the feature keep their existing construction path.
@@ -139,12 +139,11 @@ func (s *Server) Router() http.Handler {
 	// Readiness: refleja el estado real de la base de datos.
 	r.Get("/readyz", handlers.Readyz(s.pool))
 
-	// Strava webhooks (issue #86, fase 1.2): se monta ANTES del middleware de auth
-	// porque los webhooks se validan por firma HMAC-SHA256, no por Clerk JWT.
-	// Las rutas quedan fuera de /api para mantenerlas públicas.
+	// Strava webhooks are public because Strava calls them directly. The GET
+	// subscription handshake validates the configured verify token.
 	if s.webhookStore != nil && s.cfg.Strava != nil {
-		r.Get("/strava/webhook", strava.WebhookChallengeHandler("strava"))
-		r.Post("/strava/webhook", strava.WebhookHandler(s.cfg.Strava.WebhookSecret, s.webhookStore))
+		r.Get("/strava/webhook", strava.WebhookChallengeHandler(s.cfg.Strava.WebhookVerifyToken))
+		r.Post("/strava/webhook", strava.WebhookHandler(s.webhookStore))
 	}
 
 	// Strava OAuth callback (AUD-02, issue #163): también se monta FUERA de /api

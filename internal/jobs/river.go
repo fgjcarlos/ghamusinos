@@ -4,10 +4,13 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/fgjcarlos/ghamusinos/internal/db/sqlc"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/riverqueue/river"
 	"github.com/riverqueue/river/riverdriver/riverpgxv5"
+	"github.com/riverqueue/river/rivertype"
 )
 
 // NewClient creates a new River job queue client.
@@ -26,6 +29,9 @@ func NewClient(ctx context.Context, pool *pgxpool.Pool, d Deps, registerStravaWo
 		return nil, fmt.Errorf("jobs: register workers: %w", err)
 	}
 	client, err := river.NewClient[pgx.Tx](driver, &river.Config{
+		Queues: map[string]river.QueueConfig{
+			river.QueueDefault: {MaxWorkers: 10},
+		},
 		Workers: workers,
 	})
 	if err != nil {
@@ -33,6 +39,48 @@ func NewClient(ctx context.Context, pool *pgxpool.Pool, d Deps, registerStravaWo
 	}
 
 	return client, nil
+}
+
+// ActivityEventQueries is the SQLC subset required by the webhook adapter.
+type ActivityEventQueries interface {
+	GetUserIDByAthleteID(ctx context.Context, athleteID int64) (pgtype.UUID, error)
+	EnqueueActivityEvent(ctx context.Context, arg sqlc.EnqueueActivityEventParams) (sqlc.ActivityEvent, error)
+}
+
+// RiverJobInserter is the River subset required to enqueue webhook jobs.
+type RiverJobInserter interface {
+	Insert(ctx context.Context, args river.JobArgs, opts *river.InsertOpts) (*rivertype.JobInsertResult, error)
+}
+
+// ActivityEventStoreAdapter joins SQLC persistence and River enqueueing at the
+// production composition boundary without widening sqlc.Querier.
+type ActivityEventStoreAdapter struct {
+	queries ActivityEventQueries
+	river   RiverJobInserter
+}
+
+// NewActivityEventStoreAdapter builds the production Strava webhook store.
+func NewActivityEventStoreAdapter(queries ActivityEventQueries, riverClient RiverJobInserter) *ActivityEventStoreAdapter {
+	return &ActivityEventStoreAdapter{queries: queries, river: riverClient}
+}
+
+func (a *ActivityEventStoreAdapter) GetUserIDByAthleteID(ctx context.Context, athleteID int64) (pgtype.UUID, error) {
+	return a.queries.GetUserIDByAthleteID(ctx, athleteID)
+}
+
+func (a *ActivityEventStoreAdapter) EnqueueActivityEvent(ctx context.Context, arg sqlc.EnqueueActivityEventParams) (sqlc.ActivityEvent, error) {
+	return a.queries.EnqueueActivityEvent(ctx, arg)
+}
+
+func (a *ActivityEventStoreAdapter) EnqueueActivityEventJob(ctx context.Context, eventID string) error {
+	if a.river == nil {
+		return fmt.Errorf("jobs: ActivityEventStoreAdapter River client is nil")
+	}
+	_, err := a.river.Insert(ctx, &IngestActivityEventArgs{EventID: eventID}, nil)
+	if err != nil {
+		return fmt.Errorf("jobs: enqueue IngestActivityEventArgs: %w", err)
+	}
+	return nil
 }
 
 // RiverEnqueuerAdapter satisfies strava.RiverEnqueuer by delegating

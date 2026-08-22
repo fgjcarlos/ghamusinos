@@ -140,17 +140,8 @@ func TestIntegration_CreateInviteAndMarkAccepted(t *testing.T) {
 	})
 }
 
-// TestIntegration_ActivityEventEnqueueAndGet cubre las nuevas queries
-// añadidas en AUD-03 (issue #165), PR A: schema ampliado con
-// event_time, owner_id, subscription_id, y las queries
-// GetActivityEventByID + GetUserIDByAthleteID necesarias para el
-// handler (PR B) y el worker (PR C). El test verifica:
-//   - EnqueueActivityEvent inserta con event_time + owner_id.
-//   - GetActivityEventByID recupera por UUID interno.
-//   - Re-encolar el mismo (object_id, aspect_type, event_time) NO crea
-//     una segunda fila (idempotencia UNIQUE preservada por ahora vía
-//     external_id; el cambio a la UNIQUE real llega en PR B).
-//   - GetUserIDByAthleteID devuelve UUID válido para un atleta conocido.
+// TestIntegration_ActivityEventEnqueueAndGet verifies the real Strava event
+// shape, UUID lookup, athlete resolution, and natural-key idempotency.
 func TestIntegration_ActivityEventEnqueueAndGet(t *testing.T) {
 	pool := openTestDB(t)
 	q := sqlc.New(pool)
@@ -197,7 +188,6 @@ func TestIntegration_ActivityEventEnqueueAndGet(t *testing.T) {
 	// Encolar un evento con los campos del payload real.
 	eventTime := pgtype.Timestamptz{Time: time.Now().UTC().Truncate(time.Microsecond), Valid: true}
 	inserted, err := q.EnqueueActivityEvent(ctx, sqlc.EnqueueActivityEventParams{
-		ExternalID:     "evt_test_" + t.Name(),
 		UserID:         created.ID,
 		ObjectType:     "activity",
 		AspectType:     "create",
@@ -232,11 +222,8 @@ func TestIntegration_ActivityEventEnqueueAndGet(t *testing.T) {
 		t.Errorf("EventTime debería estar set, es NULL")
 	}
 
-	// Idempotencia por external_id (la UNIQUE actual sigue siendo esa;
-	// la migración a UNIQUE (object_id, aspect_type, event_time) llega
-	// en PR B). Re-encolando el mismo external_id NO crea segunda fila.
+	// Re-enqueuing the same natural event key must return the existing row.
 	if _, err := q.EnqueueActivityEvent(ctx, sqlc.EnqueueActivityEventParams{
-		ExternalID:     "evt_test_" + t.Name(),
 		UserID:         created.ID,
 		ObjectType:     "activity",
 		AspectType:     "create",
@@ -249,12 +236,13 @@ func TestIntegration_ActivityEventEnqueueAndGet(t *testing.T) {
 		t.Fatalf("EnqueueActivityEvent (retry): %v", err)
 	}
 	var count int
-	if err := pool.QueryRow(ctx, "SELECT count(*) FROM activity_events WHERE external_id = $1",
-		"evt_test_"+t.Name()).Scan(&count); err != nil {
+	if err := pool.QueryRow(ctx, `SELECT count(*) FROM activity_events
+		WHERE object_id = $1 AND aspect_type = $2 AND event_time = $3`,
+		int64(1234567890), "create", eventTime).Scan(&count); err != nil {
 		t.Fatalf("count: %v", err)
 	}
 	if count != 1 {
-		t.Errorf("idempotencia rota: %d filas con el mismo external_id, quería 1", count)
+		t.Errorf("natural-key idempotency broken: got %d rows, want 1", count)
 	}
 }
 

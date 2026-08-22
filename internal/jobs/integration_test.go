@@ -7,6 +7,8 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/riverqueue/river/riverdriver/riverpgxv5"
+	"github.com/riverqueue/river/rivermigrate"
 
 	"github.com/fgjcarlos/ghamusinos/internal/config"
 )
@@ -33,6 +35,7 @@ func TestRiverIntegration(t *testing.T) {
 		t.Fatalf("failed to connect to database: %v", err)
 	}
 	defer pool.Close()
+	migrateRiver(t, ctx, pool)
 
 	// Create the River client. AUD-04: pass Deps; registerStravaWorkers=false
 	// because integration tests don't have Strava credentials wired.
@@ -65,4 +68,15 @@ func TestRiverIntegration(t *testing.T) {
 
 	// Verify the job was enqueued (no error means success)
 	t.Logf("successfully enqueued stub job with ID: %d", insertRes.Job.ID)
+}
+
+func migrateRiver(t *testing.T, ctx context.Context, pool *pgxpool.Pool) {
+	t.Helper()
+	migrator, err := rivermigrate.New(riverpgxv5.New(pool), nil)
+	if err != nil {
+		t.Fatalf("create River migrator: %v", err)
+	}
+	if _, err := migrator.Migrate(ctx, rivermigrate.DirectionUp, nil); err != nil {
+		t.Fatalf("migrate River schema: %v", err)
+	}
 }

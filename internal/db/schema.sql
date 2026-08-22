@@ -87,30 +87,28 @@ CREATE TABLE activity_streams (
 );
 
 -- Inbox idempotente de webhooks Strava (AUD-03, issue #165).
--- Migración 00008 (PR A) añade event_time, owner_id, subscription_id
--- para reflejar el payload real de Strava:
+-- Migrations 00008 and 00009 align the inbox with the real Strava payload:
 --   (object_type, object_id, aspect_type, owner_id, event_time,
 --    subscription_id[, updates]).
--- external_id y la UNIQUE (external_id) son reliquia del modelo
--- anterior (Strava no envía external_id); las borra la migración 00009
--- que llega con el PR B (handler reescrito).
+-- Strava does not send external_id. Events are deduplicated by the natural
+-- (object_id, aspect_type, event_time) key.
 --   - owner_id: athlete_id de Strava; el handler resuelve user_id
 --     vía strava_tokens.athlete_id.
 --   - subscription_id: identifica la suscripción activa; útil para
 --     rotación de tokens/suscripciones.
 CREATE TABLE activity_events (
     id              UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
-    external_id     TEXT        NOT NULL UNIQUE,
     user_id         UUID        REFERENCES users(id) ON DELETE SET NULL,
     object_type     TEXT        NOT NULL,
     aspect_type     TEXT        NOT NULL,
     object_id       BIGINT      NOT NULL,
     owner_id        BIGINT,
     subscription_id BIGINT,
-    event_time      TIMESTAMPTZ,
+    event_time      TIMESTAMPTZ NOT NULL,
     received_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
     processed_at    TIMESTAMPTZ,
-    raw_payload     JSONB       NOT NULL DEFAULT '{}'::jsonb
+    raw_payload     JSONB       NOT NULL DEFAULT '{}'::jsonb,
+    UNIQUE (object_id, aspect_type, event_time)
 );
 
 CREATE INDEX idx_activity_events_pending ON activity_events (received_at) WHERE processed_at IS NULL;

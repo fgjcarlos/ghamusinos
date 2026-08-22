@@ -68,12 +68,11 @@ func (m *mockActivityInserter) UpsertActivity(ctx context.Context, arg sqlc.Upse
 
 type mockActivityEventLoader struct{}
 
-func (m *mockActivityEventLoader) GetActivityEventByExternalID(ctx context.Context, externalID string) (sqlc.ActivityEvent, error) {
+func (m *mockActivityEventLoader) GetActivityEventByID(ctx context.Context, id pgtype.UUID) (sqlc.ActivityEvent, error) {
 	return sqlc.ActivityEvent{
-		ID:         pgtype.UUID{Bytes: [16]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16}, Valid: true},
-		ExternalID: externalID,
-		UserID:     pgtype.UUID{Bytes: [16]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16}, Valid: true},
-		ObjectID:   12345,
+		ID:       id,
+		UserID:   pgtype.UUID{Bytes: [16]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16}, Valid: true},
+		ObjectID: 12345,
 	}, nil
 }
 
@@ -342,7 +341,7 @@ func TestIngestActivityEventWorker_Work_ProcessesEvent(t *testing.T) {
 		&mockStravaForRefresh{},
 	)
 
-	job := &river.Job[IngestActivityEventArgs]{Args: IngestActivityEventArgs{EventID: "webhook-event-123"}}
+	job := &river.Job[IngestActivityEventArgs]{Args: IngestActivityEventArgs{EventID: "01020304-0506-0708-090a-0b0c0d0e0f10"}}
 	err := worker.Work(context.Background(), job)
 	require.NoError(t, err, "IngestActivityEventWorker.Work() should process event without error")
 }
@@ -358,7 +357,7 @@ func TestIngestActivityEventWorker_Work_FetchesActivityDetail(t *testing.T) {
 		&mockStravaForRefresh{},
 	)
 
-	job := &river.Job[IngestActivityEventArgs]{Args: IngestActivityEventArgs{EventID: "webhook-event-456"}}
+	job := &river.Job[IngestActivityEventArgs]{Args: IngestActivityEventArgs{EventID: "01020304-0506-0708-090a-0b0c0d0e0f10"}}
 	err := worker.Work(context.Background(), job)
 	require.NoError(t, err, "IngestActivityEventWorker.Work() should fetch activity detail without error")
 }
@@ -374,7 +373,7 @@ func TestIngestActivityEventWorker_Work_MarksEventProcessed(t *testing.T) {
 		&mockStravaForRefresh{},
 	)
 
-	job := &river.Job[IngestActivityEventArgs]{Args: IngestActivityEventArgs{EventID: "webhook-event-789"}}
+	job := &river.Job[IngestActivityEventArgs]{Args: IngestActivityEventArgs{EventID: "01020304-0506-0708-090a-0b0c0d0e0f10"}}
 	err := worker.Work(context.Background(), job)
 	require.NoError(t, err, "IngestActivityEventWorker.Work() should mark event processed without error")
 }
