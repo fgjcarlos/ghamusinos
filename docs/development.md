@@ -88,6 +88,17 @@ Ver `.env.example`. Las principales:
 
 `govulncheck` (issue #23) corre con la base de datos oficial de vulnerabilidades de Go (`vuln.go.dev`); rompe la CI si alguna dep transitiva tiene un CVE conocido con fix disponible.
 
+### Binario descargable (job `release`)
+
+Existe un tercer job, `release`, que depende de `backend` y `frontend`. En un mismo runner:
+
+1. Compila el frontend (`pnpm --dir web build`) — si alguien se salta este paso, la build del binario sigue pero el smoke falla porque `/` devolvería el 503 de "frontend no construido".
+2. Compila el binario (`go build -o bin/ghamusinos ./cmd/ghamusinos`) con la SPA ya dentro vía `embed.FS`.
+3. Arranca el binario contra un Postgres real y ejecuta `scripts/smoke.sh`, que verifica que `/healthz` responde, que `/` y una ruta cliente (`/actividades`) sirven el `index.html` real, y que la cabecera `Content-Security-Policy` está presente.
+4. Sube `bin/ghamusinos` como artefacto `ghamusinos-linux-amd64` (retención 14 días).
+
+Para probarlo sin clonar el repo: abrir la página de la run del job `release` en GitHub Actions y bajar el artefacto. Es el mismo binario que la SPA embebida y, por tanto, el que se desplegaría. Sin firma ni SBOM todavía — eso entra cuando haya releases que publicar.
+
 ## Flujo de trabajo con ramas y PRs
 
 El repo sigue una disciplina estricta para evitar acumulación de ramas muertas:
