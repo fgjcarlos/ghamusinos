@@ -13,6 +13,7 @@ func TestLoad_FailsWithoutDatabaseURL(t *testing.T) {
 	t.Setenv("DATABASE_URL", "")
 	t.Setenv("ENV", "production") // evita que cargue .env en disco
 	t.Setenv("CLERK_JWKS_URL", "https://clerk.example.com/jwks")
+	t.Setenv("CLERK_ISSUER", "https://clerk.example.com")
 	// Limpiamos también las vars del pool y Strava para que no contaminen este test.
 	unsetPoolEnv(t)
 	unsetStravaEnv(t)
@@ -28,6 +29,7 @@ func TestLoad_DefaultValues(t *testing.T) {
 	t.Setenv("ENV", "production")
 	t.Setenv("PORT", "")
 	t.Setenv("CLERK_JWKS_URL", "https://clerk.example.com/jwks")
+	t.Setenv("CLERK_ISSUER", "https://clerk.example.com")
 	unsetPoolEnv(t)
 	unsetStravaEnv(t)
 
@@ -49,6 +51,7 @@ func TestLoad_RespectsEnvValues(t *testing.T) {
 	t.Setenv("ENV", "production")
 	t.Setenv("PORT", "9090")
 	t.Setenv("CLERK_JWKS_URL", "https://clerk.example.com/jwks")
+	t.Setenv("CLERK_ISSUER", "https://clerk.example.com")
 	unsetPoolEnv(t)
 	unsetStravaEnv(t)
 
@@ -72,6 +75,7 @@ func TestLoad_EnvDefaultIsDevelopment(t *testing.T) {
 	t.Setenv("DATABASE_URL", "postgres://test:test@localhost/test")
 	t.Setenv("ENV", "")
 	t.Setenv("CLERK_JWKS_URL", "https://clerk.example.com/jwks")
+	t.Setenv("CLERK_ISSUER", "https://clerk.example.com")
 	unsetPoolEnv(t)
 	unsetStravaEnv(t)
 
@@ -90,6 +94,7 @@ func TestLoad_PoolDefaults(t *testing.T) {
 	t.Setenv("DATABASE_URL", "postgres://test:test@localhost/test")
 	t.Setenv("ENV", "production")
 	t.Setenv("CLERK_JWKS_URL", "https://clerk.example.com/jwks")
+	t.Setenv("CLERK_ISSUER", "https://clerk.example.com")
 	unsetPoolEnv(t)
 	unsetStravaEnv(t)
 
@@ -110,6 +115,7 @@ func TestLoad_PoolEnvOverrides(t *testing.T) {
 	t.Setenv("DATABASE_URL", "postgres://test:test@localhost/test")
 	t.Setenv("ENV", "production")
 	t.Setenv("CLERK_JWKS_URL", "https://clerk.example.com/jwks")
+	t.Setenv("CLERK_ISSUER", "https://clerk.example.com")
 	unsetPoolEnv(t)
 	unsetStravaEnv(t)
 
@@ -145,6 +151,7 @@ func TestLoad_PoolInvalidInt(t *testing.T) {
 	t.Setenv("DATABASE_URL", "postgres://test:test@localhost/test")
 	t.Setenv("ENV", "production")
 	t.Setenv("CLERK_JWKS_URL", "https://clerk.example.com/jwks")
+	t.Setenv("CLERK_ISSUER", "https://clerk.example.com")
 	unsetPoolEnv(t)
 	unsetStravaEnv(t)
 
@@ -165,6 +172,7 @@ func TestLoad_PoolInvalidDuration(t *testing.T) {
 	t.Setenv("DATABASE_URL", "postgres://test:test@localhost/test")
 	t.Setenv("ENV", "production")
 	t.Setenv("CLERK_JWKS_URL", "https://clerk.example.com/jwks")
+	t.Setenv("CLERK_ISSUER", "https://clerk.example.com")
 	unsetPoolEnv(t)
 	unsetStravaEnv(t)
 
@@ -185,6 +193,7 @@ func TestLoad_PoolInvalidMaxConns(t *testing.T) {
 	t.Setenv("DATABASE_URL", "postgres://test:test@localhost/test")
 	t.Setenv("ENV", "production")
 	t.Setenv("CLERK_JWKS_URL", "https://clerk.example.com/jwks")
+	t.Setenv("CLERK_ISSUER", "https://clerk.example.com")
 	unsetPoolEnv(t)
 	unsetStravaEnv(t)
 
@@ -205,6 +214,7 @@ func TestLoad_PoolMinGreaterThanMax(t *testing.T) {
 	t.Setenv("DATABASE_URL", "postgres://test:test@localhost/test")
 	t.Setenv("ENV", "production")
 	t.Setenv("CLERK_JWKS_URL", "https://clerk.example.com/jwks")
+	t.Setenv("CLERK_ISSUER", "https://clerk.example.com")
 	unsetPoolEnv(t)
 	unsetStravaEnv(t)
 
@@ -226,6 +236,7 @@ func TestLoad_PoolConnectTimeoutRequired(t *testing.T) {
 	t.Setenv("DATABASE_URL", "postgres://test:test@localhost/test")
 	t.Setenv("ENV", "production")
 	t.Setenv("CLERK_JWKS_URL", "https://clerk.example.com/jwks")
+	t.Setenv("CLERK_ISSUER", "https://clerk.example.com")
 	unsetPoolEnv(t)
 	unsetStravaEnv(t)
 
@@ -270,11 +281,32 @@ func TestLoad_ClerkJWKSURLRequired(t *testing.T) {
 	}
 }
 
+// TestLoad_ClerkIssuerRequired verifica que CLERK_ISSUER es obligatoria
+// (issue #167). Sin el emisor, un token firmado por cualquier clave del
+// JWKS configurado entraría sin pertenecer al tenant.
+func TestLoad_ClerkIssuerRequired(t *testing.T) {
+	t.Setenv("DATABASE_URL", "postgres://test:test@localhost/test")
+	t.Setenv("ENV", "production")
+	t.Setenv("CLERK_JWKS_URL", "https://clerk.example.com/jwks")
+	// CLERK_ISSUER deliberadamente ausente.
+	unsetPoolEnv(t)
+	unsetStravaEnv(t)
+
+	_, err := Load()
+	if err == nil {
+		t.Fatal("Load() debería fallar cuando CLERK_ISSUER está vacía")
+	}
+	if !strings.Contains(err.Error(), "CLERK_ISSUER") {
+		t.Errorf("error = %q, debería mencionar CLERK_ISSUER", err)
+	}
+}
+
 // TestLoad_ClerkConfigValues verifica que CLERK_JWKS_URL y CLERK_AUDIENCE se leen correctamente.
 func TestLoad_ClerkConfigValues(t *testing.T) {
 	t.Setenv("DATABASE_URL", "postgres://test:test@localhost/test")
 	t.Setenv("ENV", "production")
 	t.Setenv("CLERK_JWKS_URL", "https://clerk.example.com/.well-known/jwks.json")
+	t.Setenv("CLERK_ISSUER", "https://clerk.example.com")
 	t.Setenv("CLERK_AUDIENCE", "my-app-prod")
 	unsetPoolEnv(t)
 	unsetStravaEnv(t)
@@ -297,6 +329,7 @@ func TestLoad_ClerkAudienceOptional(t *testing.T) {
 	t.Setenv("DATABASE_URL", "postgres://test:test@localhost/test")
 	t.Setenv("ENV", "production")
 	t.Setenv("CLERK_JWKS_URL", "https://clerk.example.com/.well-known/jwks.json")
+	t.Setenv("CLERK_ISSUER", "https://clerk.example.com")
 	t.Setenv("CLERK_AUDIENCE", "")
 	unsetPoolEnv(t)
 	unsetStravaEnv(t)
@@ -322,6 +355,7 @@ func TestLoad_StravaConfigNilWhenMissing(t *testing.T) {
 	t.Setenv("DATABASE_URL", "postgres://test:test@localhost/test")
 	t.Setenv("ENV", "production")
 	t.Setenv("CLERK_JWKS_URL", "https://clerk.example.com/jwks")
+	t.Setenv("CLERK_ISSUER", "https://clerk.example.com")
 	unsetPoolEnv(t)
 	unsetStravaEnv(t)
 
@@ -338,6 +372,7 @@ func TestLoad_StravaConfigNilWhenOnlyIDSet(t *testing.T) {
 	t.Setenv("DATABASE_URL", "postgres://test:test@localhost/test")
 	t.Setenv("ENV", "production")
 	t.Setenv("CLERK_JWKS_URL", "https://clerk.example.com/jwks")
+	t.Setenv("CLERK_ISSUER", "https://clerk.example.com")
 	unsetPoolEnv(t)
 	unsetStravaEnv(t)
 	t.Setenv("STRAVA_CLIENT_ID", "12345")
@@ -356,6 +391,7 @@ func TestLoad_StravaConfigPopulated(t *testing.T) {
 	t.Setenv("DATABASE_URL", "postgres://test:test@localhost/test")
 	t.Setenv("ENV", "production")
 	t.Setenv("CLERK_JWKS_URL", "https://clerk.example.com/jwks")
+	t.Setenv("CLERK_ISSUER", "https://clerk.example.com")
 	unsetPoolEnv(t)
 	unsetStravaEnv(t)
 
@@ -396,6 +432,7 @@ func TestLoad_StravaConfigDefaultScopes(t *testing.T) {
 	t.Setenv("DATABASE_URL", "postgres://test:test@localhost/test")
 	t.Setenv("ENV", "production")
 	t.Setenv("CLERK_JWKS_URL", "https://clerk.example.com/jwks")
+	t.Setenv("CLERK_ISSUER", "https://clerk.example.com")
 	unsetPoolEnv(t)
 	unsetStravaEnv(t)
 
@@ -418,6 +455,7 @@ func TestLoad_StravaConfigRequiresCipherKey(t *testing.T) {
 	t.Setenv("DATABASE_URL", "postgres://test:test@localhost/test")
 	t.Setenv("ENV", "production")
 	t.Setenv("CLERK_JWKS_URL", "https://clerk.example.com/jwks")
+	t.Setenv("CLERK_ISSUER", "https://clerk.example.com")
 	unsetPoolEnv(t)
 	unsetStravaEnv(t)
 	t.Setenv("STRAVA_CLIENT_ID", "id")
@@ -434,6 +472,7 @@ func TestLoad_StravaConfigRequiresWebhookVerifyToken(t *testing.T) {
 	t.Setenv("DATABASE_URL", "postgres://test:test@localhost/test")
 	t.Setenv("ENV", "production")
 	t.Setenv("CLERK_JWKS_URL", "https://clerk.example.com/jwks")
+	t.Setenv("CLERK_ISSUER", "https://clerk.example.com")
 	unsetPoolEnv(t)
 	unsetStravaEnv(t)
 	t.Setenv("STRAVA_CLIENT_ID", "id")
@@ -450,6 +489,7 @@ func TestLoad_StravaConfigInvalidBase64CipherKey(t *testing.T) {
 	t.Setenv("DATABASE_URL", "postgres://test:test@localhost/test")
 	t.Setenv("ENV", "production")
 	t.Setenv("CLERK_JWKS_URL", "https://clerk.example.com/jwks")
+	t.Setenv("CLERK_ISSUER", "https://clerk.example.com")
 	unsetPoolEnv(t)
 	unsetStravaEnv(t)
 	t.Setenv("STRAVA_CLIENT_ID", "id")
@@ -466,6 +506,7 @@ func TestLoad_StravaConfigInvalidCipherKeyLength(t *testing.T) {
 	t.Setenv("DATABASE_URL", "postgres://test:test@localhost/test")
 	t.Setenv("ENV", "production")
 	t.Setenv("CLERK_JWKS_URL", "https://clerk.example.com/jwks")
+	t.Setenv("CLERK_ISSUER", "https://clerk.example.com")
 	unsetPoolEnv(t)
 	unsetStravaEnv(t)
 	t.Setenv("STRAVA_CLIENT_ID", "id")
@@ -561,6 +602,7 @@ func TestLoad_PortNonNumericFails(t *testing.T) {
 	t.Setenv("DATABASE_URL", "postgres://test:***@localhost/test")
 	t.Setenv("ENV", "production")
 	t.Setenv("CLERK_JWKS_URL", "https://clerk.example.com/jwks")
+	t.Setenv("CLERK_ISSUER", "https://clerk.example.com")
 	unsetPoolEnv(t)
 	unsetStravaEnv(t)
 	t.Setenv("PORT", "abc")
@@ -578,6 +620,7 @@ func TestLoad_PortOutOfRangeFails(t *testing.T) {
 	t.Setenv("DATABASE_URL", "postgres://test:***@localhost/test")
 	t.Setenv("ENV", "production")
 	t.Setenv("CLERK_JWKS_URL", "https://clerk.example.com/jwks")
+	t.Setenv("CLERK_ISSUER", "https://clerk.example.com")
 	unsetPoolEnv(t)
 	unsetStravaEnv(t)
 	t.Setenv("PORT", "99999")
@@ -595,6 +638,7 @@ func TestLoad_TrustedProxiesDefaultEmpty(t *testing.T) {
 	t.Setenv("DATABASE_URL", "postgres://test:***@localhost/test")
 	t.Setenv("ENV", "production")
 	t.Setenv("CLERK_JWKS_URL", "https://clerk.example.com/jwks")
+	t.Setenv("CLERK_ISSUER", "https://clerk.example.com")
 	unsetPoolEnv(t)
 	unsetStravaEnv(t)
 	t.Setenv("TRUSTED_PROXIES", "")
@@ -612,6 +656,7 @@ func TestLoad_TrustedProxiesParsed(t *testing.T) {
 	t.Setenv("DATABASE_URL", "postgres://test:***@localhost/test")
 	t.Setenv("ENV", "production")
 	t.Setenv("CLERK_JWKS_URL", "https://clerk.example.com/jwks")
+	t.Setenv("CLERK_ISSUER", "https://clerk.example.com")
 	unsetPoolEnv(t)
 	unsetStravaEnv(t)
 	t.Setenv("TRUSTED_PROXIES", "10.0.0.0/8,127.0.0.1/32")
@@ -635,6 +680,7 @@ func TestLoad_SecurityHeadersDefaults(t *testing.T) {
 	t.Setenv("DATABASE_URL", "postgres://test:***@localhost/test")
 	t.Setenv("ENV", "production")
 	t.Setenv("CLERK_JWKS_URL", "https://clerk.example.com/jwks")
+	t.Setenv("CLERK_ISSUER", "https://clerk.example.com")
 	unsetPoolEnv(t)
 	unsetStravaEnv(t)
 	t.Setenv("SECURITY_HSTS_ENABLED", "")
@@ -659,6 +705,7 @@ func TestLoad_SecurityHeadersHSTSEnabled(t *testing.T) {
 	t.Setenv("DATABASE_URL", "postgres://test:***@localhost/test")
 	t.Setenv("ENV", "production")
 	t.Setenv("CLERK_JWKS_URL", "https://clerk.example.com/jwks")
+	t.Setenv("CLERK_ISSUER", "https://clerk.example.com")
 	unsetPoolEnv(t)
 	unsetStravaEnv(t)
 	t.Setenv("SECURITY_HSTS_ENABLED", "true")
@@ -680,6 +727,7 @@ func TestLoad_MaxBodyBytesOverride(t *testing.T) {
 	t.Setenv("DATABASE_URL", "postgres://test:***@localhost/test")
 	t.Setenv("ENV", "production")
 	t.Setenv("CLERK_JWKS_URL", "https://clerk.example.com/jwks")
+	t.Setenv("CLERK_ISSUER", "https://clerk.example.com")
 	unsetPoolEnv(t)
 	unsetStravaEnv(t)
 	t.Setenv("MAX_BODY_BYTES", "5242880")
@@ -697,6 +745,7 @@ func TestLoad_MaxBodyBytesInvalidFallsBackToDefault(t *testing.T) {
 	t.Setenv("DATABASE_URL", "postgres://test:***@localhost/test")
 	t.Setenv("ENV", "production")
 	t.Setenv("CLERK_JWKS_URL", "https://clerk.example.com/jwks")
+	t.Setenv("CLERK_ISSUER", "https://clerk.example.com")
 	unsetPoolEnv(t)
 	unsetStravaEnv(t)
 	t.Setenv("MAX_BODY_BYTES", "esto no es un número")
@@ -718,6 +767,7 @@ func TestLoad_AuthDisabledDefaultsFalse(t *testing.T) {
 	t.Setenv("DATABASE_URL", "postgres://test:***@localhost/test")
 	t.Setenv("ENV", "production")
 	t.Setenv("CLERK_JWKS_URL", "https://clerk.example.com/jwks")
+	t.Setenv("CLERK_ISSUER", "https://clerk.example.com")
 	unsetPoolEnv(t)
 	unsetStravaEnv(t)
 	t.Setenv("AUTH_DISABLED", "")
@@ -738,6 +788,7 @@ func TestLoad_AuthDisabledTruthyValues(t *testing.T) {
 			t.Setenv("DATABASE_URL", "postgres://test:***@localhost/test")
 			t.Setenv("ENV", "production")
 			t.Setenv("CLERK_JWKS_URL", "https://clerk.example.com/jwks")
+	t.Setenv("CLERK_ISSUER", "https://clerk.example.com")
 			unsetPoolEnv(t)
 			unsetStravaEnv(t)
 			t.Setenv("AUTH_DISABLED", v)

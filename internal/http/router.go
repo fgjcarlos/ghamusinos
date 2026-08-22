@@ -164,7 +164,7 @@ func (s *Server) Router() http.Handler {
 	r.Route("/api", func(r chi.Router) {
 		// Wire auth middleware for ALL /api routes
 		jwksCache := auth.NewJWKSCache(s.cfg.ClerkJWKSURL, time.Hour)
-		validator := auth.NewJWTValidator(jwksCache, s.cfg.ClerkAudience)
+		validator := auth.NewJWTValidator(jwksCache, s.cfg.ClerkIssuer, s.cfg.ClerkAudience)
 		resolver := auth.NewUserResolver(s.queries)
 
 		if s.cfg.AuthDisabled {
