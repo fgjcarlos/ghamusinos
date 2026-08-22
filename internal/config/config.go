@@ -39,6 +39,10 @@ type Config struct {
 	Pool db.PoolConfig
 	// ClerkJWKSURL es la URL del endpoint JWKS para verificar firmas JWT de Clerk (obligatoria).
 	ClerkJWKSURL string
+	// ClerkIssuer es el emisor esperado del claim 'iss' en Clerk JWTs (obligatorio).
+	// Validar el emisor es la única forma de impedir que un token firmado por
+	// una clave del JWKS configurado entre sin pertenecer al tenant. Issue #167.
+	ClerkIssuer string
 	// ClerkAudience es el valor esperado del claim 'aud' en Clerk JWTs (opcional).
 	ClerkAudience string
 	// FrontendURL es la URL base del frontend para redirecciones OAuth (default http://localhost:5173).
@@ -114,6 +118,7 @@ func Load() (*Config, error) {
 		DatabaseURL:    os.Getenv("DATABASE_URL"),
 		Pool:           pool,
 		ClerkJWKSURL:   os.Getenv("CLERK_JWKS_URL"),
+		ClerkIssuer:    os.Getenv("CLERK_ISSUER"),
 		ClerkAudience:  getEnv("CLERK_AUDIENCE", ""),
 		FrontendURL:    getEnv("FRONTEND_URL", "http://localhost:5173"),
 		TrustedProxies: parseTrustedProxies(os.Getenv("TRUSTED_PROXIES")),
@@ -130,6 +135,9 @@ func Load() (*Config, error) {
 	}
 	if cfg.ClerkJWKSURL == "" {
 		return nil, errors.New("config: CLERK_JWKS_URL es obligatoria y está vacía")
+	}
+	if cfg.ClerkIssuer == "" {
+		return nil, errors.New("config: CLERK_ISSUER es obligatoria y está vacía")
 	}
 	// PORT debe ser un entero válido entre 1 y 65535 (issue #34).
 	// Sin esta validación, PORT="abc" pasaba sin error y luego fallaba

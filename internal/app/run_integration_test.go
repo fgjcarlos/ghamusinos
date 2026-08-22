@@ -35,6 +35,7 @@ func TestRunProductionCompositionStartsWorkersAndMountsWebhooks(t *testing.T) {
 	t.Setenv("PORT", port)
 	t.Setenv("DATABASE_URL", databaseURL)
 	t.Setenv("CLERK_JWKS_URL", "https://clerk.example.invalid/jwks")
+	t.Setenv("CLERK_ISSUER", "https://clerk.example.invalid")
 	t.Setenv("STRAVA_CLIENT_ID", "production-composition-client")
 	t.Setenv("STRAVA_CLIENT_SECRET", "production-composition-secret")
 	t.Setenv("STRAVA_CIPHER_KEY", base64.StdEncoding.EncodeToString(make([]byte, 32)))

@@ -67,9 +67,11 @@ fetch_headers() {
 
 DATABASE_URL="${DATABASE_URL:?smoke: DATABASE_URL es obligatoria}"
 CLERK_JWKS_URL="${CLERK_JWKS_URL:-https://clerk.example.invalid/jwks}"
+CLERK_ISSUER="${CLERK_ISSUER:-https://clerk.example.invalid}"
 
 DATABASE_URL="$DATABASE_URL" \
 CLERK_JWKS_URL="$CLERK_JWKS_URL" \
+CLERK_ISSUER="$CLERK_ISSUER" \
 PORT="$PORT" \
 "$BINARY" >"$LOG" 2>&1 &
 PID=$!
