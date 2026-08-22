@@ -29,13 +29,19 @@ const shutdownTimeout = 10 * time.Second
 // recibe una señal de apagado (SIGINT/SIGTERM), momento en el que hace un
 // shutdown ordenado para ambos.
 func Run() error {
+	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	defer stop()
+
+	return run(ctx)
+}
+
+// run contains the production composition behind a cancellable context so the
+// binary wiring can be exercised without sending a process-wide signal.
+func run(ctx context.Context) error {
 	cfg, err := config.Load()
 	if err != nil {
 		return err
 	}
-
-	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
-	defer stop()
 
 	pool, err := db.Connect(ctx, cfg.DatabaseURL, cfg.Pool)
 	if err != nil {
@@ -44,6 +50,7 @@ func Run() error {
 	defer pool.Close()
 
 	slog.Info("conexión a base de datos establecida")
+	queries := sqlc.New(pool)
 
 	// Initialize River client for job queue. AUD-04 (issue #164): the workers
 	// are constructed from a Deps bundle instead of package globals; NewClient
@@ -61,6 +68,7 @@ func Run() error {
 	// working" that blocked the dev smoke test on a Strava-less instance.
 	var riverClient *river.Client[pgx.Tx]
 	var stravaEnqueuer *jobs.RiverEnqueuerAdapter
+	var webhookStore strava.ActivityEventStore
 	if cfg.Strava != nil {
 		var stravaForWorkers *strava.Client
 		var cipherForWorkers []byte
@@ -92,6 +100,7 @@ func Run() error {
 		// Se construye aquí (no en buildRouter) porque necesita el *river.Client
 		// que acabamos de crear; buildRouter solo recibe la Server.
 		stravaEnqueuer = &jobs.RiverEnqueuerAdapter{Client: riverClient}
+		webhookStore = jobs.NewActivityEventStoreAdapter(queries, riverClient)
 		defer func() {
 			shutdownCtx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
 			defer cancel()
@@ -105,11 +114,10 @@ func Run() error {
 		slog.Info("River job queue deshabilitado (sin STRAVA_CLIENT_ID/SECRET); API-only mode")
 	}
 
-	queries := sqlc.New(pool)
 	addr := ":" + cfg.Port
 	srv := &http.Server{
 		Addr:              addr,
-		Handler:           buildRouter(cfg, pool, queries, stravaEnqueuer),
+		Handler:           buildRouter(cfg, pool, queries, stravaEnqueuer, webhookStore),
 		ReadHeaderTimeout: 5 * time.Second,
 		ReadTimeout:       15 * time.Second,
 		WriteTimeout:      15 * time.Second,
@@ -158,7 +166,7 @@ func Run() error {
 // production when cfg.Strava != nil because app.Run wires it before
 // calling buildRouter; in dev (Strava disabled) it is nil and the
 // OAuth callback is not mounted, so the seam stays nil-safe.
-func buildRouter(cfg *config.Config, pool *pgxpool.Pool, queries sqlc.Querier, stravaEnqueuer strava.RiverEnqueuer) http.Handler {
+func buildRouter(cfg *config.Config, pool *pgxpool.Pool, queries sqlc.Querier, stravaEnqueuer strava.RiverEnqueuer, webhookStore strava.ActivityEventStore) http.Handler {
 	server := apphttp.NewServer(pool, queries, cfg)
 	server.WithGPX(
 		gpx.NewTransactionalSQLCStore(pool),
@@ -186,6 +194,9 @@ func buildRouter(cfg *config.Config, pool *pgxpool.Pool, queries sqlc.Querier, s
 		} else {
 			store := strava.NewSQLCTokenStore(queries)
 			server.WithStrava(stravaClient, store, stravaEnqueuer, cfg.Strava.CipherKey)
+			if webhookStore != nil {
+				server.WithWebhooks(webhookStore)
+			}
 			slog.Info("strava: rutas OAuth habilitadas", "redirect", cfg.Strava.RedirectURL)
 		}
 	}

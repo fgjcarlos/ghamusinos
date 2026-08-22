@@ -42,7 +42,7 @@ type ActivityInserter interface {
 
 // ActivityEventLoader defines the interface for loading activity events from the database.
 type ActivityEventLoader interface {
-	GetActivityEventByExternalID(ctx context.Context, externalID string) (sqlc.ActivityEvent, error)
+	GetActivityEventByID(ctx context.Context, id pgtype.UUID) (sqlc.ActivityEvent, error)
 	MarkActivityEventProcessed(ctx context.Context, id pgtype.UUID) error
 }
 

@@ -18,11 +18,7 @@ type Querier interface {
 	CreateUser(ctx context.Context, arg CreateUserParams) (User, error)
 	// Limpia los tokens del usuario (logout / desvinculación).
 	DeleteStravaTokensByUserID(ctx context.Context, userID pgtype.UUID) error
-	// Encola un evento de Strava (webhook). Devuelve la fila; si la
-	// terna (object_id, aspect_type, event_time) ya existe, devuelve la
-	// fila previa sin error (idempotencia). Los callers distinguen
-	// "nuevo" vs "ya visto" por received_at o vía INSERT ...
-	// ON CONFLICT DO NOTHING RETURNING (cuando lo necesites).
+	// Return the existing row when Strava retries the same natural event key.
 	EnqueueActivityEvent(ctx context.Context, arg EnqueueActivityEventParams) (ActivityEvent, error)
 	// Devuelve la invitación vigente para un email dado.
 	// "Vigente" significa: status pending o accepted, y no expirada
@@ -34,9 +30,7 @@ type Querier interface {
 	// Búsqueda idempotente por (usuario, fuente, id externo). Es la operación
 	// central de la deduplicación: si existe, se actualiza; si no, se inserta.
 	GetActivityByExternalID(ctx context.Context, arg GetActivityByExternalIDParams) (Activity, error)
-	// Recupera un evento de actividad por su UUID interno. Lo usa
-	// IngestActivityEventWorker.Work: el handler encola por POST y el
-	// worker carga por el ID que se pasó en IngestActivityEventArgs.
+	// Load an event by the internal UUID passed to IngestActivityEventWorker.
 	GetActivityEventByID(ctx context.Context, id pgtype.UUID) (ActivityEvent, error)
 	GetHRZonesByActivity(ctx context.Context, activityID pgtype.UUID) (HrZone, error)
 	GetInviteByTokenHash(ctx context.Context, tokenHash string) (Invite, error)
@@ -47,10 +41,8 @@ type Querier interface {
 	GetUserByClerkID(ctx context.Context, clerkUserID string) (User, error)
 	// Obtiene el hr_max del usuario para cálculos de zonas HR.
 	GetUserHRMaxByID(ctx context.Context, id pgtype.UUID) (pgtype.Int2, error)
-	// Resuelve el user_id interno desde el athlete_id (BIGINT) de Strava.
-	// Si el atleta no ha vinculado Strava con nuestra app, devuelve
-	// pgtype.UUID sin Valid=true (el handler lo trata como "no conozco
-	// a este atleta" y responde 200 sin encolar).
+	// The scalar subquery always returns one row. An unknown athlete therefore
+	// scans as pgtype.UUID{Valid:false} rather than pgx.ErrNoRows.
 	GetUserIDByAthleteID(ctx context.Context, athleteID int64) (pgtype.UUID, error)
 	// Lista paginada de actividades del usuario, ordenadas de más reciente a
 	// más antigua. El LIMIT es por la query (no cursor) porque el uso esperado

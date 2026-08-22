@@ -364,7 +364,7 @@ func TestLoad_StravaConfigPopulated(t *testing.T) {
 	t.Setenv("STRAVA_REDIRECT_URL", "http://localhost/callback")
 	t.Setenv("STRAVA_SCOPES", "read")
 	t.Setenv("STRAVA_CIPHER_KEY", stravaKeyB64)
-	t.Setenv("STRAVA_WEBHOOK_SECRET", "webhook-secret-123")
+	t.Setenv("STRAVA_WEBHOOK_VERIFY_TOKEN", "verify-token-123")
 
 	cfg, err := Load()
 	if err != nil {
@@ -387,8 +387,8 @@ func TestLoad_StravaConfigPopulated(t *testing.T) {
 	if len(cfg.Strava.CipherKey) != len(decoded) {
 		t.Errorf("CipherKey len = %d, quería %d", len(cfg.Strava.CipherKey), len(decoded))
 	}
-	if cfg.Strava.WebhookSecret != "webhook-secret-123" {
-		t.Errorf("WebhookSecret = %q, quería 'webhook-secret-123'", cfg.Strava.WebhookSecret)
+	if cfg.Strava.WebhookVerifyToken != "verify-token-123" {
+		t.Errorf("WebhookVerifyToken = %q, want 'verify-token-123'", cfg.Strava.WebhookVerifyToken)
 	}
 }
 
@@ -402,7 +402,7 @@ func TestLoad_StravaConfigDefaultScopes(t *testing.T) {
 	t.Setenv("STRAVA_CLIENT_ID", "id")
 	t.Setenv("STRAVA_CLIENT_SECRET", "secret")
 	t.Setenv("STRAVA_CIPHER_KEY", stravaKeyB64)
-	t.Setenv("STRAVA_WEBHOOK_SECRET", "webhook-secret")
+	t.Setenv("STRAVA_WEBHOOK_VERIFY_TOKEN", "verify-token")
 	// STRAVA_SCOPES no se setea → debe caer al default.
 
 	cfg, err := Load()
@@ -427,6 +427,22 @@ func TestLoad_StravaConfigRequiresCipherKey(t *testing.T) {
 	_, err := Load()
 	if err == nil || !strings.Contains(err.Error(), "STRAVA_CIPHER_KEY") {
 		t.Fatalf("err = %v, esperaba error mencionando STRAVA_CIPHER_KEY", err)
+	}
+}
+
+func TestLoad_StravaConfigRequiresWebhookVerifyToken(t *testing.T) {
+	t.Setenv("DATABASE_URL", "postgres://test:test@localhost/test")
+	t.Setenv("ENV", "production")
+	t.Setenv("CLERK_JWKS_URL", "https://clerk.example.com/jwks")
+	unsetPoolEnv(t)
+	unsetStravaEnv(t)
+	t.Setenv("STRAVA_CLIENT_ID", "id")
+	t.Setenv("STRAVA_CLIENT_SECRET", "secret")
+	t.Setenv("STRAVA_CIPHER_KEY", stravaKeyB64)
+
+	_, err := Load()
+	if err == nil || !strings.Contains(err.Error(), "STRAVA_WEBHOOK_VERIFY_TOKEN") {
+		t.Fatalf("err = %v, want an error mentioning STRAVA_WEBHOOK_VERIFY_TOKEN", err)
 	}
 }
 
@@ -492,6 +508,7 @@ func unsetStravaEnv(t *testing.T) {
 		"STRAVA_REDIRECT_URL",
 		"STRAVA_SCOPES",
 		"STRAVA_CIPHER_KEY",
+		"STRAVA_WEBHOOK_VERIFY_TOKEN",
 	} {
 		t.Setenv(k, "")
 	}

@@ -19,15 +19,20 @@
 package app
 
 import (
+	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/http/httptest"
 	"sort"
 	"testing"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/stretchr/testify/require"
 
 	"github.com/fgjcarlos/ghamusinos/internal/config"
+	"github.com/fgjcarlos/ghamusinos/internal/db/sqlc"
 )
 
 // collectRoutes walks the chi router and returns a sorted slice of
@@ -54,7 +59,7 @@ func TestBuildRouter_DefaultRoutesAreWired(t *testing.T) {
 	cfg := &config.Config{
 		ClerkJWKSURL: "https://clerk.example.com/jwks",
 	}
-	h := buildRouter(cfg, nil, nil, nil)
+	h := buildRouter(cfg, nil, nil, nil, nil)
 
 	got := collectRoutes(t, h)
 
@@ -85,53 +90,72 @@ func TestBuildRouter_DefaultRoutesAreWired(t *testing.T) {
 	require.Equal(t, want, got, "route list drifted; check router.go for new/changed/deleted routes and update the list in this test")
 }
 
-// TestBuildRouter_StravaOptionalRoutesWhenConfigured verifies the conditional
-// wiring: when cfg.Strava is fully populated, the Strava OAuth routes appear;
-// when it is nil, they do not. The two preceding tests cover the "Strava nil"
-// side, this test covers the populated side.
-//
-// Note: /strava/webhook is intentionally NOT in this list. buildRouter does
-// not call WithWebhooks, so the webhook routes are unreachable from production
-// even when Strava is configured — see audit finding C3 and issue #165.
-func TestBuildRouter_StravaOptionalRoutesWhenConfigured(t *testing.T) {
+// TestBuildRouterMountsEveryRoute pins the complete production route tree with
+// every optional Strava dependency enabled. The expected list is deliberately
+// hand-maintained: adding or removing any mounted route requires an explicit
+// review of this contract.
+func TestBuildRouterMountsEveryRoute(t *testing.T) {
 	cfg := &config.Config{
 		ClerkJWKSURL: "https://clerk.example.com/jwks",
 		Strava: &config.StravaConfig{
-			ClientID:     "12345",
-			ClientSecret: "secret",
-			RedirectURL:  "http://localhost/cb",
-			Scopes:       "read",
-			CipherKey:    bytes32(t),
+			ClientID:           "12345",
+			ClientSecret:       "secret",
+			RedirectURL:        "http://localhost/cb",
+			Scopes:             "read",
+			CipherKey:          bytes32(t),
+			WebhookVerifyToken: "route-test-token",
 		},
 	}
-	h := buildRouter(cfg, nil, nil, nil)
+	h := buildRouter(cfg, nil, nil, nil, &routeWebhookStore{})
 
 	got := collectRoutes(t, h)
 
-	stravaSubset := []string{
-		// /api/v1/strava/connect stays under /api because the frontend calls
-		// it with fetch() and carries the Authorization header. AUD-02 (#163)
-		// moved it out of an r.Route("/strava") group but kept it inside /api.
+	want := []string{
+		"CONNECT /*",
+		"DELETE /*",
+		"DELETE /api/v1/gpx/{id}",
+		"GET /*",
+		"GET /api/v1/gpx/",
+		"GET /api/v1/gpx/{id}",
+		"GET /api/v1/me",
 		"GET /api/v1/strava/connect",
-		// /strava/callback moved OUT of /api (AUD-02, finding C1): the
-		// browser-top-level redirect from Strava does not carry an
-		// Authorization header, so the handler must be reachable without
-		// going through AuthMiddleware. The user_id rides inside the
-		// signed state.
+		"GET /healthz",
+		"GET /readyz",
 		"GET /strava/callback",
+		"GET /strava/webhook",
+		"HEAD /*",
+		"OPTIONS /*",
+		"PATCH /*",
+		"POST /*",
+		"POST /api/v1/gpx/compare",
+		"POST /api/v1/gpx/upload",
+		"POST /strava/webhook",
+		"PUT /*",
+		"QUERY /*",
+		"TRACE /*",
 	}
-	for _, want := range stravaSubset {
-		require.Contains(t, got, want, "expected Strava route %q to be mounted when cfg.Strava is configured", want)
-	}
+	require.Equal(t, want, got, "complete production route list drifted")
 
-	// /api/v1/strava/callback used to be in this list (the old design put
-	// the callback under /api too); assert it is NOT mounted there now.
-	require.NotContains(t, got, "GET /api/v1/strava/callback", "callback must live outside /api (AUD-02)")
+	req := httptest.NewRequestWithContext(context.Background(), http.MethodGet,
+		"/strava/webhook?hub.mode=subscribe&hub.challenge=route-proof&hub.verify_token=route-test-token", nil)
+	recorder := httptest.NewRecorder()
+	h.ServeHTTP(recorder, req)
+	require.Equal(t, http.StatusOK, recorder.Code)
+	var challenge map[string]string
+	require.NoError(t, json.NewDecoder(recorder.Body).Decode(&challenge))
+	require.Equal(t, "route-proof", challenge["hub.challenge"])
+}
 
-	// Webhook routes must NOT be present: buildRouter does not call WithWebhooks.
-	// AUD-03 (issue #165) is the issue that wires them. When it lands, this
-	// assertion will fail and the list will need to be updated alongside the fix.
-	for _, mustNot := range []string{"GET /strava/webhook", "POST /strava/webhook"} {
-		require.NotContains(t, got, mustNot, "unexpected webhook route %q mounted; this PR should not wire WithWebhooks (that is AUD-03)", mustNot)
-	}
+type routeWebhookStore struct{}
+
+func (*routeWebhookStore) GetUserIDByAthleteID(context.Context, int64) (pgtype.UUID, error) {
+	return pgtype.UUID{}, nil
+}
+
+func (*routeWebhookStore) EnqueueActivityEvent(context.Context, sqlc.EnqueueActivityEventParams) (sqlc.ActivityEvent, error) {
+	return sqlc.ActivityEvent{}, nil
+}
+
+func (*routeWebhookStore) EnqueueActivityEventJob(context.Context, string) error {
+	return nil
 }

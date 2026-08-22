@@ -7,26 +7,23 @@ package sqlc
 
 import (
 	"context"
-	"errors"
 
-	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
 const enqueueActivityEvent = `-- name: EnqueueActivityEvent :one
 INSERT INTO activity_events (
-    external_id, user_id, object_type, aspect_type, object_id,
+    user_id, object_type, aspect_type, object_id,
     owner_id, subscription_id, event_time, raw_payload
 ) VALUES (
-    $1, $2, $3, $4, $5, $6, $7, $8, $9
+    $1, $2, $3, $4, $5, $6, $7, $8
 )
-ON CONFLICT (external_id) DO UPDATE SET
-    external_id = EXCLUDED.external_id
-RETURNING id, external_id, user_id, object_type, aspect_type, object_id, owner_id, subscription_id, event_time, received_at, processed_at, raw_payload
+ON CONFLICT (object_id, aspect_type, event_time) DO UPDATE SET
+    object_id = EXCLUDED.object_id
+RETURNING id, user_id, object_type, aspect_type, object_id, owner_id, subscription_id, event_time, received_at, processed_at, raw_payload
 `
 
 type EnqueueActivityEventParams struct {
-	ExternalID     string             `json:"external_id"`
 	UserID         pgtype.UUID        `json:"user_id"`
 	ObjectType     string             `json:"object_type"`
 	AspectType     string             `json:"aspect_type"`
@@ -37,9 +34,9 @@ type EnqueueActivityEventParams struct {
 	RawPayload     []byte             `json:"raw_payload"`
 }
 
+// Return the existing row when Strava retries the same natural event key.
 func (q *Queries) EnqueueActivityEvent(ctx context.Context, arg EnqueueActivityEventParams) (ActivityEvent, error) {
 	row := q.db.QueryRow(ctx, enqueueActivityEvent,
-		arg.ExternalID,
 		arg.UserID,
 		arg.ObjectType,
 		arg.AspectType,
@@ -52,7 +49,6 @@ func (q *Queries) EnqueueActivityEvent(ctx context.Context, arg EnqueueActivityE
 	var i ActivityEvent
 	err := row.Scan(
 		&i.ID,
-		&i.ExternalID,
 		&i.UserID,
 		&i.ObjectType,
 		&i.AspectType,
@@ -68,17 +64,15 @@ func (q *Queries) EnqueueActivityEvent(ctx context.Context, arg EnqueueActivityE
 }
 
 const getActivityEventByID = `-- name: GetActivityEventByID :one
-SELECT id, external_id, user_id, object_type, aspect_type, object_id, owner_id, subscription_id, event_time, received_at, processed_at, raw_payload
-FROM activity_events
-WHERE id = $1
+SELECT id, user_id, object_type, aspect_type, object_id, owner_id, subscription_id, event_time, received_at, processed_at, raw_payload FROM activity_events WHERE id = $1
 `
 
+// Load an event by the internal UUID passed to IngestActivityEventWorker.
 func (q *Queries) GetActivityEventByID(ctx context.Context, id pgtype.UUID) (ActivityEvent, error) {
 	row := q.db.QueryRow(ctx, getActivityEventByID, id)
 	var i ActivityEvent
 	err := row.Scan(
 		&i.ID,
-		&i.ExternalID,
 		&i.UserID,
 		&i.ObjectType,
 		&i.AspectType,
@@ -94,30 +88,30 @@ func (q *Queries) GetActivityEventByID(ctx context.Context, id pgtype.UUID) (Act
 }
 
 const getUserIDByAthleteID = `-- name: GetUserIDByAthleteID :one
-SELECT user_id FROM strava_tokens WHERE athlete_id = $1 LIMIT 1
+SELECT (
+    SELECT user_id FROM strava_tokens WHERE athlete_id = $1 LIMIT 1
+)::uuid AS user_id
 `
 
+// The scalar subquery always returns one row. An unknown athlete therefore
+// scans as pgtype.UUID{Valid:false} rather than pgx.ErrNoRows.
 func (q *Queries) GetUserIDByAthleteID(ctx context.Context, athleteID int64) (pgtype.UUID, error) {
+	row := q.db.QueryRow(ctx, getUserIDByAthleteID, athleteID)
 	var user_id pgtype.UUID
-	err := q.db.QueryRow(ctx, getUserIDByAthleteID, athleteID).Scan(&user_id)
-	// sqlc deja ErrNoRows crudo: lo aplanamos a (uuid inválido, nil) para
-	// que el handler del PR B pueda hacer `if !uid.Valid { return }` sin
-	// distinguir entre "atleta desconocido" y un error real de DB.
-	// AUD-03 (issue #165) PR A.
-	if errors.Is(err, pgx.ErrNoRows) {
-		return pgtype.UUID{}, nil
-	}
+	err := row.Scan(&user_id)
 	return user_id, err
 }
 
 const listPendingActivityEvents = `-- name: ListPendingActivityEvents :many
-SELECT id, external_id, user_id, object_type, aspect_type, object_id, owner_id, subscription_id, event_time, received_at, processed_at, raw_payload
+SELECT id, user_id, object_type, aspect_type, object_id, owner_id, subscription_id, event_time, received_at, processed_at, raw_payload
 FROM activity_events
 WHERE processed_at IS NULL
 ORDER BY received_at
 LIMIT $1
 `
 
+// Lista los eventos pendientes (processed_at IS NULL) para alimentar un
+// job de procesamiento. LIMIT defensivo para evitar scans descontrolados.
 func (q *Queries) ListPendingActivityEvents(ctx context.Context, limit int32) ([]ActivityEvent, error) {
 	rows, err := q.db.Query(ctx, listPendingActivityEvents, limit)
 	if err != nil {
@@ -129,7 +123,6 @@ func (q *Queries) ListPendingActivityEvents(ctx context.Context, limit int32) ([
 		var i ActivityEvent
 		if err := rows.Scan(
 			&i.ID,
-			&i.ExternalID,
 			&i.UserID,
 			&i.ObjectType,
 			&i.AspectType,
@@ -157,6 +150,7 @@ SET processed_at = now()
 WHERE id = $1
 `
 
+// Marca un evento como procesado una vez consumido por el job.
 func (q *Queries) MarkActivityEventProcessed(ctx context.Context, id pgtype.UUID) error {
 	_, err := q.db.Exec(ctx, markActivityEventProcessed, id)
 	return err

@@ -31,7 +31,6 @@ type Activity struct {
 
 type ActivityEvent struct {
 	ID             pgtype.UUID        `json:"id"`
-	ExternalID     string             `json:"external_id"`
 	UserID         pgtype.UUID        `json:"user_id"`
 	ObjectType     string             `json:"object_type"`
 	AspectType     string             `json:"aspect_type"`
