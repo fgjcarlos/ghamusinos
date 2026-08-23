@@ -788,7 +788,7 @@ func TestLoad_AuthDisabledTruthyValues(t *testing.T) {
 			t.Setenv("DATABASE_URL", "postgres://test:***@localhost/test")
 			t.Setenv("ENV", "production")
 			t.Setenv("CLERK_JWKS_URL", "https://clerk.example.com/jwks")
-	t.Setenv("CLERK_ISSUER", "https://clerk.example.com")
+			t.Setenv("CLERK_ISSUER", "https://clerk.example.com")
 			unsetPoolEnv(t)
 			unsetStravaEnv(t)
 			t.Setenv("AUTH_DISABLED", v)
