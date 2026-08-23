@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	"strconv"
 
 	"github.com/fgjcarlos/ghamusinos/internal/auth"
 	"github.com/fgjcarlos/ghamusinos/internal/gpx"
@@ -15,7 +16,7 @@ import (
 )
 
 type GPXDetailStore interface {
-	GetDetail(context.Context, pgtype.UUID, pgtype.UUID) (*gpx.StoredTrackDetail, error)
+	GetDetail(context.Context, pgtype.UUID, pgtype.UUID, int) (*gpx.StoredTrackDetail, error)
 }
 
 func GetGPX(store GPXDetailStore) http.Handler {
@@ -32,7 +33,11 @@ func GetGPX(store GPXDetailStore) http.Handler {
 			return
 		}
 		trackID := pgtype.UUID{Bytes: parsedID, Valid: true}
-		detail, err := store.GetDetail(r.Context(), parseUserID(user.ID), trackID)
+		// ?resolution=N: el cliente puede pedir más o menos puntos para
+		// la pantalla de detalle. 0 o ausente → DefaultResolution (2000,
+		// en gpx.DefaultResolution). issue #170, M9.
+		resolution := parseResolution(r.URL.Query().Get("resolution"))
+		detail, err := store.GetDetail(r.Context(), parseUserID(user.ID), trackID, resolution)
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
 				WriteProblem(w, NewNotFound("GPX track not found", requestID))
@@ -45,4 +50,18 @@ func GetGPX(store GPXDetailStore) http.Handler {
 		w.WriteHeader(http.StatusOK)
 		escribirJSON(w, detail)
 	})
+}
+
+// parseResolution traduce el query param a un entero positivo. Vacío o
+// no numérico → 0 (la store aplica DefaultResolution). Negativos
+// también caen a 0, mismo motivo.
+func parseResolution(raw string) int {
+	if raw == "" {
+		return 0
+	}
+	n, err := strconv.Atoi(raw)
+	if err != nil || n <= 0 {
+		return 0
+	}
+	return n
 }

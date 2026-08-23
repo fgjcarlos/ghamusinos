@@ -15,19 +15,28 @@ import (
 )
 
 type detailGPXStore struct {
-	detail  *gpx.StoredTrackDetail
-	err     error
-	userID  pgtype.UUID
-	trackID pgtype.UUID
+	detail     *gpx.StoredTrackDetail
+	err        error
+	userID     pgtype.UUID
+	trackID    pgtype.UUID
+	resolution int
 }
 
-func (s *detailGPXStore) GetDetail(_ context.Context, userID, trackID pgtype.UUID) (*gpx.StoredTrackDetail, error) {
-	s.userID, s.trackID = userID, trackID
+func (s *detailGPXStore) GetDetail(_ context.Context, userID, trackID pgtype.UUID, resolution int) (*gpx.StoredTrackDetail, error) {
+	s.userID, s.trackID, s.resolution = userID, trackID, resolution
 	return s.detail, s.err
 }
 
 func getGPXRequest(authenticated bool) *http.Request {
-	req := httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/api/v1/gpx/00000000-0000-0000-0000-000000000002", nil)
+	return getGPXRequestWithResolution(authenticated, "")
+}
+
+func getGPXRequestWithResolution(authenticated bool, resolution string) *http.Request {
+	url := "/api/v1/gpx/00000000-0000-0000-0000-000000000002"
+	if resolution != "" {
+		url += "?resolution=" + resolution
+	}
+	req := httptest.NewRequestWithContext(context.Background(), http.MethodGet, url, nil)
 	routeCtx := chi.NewRouteContext()
 	routeCtx.URLParams.Add("id", "00000000-0000-0000-0000-000000000002")
 	req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, routeCtx))
@@ -71,4 +80,30 @@ func TestGetGPXReturnsOwnedTrackDetail(t *testing.T) {
 	require.Contains(t, recorder.Body.String(), `"risk_type":"steep"`)
 	require.True(t, store.userID.Valid)
 	require.Equal(t, id, store.trackID)
+}
+
+// TestGetGPXForwardsResolutionQueryParam: ?resolution=N se reenvía al
+// store (issue #170, M9). Sin query param o con valor inválido, el
+// handler pasa 0 y el store cae a gpx.DefaultResolution.
+func TestGetGPXForwardsResolutionQueryParam(t *testing.T) {
+	cases := []struct {
+		name        string
+		query       string
+		wantForward int
+	}{
+		{"explicit", "500", 500},
+		{"missing defaults to 0", "", 0},
+		{"non-numeric defaults to 0", "foo", 0},
+		{"negative defaults to 0", "-10", 0},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			store := &detailGPXStore{}
+			recorder := httptest.NewRecorder()
+			GetGPX(store).ServeHTTP(recorder, getGPXRequestWithResolution(true, tc.query))
+
+			require.Equal(t, http.StatusOK, recorder.Code)
+			require.Equal(t, tc.wantForward, store.resolution)
+		})
+	}
 }

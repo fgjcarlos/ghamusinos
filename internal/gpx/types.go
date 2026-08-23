@@ -169,8 +169,12 @@ type TrackTypeDetector interface {
 type GPXStore interface {
 	Create(ctx context.Context, track *Track, analysis *Analysis) error
 	CreateDetail(ctx context.Context, track *Track, analysis *Analysis, climbs []Climb, riskZones []RiskZone, kingClimb *Climb) (*StoredTrackDetail, error)
-	GetByID(ctx context.Context, userID pgtype.UUID, trackID pgtype.UUID) (*StoredTrack, error)
-	GetDetail(ctx context.Context, userID pgtype.UUID, trackID pgtype.UUID) (*StoredTrackDetail, error)
+	// GetByID and GetDetail accept resolution in points-per-detail; 0 or
+	// negative falls back to gpx.DefaultResolution (2000). Resolutions
+	// smaller than the track length trigger min/max-per-bucket
+	// subsampling (issue #170, M9).
+	GetByID(ctx context.Context, userID pgtype.UUID, trackID pgtype.UUID, resolution int) (*StoredTrack, error)
+	GetDetail(ctx context.Context, userID pgtype.UUID, trackID pgtype.UUID, resolution int) (*StoredTrackDetail, error)
 	FindByHash(ctx context.Context, userID pgtype.UUID, fileHash string) (*StoredTrack, error)
 	ListClimbs(ctx context.Context, trackID pgtype.UUID) ([]Climb, error)
 	ListRiskZones(ctx context.Context, trackID pgtype.UUID) ([]RiskZone, error)

@@ -3,6 +3,8 @@ package gpx
 import (
 	"context"
 	"errors"
+	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/fgjcarlos/ghamusinos/internal/db/sqlc"
@@ -93,7 +95,7 @@ func TestSQLCStoreGetByIDScopesByUser(t *testing.T) {
 	userID := pgtype.UUID{Valid: true, Bytes: [16]byte{1}}
 	trackID := pgtype.UUID{Valid: true, Bytes: [16]byte{2}}
 	query := &mockGPXQuerier{track: databaseTrack(trackID, userID)}
-	got, err := NewSQLCStore(query).GetByID(context.Background(), userID, trackID)
+	got, err := NewSQLCStore(query).GetByID(context.Background(), userID, trackID, 0)
 	require.NoError(t, err)
 	require.Equal(t, userID, query.getParams.UserID)
 	require.Equal(t, trackID, got.Track.ID)
@@ -122,7 +124,7 @@ func TestSQLCStoreRejectsMissingDependencies(t *testing.T) {
 	ctx := context.Background()
 	require.Error(t, NewSQLCStore(nil).Create(ctx, &Track{}, &Analysis{}))
 	require.Error(t, NewSQLCStore(&mockGPXQuerier{}).Create(ctx, nil, &Analysis{}))
-	_, err := NewSQLCStore(nil).GetByID(ctx, pgtype.UUID{}, pgtype.UUID{})
+	_, err := NewSQLCStore(nil).GetByID(ctx, pgtype.UUID{}, pgtype.UUID{}, 0)
 	require.Error(t, err)
 	_, err = NewSQLCStore(nil).List(ctx, pgtype.UUID{}, ListParams{})
 	require.Error(t, err)
@@ -134,7 +136,7 @@ func TestSQLCStoreWrapsQueryErrors(t *testing.T) {
 	ctx := context.Background()
 	track := &Track{Name: "Trail", TrackType: "point-to-point", Points: []Point{{}, {}}}
 	require.ErrorContains(t, NewSQLCStore(query).Create(ctx, track, &Analysis{}), "create track")
-	_, err := NewSQLCStore(query).GetByID(ctx, pgtype.UUID{}, pgtype.UUID{})
+	_, err := NewSQLCStore(query).GetByID(ctx, pgtype.UUID{}, pgtype.UUID{}, 0)
 	require.ErrorContains(t, err, "get track")
 	_, err = NewSQLCStore(query).List(ctx, pgtype.UUID{}, ListParams{})
 	require.ErrorContains(t, err, "list tracks")
@@ -144,7 +146,7 @@ func TestSQLCStoreWrapsQueryErrors(t *testing.T) {
 func TestSQLCStoreRejectsInvalidStoredCoordinates(t *testing.T) {
 	query := &mockGPXQuerier{track: databaseTrack(pgtype.UUID{}, pgtype.UUID{})}
 	query.track.Coordinates = []byte(`not-json`)
-	_, err := NewSQLCStore(query).GetByID(context.Background(), pgtype.UUID{}, pgtype.UUID{})
+	_, err := NewSQLCStore(query).GetByID(context.Background(), pgtype.UUID{}, pgtype.UUID{}, 0)
 	require.ErrorContains(t, err, "unmarshal coordinates")
 }
 
@@ -190,13 +192,17 @@ func TestSQLCStoreFindByHashScopesDuplicateToUser(t *testing.T) {
 func TestSQLCStoreGetDetailHydratesChildren(t *testing.T) {
 	userID := pgtype.UUID{Bytes: [16]byte{1}, Valid: true}
 	trackID := pgtype.UUID{Bytes: [16]byte{2}, Valid: true}
+	gain100, err := numeric(100)
+	if err != nil {
+		t.Fatalf("test setup numeric(100): %v", err)
+	}
 	query := &mockGPXQuerier{
 		track:  databaseTrack(trackID, userID),
-		climbs: []sqlc.GpxClimb{{StartIdx: 1, EndIdx: 3, GainM: numeric(100), IsKingClimb: true}},
+		climbs: []sqlc.GpxClimb{{StartIdx: 1, EndIdx: 3, GainM: gain100, IsKingClimb: true}},
 		risks:  []sqlc.GpxRiskZone{{StartIdx: 2, EndIdx: 4, RiskType: "technical", Severity: "medium"}},
 	}
 
-	detail, err := NewSQLCStore(query).GetDetail(context.Background(), userID, trackID)
+	detail, err := NewSQLCStore(query).GetDetail(context.Background(), userID, trackID, 0)
 	require.NoError(t, err)
 	require.Equal(t, trackID, detail.Track.Track.ID)
 	require.Len(t, detail.Climbs, 1)
@@ -213,3 +219,107 @@ func databaseTrack(id, userID pgtype.UUID) sqlc.GpxTrack {
 		DifficultyScore: 30, DifficultyLabel: "intermediate", TrackType: "point-to-point",
 	}
 }
+
+// ─── submuestreo (issue #170, M9) ───────────────────────────────────────
+
+// TestSubsamplePoints_NoOpForSmallInput: si el track ya tiene menos
+// puntos que la resolución pedida, devolvemos los puntos tal cual, sin
+// perder información ni inventar duplicados.
+func TestSubsamplePoints_NoOpForSmallInput(t *testing.T) {
+	pts := make([]Point, 0, 5)
+	for i := 0; i < 5; i++ {
+		pts = append(pts, Point{Lat: float64(i), Lon: float64(i), Ele: ptr(float64(i * 10))})
+	}
+	got := subsamplePoints(pts, 100)
+	require.Equal(t, pts, got)
+}
+
+// TestSubsamplePoints_KeepsGlobalExtrema: el pico y el valle de elevación
+// del track completo aparecen en la respuesta submuestreada, incluso si
+// caen en grupos distintos. AC del issue #170, M9.
+func TestSubsamplePoints_KeepsGlobalExtrema(t *testing.T) {
+	pts := make([]Point, 0, 100)
+	for i := 0; i < 100; i++ {
+		// Valle en el punto 25, pico en el 75, resto llano.
+		ele := 100.0
+		if i == 25 {
+			ele = 50
+		}
+		if i == 75 {
+			ele = 250
+		}
+		pts = append(pts, Point{Lat: float64(i), Lon: float64(i), Ele: ptr(ele)})
+	}
+	got := subsamplePoints(pts, 10) // 10 grupos → ~20 puntos
+	var minEle, maxEle float64
+	minEle, maxEle = 1e9, -1e9
+	for _, p := range got {
+		if p.Ele == nil {
+			continue
+		}
+		if *p.Ele < minEle {
+			minEle = *p.Ele
+		}
+		if *p.Ele > maxEle {
+			maxEle = *p.Ele
+		}
+	}
+	require.InDelta(t, 50, minEle, 0, "el valle global debe sobrevivir al submuestreo")
+	require.InDelta(t, 250, maxEle, 0, "el pico global debe sobrevivir al submuestreo")
+}
+
+// TestSubsamplePoints_OutputSizeProportionalToResolution: con n=1000 y
+// resolution=10 esperamos ~20 puntos (10 grupos × 2 extremos). El cap
+// del issue es "como mucho ~2 000 puntos por defecto" (DefaultResolution).
+func TestSubsamplePoints_OutputSizeProportionalToResolution(t *testing.T) {
+	pts := make([]Point, 0, 1000)
+	for i := 0; i < 1000; i++ {
+		pts = append(pts, Point{Lat: float64(i), Lon: float64(i), Ele: ptr(float64(i % 100))})
+	}
+	got := subsamplePoints(pts, 10)
+	// 10 grupos → hasta 20 puntos. El test exige ≤ 2*resolution; los
+	// cuellos finos (buckets donde min==max) pueden bajar el conteo.
+	require.LessOrEqual(t, len(got), 2*10)
+	require.Greater(t, len(got), 10, "el submuestreo no debería colapsar a menos de resolution")
+}
+
+// TestSubsamplePoints_BucketWithoutElevation: si un grupo entero de
+// puntos carece de <ele>, devolvemos al menos el primer punto del grupo
+// para no perder el tramo horizontal.
+func TestSubsamplePoints_BucketWithoutElevation(t *testing.T) {
+	pts := []Point{
+		{Lat: 0, Lon: 0, Ele: ptr(100)},
+		{Lat: 1, Lon: 1, Ele: ptr(110)},
+		{Lat: 2, Lon: 2, Ele: nil}, // grupo sin elevación: queda solo
+		{Lat: 3, Lon: 3, Ele: nil},
+		{Lat: 4, Lon: 4, Ele: ptr(150)},
+	}
+	got := subsamplePoints(pts, 2) // 2 grupos: [0,1] y [2,3,4]
+	// Grupo 1 ([0,1]): min=100, max=110 → 2 puntos.
+	// Grupo 2 ([2,3,4]): sin elevación → primer punto (idx 2).
+	require.Len(t, got, 3)
+	require.NotNil(t, got[2].Ele, "el grupo con elevación debe sobrevivir íntegro")
+}
+
+// TestSQLCStoreGetByIDAppliesResolution: end-to-end a través del store.
+// Un track de 1000 puntos en la BD debe salir con ~20 puntos cuando
+// llamamos GetByID(_, _, 10).
+func TestSQLCStoreGetByIDAppliesResolution(t *testing.T) {
+	userID := pgtype.UUID{Valid: true, Bytes: [16]byte{1}}
+	trackID := pgtype.UUID{Valid: true, Bytes: [16]byte{2}}
+	coords := []string{}
+	for i := 0; i < 1000; i++ {
+		coords = append(coords, fmt.Sprintf("[%d,%d,%d]", i, i, i%100))
+	}
+	row := databaseTrack(trackID, userID)
+	row.Coordinates = []byte("[" + strings.Join(coords, ",") + "]")
+	query := &mockGPXQuerier{track: row}
+
+	track, err := NewSQLCStore(query).GetByID(context.Background(), userID, trackID, 10)
+	require.NoError(t, err)
+	require.LessOrEqual(t, len(track.Track.Points), 2*10, "el store debe aplicar la resolución pedida")
+}
+
+// helpers ────────────────────────────────────────────────────────────────
+
+func ptr(v float64) *float64 { return &v }

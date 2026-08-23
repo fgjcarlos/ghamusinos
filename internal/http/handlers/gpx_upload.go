@@ -120,6 +120,19 @@ func UploadGPX(
 
 		detail, err := store.CreateDetail(r.Context(), track, analysis, climbs, riskZones, kingClimb)
 		if err != nil {
+			// +Inf/-Inf/NaN propagado desde el análisis: el cliente envió
+			// un GPX cuyo análisis cae fuera del rango representable.
+			// 422 en vez de 500 opaco (issue #170, M8).
+			if errors.Is(err, gpx.ErrNumericConversion) {
+				WriteProblem(w, ProblemDetail{
+					Type:     "about:blank",
+					Title:    "Unprocessable Entity",
+					Status:   http.StatusUnprocessableEntity,
+					Detail:   "el análisis produjo un valor no representable",
+					Instance: requestID,
+				})
+				return
+			}
 			WriteProblem(w, NewInternalError("failed to persist GPX", requestID))
 			return
 		}

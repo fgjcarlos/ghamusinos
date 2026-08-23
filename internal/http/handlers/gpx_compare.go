@@ -16,8 +16,12 @@ import (
 // track del array se resuelve con GetDetail (que ya valida user_id y
 // devuelve climbs + risk_zones + métricas). No hay query SQLC
 // adicional — la lógica de diff se hace en Go.
+//
+// resolution es 0 aquí: la pantalla de compare (#126) muestra
+// métricas agregadas, no el perfil, así que submuestrear al default
+// basta para no inflar la respuesta.
 type GPXCompareStore interface {
-	GetDetail(ctx context.Context, userID pgtype.UUID, trackID pgtype.UUID) (*gpx.StoredTrackDetail, error)
+	GetDetail(ctx context.Context, userID pgtype.UUID, trackID pgtype.UUID, resolution int) (*gpx.StoredTrackDetail, error)
 }
 
 // compareRequest es el body de POST /api/v1/gpx/compare. Acepta hasta
@@ -65,7 +69,7 @@ func CompareGPX(store GPXCompareStore) http.Handler {
 				WriteProblem(w, NewBadRequest("invalid track id: "+raw, requestID))
 				return
 			}
-			detail, err := store.GetDetail(r.Context(), uid, pgtype.UUID{Bytes: parsed, Valid: true})
+			detail, err := store.GetDetail(r.Context(), uid, pgtype.UUID{Bytes: parsed, Valid: true}, 0)
 			if err != nil {
 				WriteProblem(w, NewNotFound("GPX track not found: "+raw, requestID))
 				return

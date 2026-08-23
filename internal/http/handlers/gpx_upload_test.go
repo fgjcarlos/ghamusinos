@@ -157,3 +157,16 @@ func TestUploadGPXReturnsInternalErrorWhenStoreFails(t *testing.T) {
 	require.Equal(t, http.StatusInternalServerError, recorder.Code)
 	require.Contains(t, recorder.Body.String(), "failed to persist GPX")
 }
+
+// TestUploadGPXReturns422WhenAnalysisProducesNonRepresentableValue verifica
+// que un +Inf/-Inf/NaN del analizador (p.ej. una división por cero
+// inesperada) sale como 422 con mensaje legible en vez del 500 opaco
+// que paniqueaba antes del issue #170 (M8).
+func TestUploadGPXReturns422WhenAnalysisProducesNonRepresentableValue(t *testing.T) {
+	store := &uploadGPXStore{findErr: pgx.ErrNoRows, createErr: gpx.ErrNumericConversion}
+	recorder := httptest.NewRecorder()
+	uploadHandler(store).ServeHTTP(recorder, multipartGPXRequest(t, validUploadGPX(true), true))
+
+	require.Equal(t, http.StatusUnprocessableEntity, recorder.Code)
+	require.Contains(t, recorder.Body.String(), "valor no representable")
+}
