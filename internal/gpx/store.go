@@ -105,7 +105,7 @@ type gpxQuerier interface {
 	GetGPXTrackByHash(context.Context, sqlc.GetGPXTrackByHashParams) (sqlc.GpxTrack, error)
 	ListGPXClimbsByTrack(context.Context, pgtype.UUID) ([]sqlc.GpxClimb, error)
 	ListGPXRiskZonesByTrack(context.Context, pgtype.UUID) ([]sqlc.GpxRiskZone, error)
-	ListGPXTracksByUser(context.Context, sqlc.ListGPXTracksByUserParams) ([]sqlc.GpxTrack, error)
+	ListGPXTracksByUser(context.Context, sqlc.ListGPXTracksByUserParams) ([]sqlc.ListGPXTracksByUserRow, error)
 	DeleteGPXTrack(context.Context, sqlc.DeleteGPXTrackParams) error
 }
 
@@ -338,6 +338,10 @@ func (s *SQLCStore) List(ctx context.Context, userID pgtype.UUID, params ListPar
 	if limit <= 0 {
 		limit = 20
 	}
+	// Pedimos limit+1 para detectar has_next sin segundo query (mismo
+	// patrón que ya usábamos). LIMIT $2 se ejecuta antes que
+	// COUNT(*) OVER() en Postgres, así que TotalCount en cada fila
+	// sigue siendo el total real subyacente al WHERE, no el LIMIT+1.
 	rows, err := s.q.ListGPXTracksByUser(ctx, sqlc.ListGPXTracksByUserParams{
 		UserID: userID,
 		Limit:  limit + 1,
@@ -346,23 +350,61 @@ func (s *SQLCStore) List(ctx context.Context, userID pgtype.UUID, params ListPar
 	if err != nil {
 		return nil, fmt.Errorf("gpx: list tracks: %w", err)
 	}
+	// Total real vía COUNT(*) OVER() (issue #172, M6). Todas las filas
+	// traen el mismo valor; si la lista está vacía no hay total.
+	var total int64
+	if len(rows) > 0 {
+		total = rows[0].TotalCount
+	}
 	hasNext := len(rows) > int(limit)
 	if hasNext {
 		rows = rows[:int(limit)]
 	}
-	result := &PaginatedTracks{Data: make([]StoredTrack, 0, len(rows)), Limit: limit, Offset: params.Offset, HasNext: hasNext}
+	result := &PaginatedTracks{Data: make([]StoredTrack, 0, len(rows)), Limit: limit, Offset: params.Offset, HasNext: hasNext, Total: int(total)}
 	for _, row := range rows {
-		item, convertErr := storedTrack(row, 0)
+		item, convertErr := storedTrack(listRowToGpxTrack(row), 0)
 		if convertErr != nil {
 			return nil, convertErr
 		}
 		result.Data = append(result.Data, *item)
 	}
-	result.Total = int(params.Offset) + len(result.Data)
-	if hasNext {
-		result.Total++
-	}
 	return result, nil
+}
+
+// listRowToGpxTrack aplana el row generado por ListGPXTracksByUser (que
+// lleva el TotalCount del window function) a la forma sqlc.GpxTrack que
+// espera storedTrack. Solo se llama desde List, que es el único punto
+// que consume la nueva query con TotalCount.
+func listRowToGpxTrack(row sqlc.ListGPXTracksByUserRow) sqlc.GpxTrack {
+	return sqlc.GpxTrack{
+		ID:              row.ID,
+		UserID:          row.UserID,
+		Name:            row.Name,
+		FileHash:        row.FileHash,
+		FileSizeBytes:   row.FileSizeBytes,
+		Coordinates:     row.Coordinates,
+		DistanceM:       row.DistanceM,
+		MovingTimeS:     row.MovingTimeS,
+		DPlusM:          row.DPlusM,
+		DMinusM:         row.DMinusM,
+		MaxElevationM:   row.MaxElevationM,
+		MinElevationM:   row.MinElevationM,
+		AvgSlopePct:     row.AvgSlopePct,
+		MaxSlopePct:     row.MaxSlopePct,
+		EffortIndex:     row.EffortIndex,
+		ItraPoints:      row.ItraPoints,
+		LegBreakerIndex: row.LegBreakerIndex,
+		EstimatedVam:    row.EstimatedVam,
+		DifficultyScore: row.DifficultyScore,
+		DifficultyLabel: row.DifficultyLabel,
+		RunnabilityPct:  row.RunnabilityPct,
+		KingClimb:       row.KingClimb,
+		TrackType:       row.TrackType,
+		Direction:       row.Direction,
+		CreatedAt:       row.CreatedAt,
+		AnalyzedAt:      row.AnalyzedAt,
+		UpdatedAt:       row.UpdatedAt,
+	}
 }
 
 func (s *SQLCStore) Delete(ctx context.Context, userID, trackID pgtype.UUID) error {

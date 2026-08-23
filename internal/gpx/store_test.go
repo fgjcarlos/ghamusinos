@@ -22,7 +22,7 @@ type mockGPXQuerier struct {
 	listParams   sqlc.ListGPXTracksByUserParams
 	deleteParams sqlc.DeleteGPXTrackParams
 	track        sqlc.GpxTrack
-	tracks       []sqlc.GpxTrack
+	tracks       []sqlc.ListGPXTracksByUserRow
 	err          error
 	climbs       []sqlc.GpxClimb
 	risks        []sqlc.GpxRiskZone
@@ -71,7 +71,7 @@ func (m *mockGPXQuerier) GetGPXTrackByID(_ context.Context, params sqlc.GetGPXTr
 	return m.track, m.err
 }
 
-func (m *mockGPXQuerier) ListGPXTracksByUser(_ context.Context, params sqlc.ListGPXTracksByUserParams) ([]sqlc.GpxTrack, error) {
+func (m *mockGPXQuerier) ListGPXTracksByUser(_ context.Context, params sqlc.ListGPXTracksByUserParams) ([]sqlc.ListGPXTracksByUserRow, error) {
 	m.listParams = params
 	return m.tracks, m.err
 }
@@ -103,7 +103,11 @@ func TestSQLCStoreGetByIDScopesByUser(t *testing.T) {
 
 func TestSQLCStoreListPaginates(t *testing.T) {
 	userID := pgtype.UUID{Valid: true, Bytes: [16]byte{1}}
-	query := &mockGPXQuerier{tracks: []sqlc.GpxTrack{databaseTrack(pgtype.UUID{Valid: true}, userID), databaseTrack(pgtype.UUID{Valid: true}, userID), databaseTrack(pgtype.UUID{Valid: true}, userID)}}
+	query := &mockGPXQuerier{tracks: []sqlc.ListGPXTracksByUserRow{
+		databaseTrackRow(databaseTrack(pgtype.UUID{Valid: true}, userID)),
+		databaseTrackRow(databaseTrack(pgtype.UUID{Valid: true}, userID)),
+		databaseTrackRow(databaseTrack(pgtype.UUID{Valid: true}, userID)),
+	}}
 	got, err := NewSQLCStore(query).List(context.Background(), userID, ListParams{Limit: 2, Offset: 4})
 	require.NoError(t, err)
 	require.Equal(t, int32(3), query.listParams.Limit)
@@ -220,6 +224,41 @@ func databaseTrack(id, userID pgtype.UUID) sqlc.GpxTrack {
 	}
 }
 
+// databaseTrackRow aplana una sqlc.GpxTrack a la forma
+// sqlc.ListGPXTracksByUserRow (que añade TotalCount del window function
+// tras el regen de SQLC en #172). Usado por el test de List.
+func databaseTrackRow(t sqlc.GpxTrack) sqlc.ListGPXTracksByUserRow {
+	return sqlc.ListGPXTracksByUserRow{
+		ID:              t.ID,
+		UserID:          t.UserID,
+		Name:            t.Name,
+		FileHash:        t.FileHash,
+		FileSizeBytes:   t.FileSizeBytes,
+		Coordinates:     t.Coordinates,
+		DistanceM:       t.DistanceM,
+		MovingTimeS:     t.MovingTimeS,
+		DPlusM:          t.DPlusM,
+		DMinusM:         t.DMinusM,
+		MaxElevationM:   t.MaxElevationM,
+		MinElevationM:   t.MinElevationM,
+		AvgSlopePct:     t.AvgSlopePct,
+		MaxSlopePct:     t.MaxSlopePct,
+		EffortIndex:     t.EffortIndex,
+		ItraPoints:      t.ItraPoints,
+		LegBreakerIndex: t.LegBreakerIndex,
+		EstimatedVam:    t.EstimatedVam,
+		DifficultyScore: t.DifficultyScore,
+		DifficultyLabel: t.DifficultyLabel,
+		RunnabilityPct:  t.RunnabilityPct,
+		KingClimb:       t.KingClimb,
+		TrackType:       t.TrackType,
+		Direction:       t.Direction,
+		CreatedAt:       t.CreatedAt,
+		AnalyzedAt:      t.AnalyzedAt,
+		UpdatedAt:       t.UpdatedAt,
+	}
+}
+
 // ─── submuestreo (issue #170, M9) ───────────────────────────────────────
 
 // TestSubsamplePoints_NoOpForSmallInput: si el track ya tiene menos
@@ -323,3 +362,33 @@ func TestSQLCStoreGetByIDAppliesResolution(t *testing.T) {
 // helpers ────────────────────────────────────────────────────────────────
 
 func ptr(v float64) *float64 { return &v }
+
+// ─── total real vía COUNT(*) OVER() (issue #172, M6) ─────────────────
+
+// TestSQLCStoreList_TotalComesFromCountOver verifica que el `Total`
+// que List expone sale del window function de la query (no de
+// offset+len+1). Misma corrección aplicada a activities.List, issue
+// #172, M6.
+func TestSQLCStoreList_TotalComesFromCountOver(t *testing.T) {
+	userID := pgtype.UUID{Valid: true, Bytes: [16]byte{1}}
+	// 248 filas totales, devolvemos limit+1 = 4 (limit=3 + centinela).
+	// Si el store usara el heurístico viejo, Total sería offset + len + 1 = 4;
+	// con COUNT(*) OVER() debe ser 248.
+	query := &mockGPXQuerier{tracks: []sqlc.ListGPXTracksByUserRow{
+		databaseTrackRow(databaseTrack(pgtype.UUID{Bytes: [16]byte{14: 1}, Valid: true}, userID)),
+		databaseTrackRow(databaseTrack(pgtype.UUID{Bytes: [16]byte{14: 2}, Valid: true}, userID)),
+		databaseTrackRow(databaseTrack(pgtype.UUID{Bytes: [16]byte{14: 3}, Valid: true}, userID)),
+		databaseTrackRow(databaseTrack(pgtype.UUID{Bytes: [16]byte{14: 4}, Valid: true}, userID)),
+	}}
+	// Marcamos 248 como TotalCount en cada fila (lo devuelve
+	// COUNT(*) OVER() en producción).
+	for i := range query.tracks {
+		query.tracks[i].TotalCount = 248
+	}
+
+	got, err := NewSQLCStore(query).List(context.Background(), userID, ListParams{Limit: 3, Offset: 0})
+	require.NoError(t, err)
+	require.Equal(t, 248, got.Total, "Total debe venir del window function, no del heurístico offset+len+1")
+	require.Len(t, got.Data, 3, "el centinela +1 se descarta")
+	require.True(t, got.HasNext)
+}

@@ -46,7 +46,12 @@ RETURNING *;
 -- más antigua. El LIMIT es por la query (no cursor) porque el uso esperado
 -- es UI paginada con offset; cuando se necesite cursor, se añadirá en su
 -- propia query sin tocar esta.
-SELECT *
+--
+-- COUNT(*) OVER() añade el total real de filas que cumplen el WHERE a
+-- cada fila devuelta. El handler coge el valor de la primera fila
+-- (es el mismo para todas). issue #172, M6 — antes el handler
+-- devolvía `offset + len(rows) (+ 1 si has_next)`, que no es un total.
+SELECT *, COUNT(*) OVER() AS total_count
 FROM activities
 WHERE user_id = $1
 ORDER BY started_at DESC
