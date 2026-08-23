@@ -127,7 +127,7 @@ func (m *mockMeQuerier) GetUserByClerkID(ctx context.Context, clerkUserID string
 func (m *mockMeQuerier) GetLatestSyncSession(ctx context.Context, userID pgtype.UUID) (sqlc.SyncSession, error) {
 	return sqlc.SyncSession{}, nil
 }
-func (m *mockMeQuerier) ListActivitiesByUser(ctx context.Context, arg sqlc.ListActivitiesByUserParams) ([]sqlc.Activity, error) {
+func (m *mockMeQuerier) ListActivitiesByUser(ctx context.Context, arg sqlc.ListActivitiesByUserParams) ([]sqlc.ListActivitiesByUserRow, error) {
 	return nil, nil
 }
 func (m *mockMeQuerier) ListPendingActivityEvents(ctx context.Context, limit int32) ([]sqlc.ActivityEvent, error) {
@@ -174,4 +174,35 @@ func (m *mockMeQuerier) GetUserHRMaxByID(ctx context.Context, userID pgtype.UUID
 }
 func (m *mockMeQuerier) UpsertHRZones(ctx context.Context, arg sqlc.UpsertHRZonesParams) (sqlc.HrZone, error) {
 	return sqlc.HrZone{}, nil
+}
+
+// Stubs gpx añadidos tras el regen de SQLC (issue #172, M6). Estos
+// tests no ejercitan el GPX lab, pero el mock debe implementar la
+// interfaz completa para que el compilador no proteste.
+func (m *mockMeQuerier) CreateGPXClimb(ctx context.Context, arg sqlc.CreateGPXClimbParams) (sqlc.GpxClimb, error) {
+	return sqlc.GpxClimb{}, nil
+}
+func (m *mockMeQuerier) CreateGPXRiskZone(ctx context.Context, arg sqlc.CreateGPXRiskZoneParams) (sqlc.GpxRiskZone, error) {
+	return sqlc.GpxRiskZone{}, nil
+}
+func (m *mockMeQuerier) CreateGPXTrack(ctx context.Context, arg sqlc.CreateGPXTrackParams) (sqlc.GpxTrack, error) {
+	return sqlc.GpxTrack{}, nil
+}
+func (m *mockMeQuerier) DeleteGPXTrack(ctx context.Context, arg sqlc.DeleteGPXTrackParams) error {
+	return nil
+}
+func (m *mockMeQuerier) GetGPXTrackByHash(ctx context.Context, arg sqlc.GetGPXTrackByHashParams) (sqlc.GpxTrack, error) {
+	return sqlc.GpxTrack{}, nil
+}
+func (m *mockMeQuerier) GetGPXTrackByID(ctx context.Context, arg sqlc.GetGPXTrackByIDParams) (sqlc.GpxTrack, error) {
+	return sqlc.GpxTrack{}, nil
+}
+func (m *mockMeQuerier) ListGPXClimbsByTrack(ctx context.Context, trackID pgtype.UUID) ([]sqlc.GpxClimb, error) {
+	return nil, nil
+}
+func (m *mockMeQuerier) ListGPXRiskZonesByTrack(ctx context.Context, trackID pgtype.UUID) ([]sqlc.GpxRiskZone, error) {
+	return nil, nil
+}
+func (m *mockMeQuerier) ListGPXTracksByUser(ctx context.Context, arg sqlc.ListGPXTracksByUserParams) ([]sqlc.ListGPXTracksByUserRow, error) {
+	return nil, nil
 }

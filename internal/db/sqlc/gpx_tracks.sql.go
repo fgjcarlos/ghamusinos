@@ -225,7 +225,7 @@ func (q *Queries) GetGPXTrackByID(ctx context.Context, arg GetGPXTrackByIDParams
 }
 
 const listGPXTracksByUser = `-- name: ListGPXTracksByUser :many
-SELECT id, user_id, name, file_hash, file_size_bytes, coordinates, distance_m, moving_time_s, d_plus_m, d_minus_m, max_elevation_m, min_elevation_m, avg_slope_pct, max_slope_pct, effort_index, itra_points, leg_breaker_index, estimated_vam, difficulty_score, difficulty_label, runnability_pct, king_climb, track_type, direction, created_at, analyzed_at, updated_at
+SELECT id, user_id, name, file_hash, file_size_bytes, coordinates, distance_m, moving_time_s, d_plus_m, d_minus_m, max_elevation_m, min_elevation_m, avg_slope_pct, max_slope_pct, effort_index, itra_points, leg_breaker_index, estimated_vam, difficulty_score, difficulty_label, runnability_pct, king_climb, track_type, direction, created_at, analyzed_at, updated_at, COUNT(*) OVER() AS total_count
 FROM gpx_tracks
 WHERE user_id = $1
 ORDER BY created_at DESC
@@ -238,15 +238,49 @@ type ListGPXTracksByUserParams struct {
 	Offset int32       `json:"offset"`
 }
 
-func (q *Queries) ListGPXTracksByUser(ctx context.Context, arg ListGPXTracksByUserParams) ([]GpxTrack, error) {
+type ListGPXTracksByUserRow struct {
+	ID              pgtype.UUID        `json:"id"`
+	UserID          pgtype.UUID        `json:"user_id"`
+	Name            string             `json:"name"`
+	FileHash        string             `json:"file_hash"`
+	FileSizeBytes   int64              `json:"file_size_bytes"`
+	Coordinates     []byte             `json:"coordinates"`
+	DistanceM       pgtype.Numeric     `json:"distance_m"`
+	MovingTimeS     int32              `json:"moving_time_s"`
+	DPlusM          pgtype.Numeric     `json:"d_plus_m"`
+	DMinusM         pgtype.Numeric     `json:"d_minus_m"`
+	MaxElevationM   pgtype.Numeric     `json:"max_elevation_m"`
+	MinElevationM   pgtype.Numeric     `json:"min_elevation_m"`
+	AvgSlopePct     pgtype.Numeric     `json:"avg_slope_pct"`
+	MaxSlopePct     pgtype.Numeric     `json:"max_slope_pct"`
+	EffortIndex     pgtype.Numeric     `json:"effort_index"`
+	ItraPoints      pgtype.Numeric     `json:"itra_points"`
+	LegBreakerIndex pgtype.Numeric     `json:"leg_breaker_index"`
+	EstimatedVam    pgtype.Numeric     `json:"estimated_vam"`
+	DifficultyScore int32              `json:"difficulty_score"`
+	DifficultyLabel string             `json:"difficulty_label"`
+	RunnabilityPct  pgtype.Numeric     `json:"runnability_pct"`
+	KingClimb       []byte             `json:"king_climb"`
+	TrackType       string             `json:"track_type"`
+	Direction       pgtype.Text        `json:"direction"`
+	CreatedAt       pgtype.Timestamptz `json:"created_at"`
+	AnalyzedAt      pgtype.Timestamptz `json:"analyzed_at"`
+	UpdatedAt       pgtype.Timestamptz `json:"updated_at"`
+	TotalCount      int64              `json:"total_count"`
+}
+
+// Misma corrección que ListActivitiesByUser (issue #172, M6):
+// COUNT(*) OVER() añade el total real a cada fila para que el handler
+// pueda devolverlo en `total` sin engañarse con offset+len+1.
+func (q *Queries) ListGPXTracksByUser(ctx context.Context, arg ListGPXTracksByUserParams) ([]ListGPXTracksByUserRow, error) {
 	rows, err := q.db.Query(ctx, listGPXTracksByUser, arg.UserID, arg.Limit, arg.Offset)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []GpxTrack
+	var items []ListGPXTracksByUserRow
 	for rows.Next() {
-		var i GpxTrack
+		var i ListGPXTracksByUserRow
 		if err := rows.Scan(
 			&i.ID,
 			&i.UserID,
@@ -275,6 +309,7 @@ func (q *Queries) ListGPXTracksByUser(ctx context.Context, arg ListGPXTracksByUs
 			&i.CreatedAt,
 			&i.AnalyzedAt,
 			&i.UpdatedAt,
+			&i.TotalCount,
 		); err != nil {
 			return nil, err
 		}

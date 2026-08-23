@@ -32,10 +32,14 @@ func ListActivities(q sqlc.Querier) http.Handler {
 		// Parse pagination parameters
 		limit, offset := parsePagination(r)
 
-		// Query activities
+		// Query activities. Pedimos limit+1 filas para detectar has_next sin
+		// segunda query; mismo patrón que gpx.SQLCStore.List y que ya se
+		// documentaba en el issue #172, M6. El COUNT(*) OVER() de la query
+		// nos da el total real subyacente al WHERE (no al LIMIT), así que
+		// no necesitamos una query separada para paginación real.
 		activities, err := q.ListActivitiesByUser(r.Context(), sqlc.ListActivitiesByUserParams{
 			UserID: parseUserID(user.ID),
-			Limit:  int32(limit),
+			Limit:  int32(limit + 1),
 			Offset: int32(offset),
 		})
 		if err != nil {
@@ -45,13 +49,22 @@ func ListActivities(q sqlc.Querier) http.Handler {
 			return
 		}
 
+		// Total real vía COUNT(*) OVER() (issue #172, M6). Si la lista
+		// está vacía no hay fila de la que sacar el total.
+		var total int64
+		if len(activities) > 0 {
+			total = activities[0].TotalCount
+		}
+		// has_next correcto incluso cuando la última página cabe justa
+		// (45 filas, limit=15, página 3): descartar la fila extra que
+		// pedimos como centinela.
+		hasNext := len(activities) > limit
+		if hasNext {
+			activities = activities[:limit]
+		}
+
 		// Build response
 		page := offset/limit + 1
-		hasNext := len(activities) == limit
-		total := offset + len(activities)
-		if hasNext {
-			total += 1 // Indicate there's at least one more
-		}
 
 		resp := map[string]interface{}{
 			"data":     activities,

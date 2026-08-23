@@ -12,6 +12,7 @@ import (
 	"github.com/fgjcarlos/ghamusinos/internal/db/sqlc"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
+	"github.com/stretchr/testify/require"
 )
 
 // T1.1: GET /api/v1/activities returns user's activities sorted by started_at DESC, paginated (limit/offset)
@@ -60,12 +61,17 @@ func TestListActivities_ReturnsActivitiesSortedAndPaginated(t *testing.T) {
 		UpdatedAt:      pgtype.Timestamptz{Time: time.Now(), Valid: true},
 	}
 
-	mockQ.ListActivitiesByUserFunc = func(ctx context.Context, arg sqlc.ListActivitiesByUserParams) ([]sqlc.Activity, error) {
-		// Verify pagination params
-		if arg.Limit != 20 || arg.Offset != 0 {
-			t.Errorf("expected limit=20, offset=0; got limit=%d, offset=%d", arg.Limit, arg.Offset)
+	mockQ.ListActivitiesByUserFunc = func(ctx context.Context, arg sqlc.ListActivitiesByUserParams) ([]sqlc.ListActivitiesByUserRow, error) {
+		// Verificamos los params que el handler pasa tras el cambio a
+		// limit+1 (issue #172, M6): el handler pide limit+1 para detectar
+		// has_next sin segunda query.
+		if arg.Limit != 21 || arg.Offset != 0 {
+			t.Errorf("expected limit=21 (limit+1), offset=0; got limit=%d, offset=%d", arg.Limit, arg.Offset)
 		}
-		return []sqlc.Activity{activity1, activity2}, nil
+		return []sqlc.ListActivitiesByUserRow{
+			activityToRow(activity1, 42),
+			activityToRow(activity2, 42),
+		}, nil
 	}
 
 	handler := ListActivities(mockQ)
@@ -169,12 +175,12 @@ func TestListActivities_PaginationPage2(t *testing.T) {
 		UpdatedAt:      pgtype.Timestamptz{Time: time.Now(), Valid: true},
 	}
 
-	mockQ.ListActivitiesByUserFunc = func(ctx context.Context, arg sqlc.ListActivitiesByUserParams) ([]sqlc.Activity, error) {
-		// Page 2, limit 20 should result in offset = (2-1)*20 = 20
-		if arg.Offset != 20 {
-			t.Errorf("expected offset=20 for page 2, got %d", arg.Offset)
+	mockQ.ListActivitiesByUserFunc = func(ctx context.Context, arg sqlc.ListActivitiesByUserParams) ([]sqlc.ListActivitiesByUserRow, error) {
+		// Page 2, limit 20 → offset=20; el handler sigue pidiendo limit+1=21.
+		if arg.Limit != 21 || arg.Offset != 20 {
+			t.Errorf("expected limit=21, offset=20 for page 2; got limit=%d, offset=%d", arg.Limit, arg.Offset)
 		}
-		return []sqlc.Activity{activity}, nil
+		return []sqlc.ListActivitiesByUserRow{activityToRow(activity, 7)}, nil
 	}
 
 	handler := ListActivities(mockQ)
@@ -423,7 +429,7 @@ func TestSyncStatus_NotFoundWhenNoSessionExists(t *testing.T) {
 type activitiesMockQuerier struct {
 	t *testing.T
 
-	ListActivitiesByUserFunc    func(context.Context, sqlc.ListActivitiesByUserParams) ([]sqlc.Activity, error)
+	ListActivitiesByUserFunc    func(context.Context, sqlc.ListActivitiesByUserParams) ([]sqlc.ListActivitiesByUserRow, error)
 	GetActivityByExternalIDFunc func(context.Context, sqlc.GetActivityByExternalIDParams) (sqlc.Activity, error)
 	GetLatestSyncSessionFunc    func(context.Context, pgtype.UUID) (sqlc.SyncSession, error)
 }
@@ -434,7 +440,7 @@ func newActivitiesMockQuerier(t *testing.T) *activitiesMockQuerier {
 
 // Implement sqlc.Querier interface - stub all methods except activities ones
 
-func (m *activitiesMockQuerier) ListActivitiesByUser(ctx context.Context, arg sqlc.ListActivitiesByUserParams) ([]sqlc.Activity, error) {
+func (m *activitiesMockQuerier) ListActivitiesByUser(ctx context.Context, arg sqlc.ListActivitiesByUserParams) ([]sqlc.ListActivitiesByUserRow, error) {
 	if m.ListActivitiesByUserFunc != nil {
 		return m.ListActivitiesByUserFunc(ctx, arg)
 	}
@@ -535,4 +541,146 @@ func (m *activitiesMockQuerier) GetUserHRMaxByID(ctx context.Context, userID pgt
 }
 func (m *activitiesMockQuerier) UpsertHRZones(ctx context.Context, arg sqlc.UpsertHRZonesParams) (sqlc.HrZone, error) {
 	return sqlc.HrZone{}, nil
+}
+
+// Stubs gpx añadidos tras el regen de SQLC (issue #172, M6).
+// Estos tests no ejercitan el GPX lab, pero el mock debe implementar
+// la interfaz completa para que el compilador no proteste.
+func (m *activitiesMockQuerier) CreateGPXClimb(ctx context.Context, arg sqlc.CreateGPXClimbParams) (sqlc.GpxClimb, error) {
+	return sqlc.GpxClimb{}, nil
+}
+func (m *activitiesMockQuerier) CreateGPXRiskZone(ctx context.Context, arg sqlc.CreateGPXRiskZoneParams) (sqlc.GpxRiskZone, error) {
+	return sqlc.GpxRiskZone{}, nil
+}
+func (m *activitiesMockQuerier) CreateGPXTrack(ctx context.Context, arg sqlc.CreateGPXTrackParams) (sqlc.GpxTrack, error) {
+	return sqlc.GpxTrack{}, nil
+}
+func (m *activitiesMockQuerier) DeleteGPXTrack(ctx context.Context, arg sqlc.DeleteGPXTrackParams) error {
+	return nil
+}
+func (m *activitiesMockQuerier) GetGPXTrackByHash(ctx context.Context, arg sqlc.GetGPXTrackByHashParams) (sqlc.GpxTrack, error) {
+	return sqlc.GpxTrack{}, nil
+}
+func (m *activitiesMockQuerier) GetGPXTrackByID(ctx context.Context, arg sqlc.GetGPXTrackByIDParams) (sqlc.GpxTrack, error) {
+	return sqlc.GpxTrack{}, nil
+}
+func (m *activitiesMockQuerier) ListGPXClimbsByTrack(ctx context.Context, trackID pgtype.UUID) ([]sqlc.GpxClimb, error) {
+	return nil, nil
+}
+func (m *activitiesMockQuerier) ListGPXRiskZonesByTrack(ctx context.Context, trackID pgtype.UUID) ([]sqlc.GpxRiskZone, error) {
+	return nil, nil
+}
+func (m *activitiesMockQuerier) ListGPXTracksByUser(ctx context.Context, arg sqlc.ListGPXTracksByUserParams) ([]sqlc.ListGPXTracksByUserRow, error) {
+	return nil, nil
+}
+
+// activityToRow aplana una sqlc.Activity a sqlc.ListActivitiesByUserRow
+// (issue #172, M6: la query ahora trae también total_count del window
+// function, y el handler lo lee de la primera fila).
+func activityToRow(a sqlc.Activity, total int64) sqlc.ListActivitiesByUserRow {
+	return sqlc.ListActivitiesByUserRow{
+		ID:             a.ID,
+		UserID:         a.UserID,
+		ExternalSource: a.ExternalSource,
+		ExternalID:     a.ExternalID,
+		Name:           a.Name,
+		SportType:      a.SportType,
+		StartedAt:      a.StartedAt,
+		ElapsedSeconds: a.ElapsedSeconds,
+		MovingSeconds:  a.MovingSeconds,
+		DistanceMeters: a.DistanceMeters,
+		ElevationGainM: a.ElevationGainM,
+		AvgHr:          a.AvgHr,
+		MaxHr:          a.MaxHr,
+		AvgPower:       a.AvgPower,
+		RawPayload:     a.RawPayload,
+		CreatedAt:      a.CreatedAt,
+		UpdatedAt:      a.UpdatedAt,
+		TotalCount:     total,
+	}
+}
+
+// makeActivityRows construye N filas con TotalCount=total. Útil para
+// tests que verifican que `total` se sirve del window function y no de
+// offset+len (issue #172, M6).
+func makeActivityRows(n int, total int64) []sqlc.ListActivitiesByUserRow {
+	rows := make([]sqlc.ListActivitiesByUserRow, n)
+	for i := 0; i < n; i++ {
+		rows[i] = sqlc.ListActivitiesByUserRow{
+			ID:             pgtype.UUID{Bytes: [16]byte{byte(i)}, Valid: true},
+			UserID:         pgtype.UUID{Valid: true},
+			ExternalSource: "strava",
+			ExternalID:     int64(i),
+			Name:           "Activity",
+			StartedAt:      pgtype.Timestamptz{Time: time.Now(), Valid: true},
+			TotalCount:     total,
+		}
+	}
+	return rows
+}
+
+// TestListActivities_TotalComesFromCountOver verifica que el `total`
+// del JSON sale del window function (COUNT(*) OVER()) de la primera
+// fila, no de `offset + len + (1 si has_next)`. Antes mentía: con 45
+// filas, página 1 reportaba 21. issue #172, M6.
+func TestListActivities_TotalComesFromCountOver(t *testing.T) {
+	mockQ := newActivitiesMockQuerier(t)
+	// 45 filas totales, página 1 devuelve 21 (limit + sentinela).
+	mockQ.ListActivitiesByUserFunc = func(ctx context.Context, arg sqlc.ListActivitiesByUserParams) ([]sqlc.ListActivitiesByUserRow, error) {
+		return makeActivityRows(21, 45), nil
+	}
+	handler := ListActivities(mockQ)
+	req := httptest.NewRequestWithContext(
+		auth.WithAuthUser(context.Background(), &auth.User{ID: "00000000-0000-0000-0000-000000000001"}),
+		"GET", "/api/v1/activities?page=1&limit=20", nil)
+	w := httptest.NewRecorder()
+	handler.ServeHTTP(w, req)
+
+	var resp map[string]interface{}
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
+	require.Equal(t, float64(45), resp["total"], "total debe ser el conteo real, no offset+len+1")
+}
+
+// TestListActivities_TotalIsSameAcrossPages verifica que página 3
+// también reporta 45, no offset+len.
+func TestListActivities_TotalIsSameAcrossPages(t *testing.T) {
+	mockQ := newActivitiesMockQuerier(t)
+	mockQ.ListActivitiesByUserFunc = func(ctx context.Context, arg sqlc.ListActivitiesByUserParams) ([]sqlc.ListActivitiesByUserRow, error) {
+		// Página 3 con limit=20 → offset=40, devuelvo 5 (las últimas 5).
+		return makeActivityRows(5, 45), nil
+	}
+	handler := ListActivities(mockQ)
+	req := httptest.NewRequestWithContext(
+		auth.WithAuthUser(context.Background(), &auth.User{ID: "00000000-0000-0000-0000-000000000001"}),
+		"GET", "/api/v1/activities?page=3&limit=20", nil)
+	w := httptest.NewRecorder()
+	handler.ServeHTTP(w, req)
+
+	var resp map[string]interface{}
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
+	require.Equal(t, float64(45), resp["total"])
+}
+
+// TestListActivities_HasNextCorrectOnExactLastPage verifica el caso
+// que el audit detectó: 45 filas, limit=15, página 3 (offset=30) → la
+// última página cabe justa (15 filas), no hay más. Antes el handler
+// decía has_next=true porque len == limit. issue #172, M6.
+func TestListActivities_HasNextCorrectOnExactLastPage(t *testing.T) {
+	mockQ := newActivitiesMockQuerier(t)
+	mockQ.ListActivitiesByUserFunc = func(ctx context.Context, arg sqlc.ListActivitiesByUserParams) ([]sqlc.ListActivitiesByUserRow, error) {
+		// Pedimos limit+1=16 para detectar centinela; devolvemos solo
+		// 15 (no hay centinela → última página exacta).
+		return makeActivityRows(15, 45), nil
+	}
+	handler := ListActivities(mockQ)
+	req := httptest.NewRequestWithContext(
+		auth.WithAuthUser(context.Background(), &auth.User{ID: "00000000-0000-0000-0000-000000000001"}),
+		"GET", "/api/v1/activities?page=3&limit=15", nil)
+	w := httptest.NewRecorder()
+	handler.ServeHTTP(w, req)
+
+	var resp map[string]interface{}
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
+	require.Equal(t, false, resp["has_next"], "última página exacta debe decir has_next=false")
+	require.Equal(t, float64(45), resp["total"])
 }

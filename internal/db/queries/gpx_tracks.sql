@@ -29,7 +29,10 @@ WHERE user_id = $1 AND file_hash = $2
 LIMIT 1;
 
 -- name: ListGPXTracksByUser :many
-SELECT *
+-- Misma corrección que ListActivitiesByUser (issue #172, M6):
+-- COUNT(*) OVER() añade el total real a cada fila para que el handler
+-- pueda devolverlo en `total` sin engañarse con offset+len+1.
+SELECT *, COUNT(*) OVER() AS total_count
 FROM gpx_tracks
 WHERE user_id = $1
 ORDER BY created_at DESC

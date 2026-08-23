@@ -54,7 +54,7 @@ func (q *Queries) GetActivityByExternalID(ctx context.Context, arg GetActivityBy
 }
 
 const listActivitiesByUser = `-- name: ListActivitiesByUser :many
-SELECT id, user_id, external_source, external_id, name, sport_type, started_at, elapsed_seconds, moving_seconds, distance_meters, elevation_gain_m, avg_hr, max_hr, avg_power, raw_payload, created_at, updated_at
+SELECT id, user_id, external_source, external_id, name, sport_type, started_at, elapsed_seconds, moving_seconds, distance_meters, elevation_gain_m, avg_hr, max_hr, avg_power, raw_payload, created_at, updated_at, COUNT(*) OVER() AS total_count
 FROM activities
 WHERE user_id = $1
 ORDER BY started_at DESC
@@ -67,19 +67,45 @@ type ListActivitiesByUserParams struct {
 	Offset int32       `json:"offset"`
 }
 
+type ListActivitiesByUserRow struct {
+	ID             pgtype.UUID        `json:"id"`
+	UserID         pgtype.UUID        `json:"user_id"`
+	ExternalSource string             `json:"external_source"`
+	ExternalID     int64              `json:"external_id"`
+	Name           string             `json:"name"`
+	SportType      string             `json:"sport_type"`
+	StartedAt      pgtype.Timestamptz `json:"started_at"`
+	ElapsedSeconds int32              `json:"elapsed_seconds"`
+	MovingSeconds  int32              `json:"moving_seconds"`
+	DistanceMeters pgtype.Numeric     `json:"distance_meters"`
+	ElevationGainM pgtype.Numeric     `json:"elevation_gain_m"`
+	AvgHr          pgtype.Int2        `json:"avg_hr"`
+	MaxHr          pgtype.Int2        `json:"max_hr"`
+	AvgPower       pgtype.Int2        `json:"avg_power"`
+	RawPayload     []byte             `json:"raw_payload"`
+	CreatedAt      pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt      pgtype.Timestamptz `json:"updated_at"`
+	TotalCount     int64              `json:"total_count"`
+}
+
 // Lista paginada de actividades del usuario, ordenadas de más reciente a
 // más antigua. El LIMIT es por la query (no cursor) porque el uso esperado
 // es UI paginada con offset; cuando se necesite cursor, se añadirá en su
 // propia query sin tocar esta.
-func (q *Queries) ListActivitiesByUser(ctx context.Context, arg ListActivitiesByUserParams) ([]Activity, error) {
+//
+// COUNT(*) OVER() añade el total real de filas que cumplen el WHERE a
+// cada fila devuelta. El handler coge el valor de la primera fila
+// (es el mismo para todas). issue #172, M6 — antes el handler
+// devolvía `offset + len(rows) (+ 1 si has_next)`, que no es un total.
+func (q *Queries) ListActivitiesByUser(ctx context.Context, arg ListActivitiesByUserParams) ([]ListActivitiesByUserRow, error) {
 	rows, err := q.db.Query(ctx, listActivitiesByUser, arg.UserID, arg.Limit, arg.Offset)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []Activity
+	var items []ListActivitiesByUserRow
 	for rows.Next() {
-		var i Activity
+		var i ListActivitiesByUserRow
 		if err := rows.Scan(
 			&i.ID,
 			&i.UserID,
@@ -98,6 +124,7 @@ func (q *Queries) ListActivitiesByUser(ctx context.Context, arg ListActivitiesBy
 			&i.RawPayload,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.TotalCount,
 		); err != nil {
 			return nil, err
 		}

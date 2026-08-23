@@ -11,11 +11,15 @@ import (
 )
 
 type Querier interface {
+	CreateGPXClimb(ctx context.Context, arg CreateGPXClimbParams) (GpxClimb, error)
+	CreateGPXRiskZone(ctx context.Context, arg CreateGPXRiskZoneParams) (GpxRiskZone, error)
+	CreateGPXTrack(ctx context.Context, arg CreateGPXTrackParams) (GpxTrack, error)
 	CreateInvite(ctx context.Context, arg CreateInviteParams) (Invite, error)
 	// Crea una nueva sesión de sincronización en estado 'pending'. El caller la
 	// transita a 'running' con UpdateSyncSessionStatus cuando empieza a procesar.
 	CreateSyncSession(ctx context.Context, arg CreateSyncSessionParams) (SyncSession, error)
 	CreateUser(ctx context.Context, arg CreateUserParams) (User, error)
+	DeleteGPXTrack(ctx context.Context, arg DeleteGPXTrackParams) error
 	// Limpia los tokens del usuario (logout / desvinculación).
 	DeleteStravaTokensByUserID(ctx context.Context, userID pgtype.UUID) error
 	// Return the existing row when Strava retries the same natural event key.
@@ -32,6 +36,8 @@ type Querier interface {
 	GetActivityByExternalID(ctx context.Context, arg GetActivityByExternalIDParams) (Activity, error)
 	// Load an event by the internal UUID passed to IngestActivityEventWorker.
 	GetActivityEventByID(ctx context.Context, id pgtype.UUID) (ActivityEvent, error)
+	GetGPXTrackByHash(ctx context.Context, arg GetGPXTrackByHashParams) (GpxTrack, error)
+	GetGPXTrackByID(ctx context.Context, arg GetGPXTrackByIDParams) (GpxTrack, error)
 	GetHRZonesByActivity(ctx context.Context, activityID pgtype.UUID) (HrZone, error)
 	GetInviteByTokenHash(ctx context.Context, tokenHash string) (Invite, error)
 	// Obtiene la sesión de sincronización más reciente del usuario.
@@ -48,7 +54,18 @@ type Querier interface {
 	// más antigua. El LIMIT es por la query (no cursor) porque el uso esperado
 	// es UI paginada con offset; cuando se necesite cursor, se añadirá en su
 	// propia query sin tocar esta.
-	ListActivitiesByUser(ctx context.Context, arg ListActivitiesByUserParams) ([]Activity, error)
+	//
+	// COUNT(*) OVER() añade el total real de filas que cumplen el WHERE a
+	// cada fila devuelta. El handler coge el valor de la primera fila
+	// (es el mismo para todas). issue #172, M6 — antes el handler
+	// devolvía `offset + len(rows) (+ 1 si has_next)`, que no es un total.
+	ListActivitiesByUser(ctx context.Context, arg ListActivitiesByUserParams) ([]ListActivitiesByUserRow, error)
+	ListGPXClimbsByTrack(ctx context.Context, trackID pgtype.UUID) ([]GpxClimb, error)
+	ListGPXRiskZonesByTrack(ctx context.Context, trackID pgtype.UUID) ([]GpxRiskZone, error)
+	// Misma corrección que ListActivitiesByUser (issue #172, M6):
+	// COUNT(*) OVER() añade el total real a cada fila para que el handler
+	// pueda devolverlo en `total` sin engañarse con offset+len+1.
+	ListGPXTracksByUser(ctx context.Context, arg ListGPXTracksByUserParams) ([]ListGPXTracksByUserRow, error)
 	// Lista los eventos pendientes (processed_at IS NULL) para alimentar un
 	// job de procesamiento. LIMIT defensivo para evitar scans descontrolados.
 	ListPendingActivityEvents(ctx context.Context, limit int32) ([]ActivityEvent, error)
