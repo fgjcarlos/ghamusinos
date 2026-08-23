@@ -44,6 +44,12 @@ const (
 	// para errores transitorios (5xx, 429). Errores 4xx del cliente no
 	// se reintentan (no se van a arreglar solos).
 	defaultMaxRetries = 3
+
+	// maxRetryAfter acota el sleep que hacemos cuando Strava devuelve
+	// un Retry-After grande. Un servidor malicioso podría pedir 15 min
+	// en cada 429; capamos a 60 s para que un bucle de rate limit no
+	// nos deje dormidos una eternidad. issue #169, M1.
+	maxRetryAfter = 60 * time.Second
 )
 
 // Config agrupa la configuración de la app Strava (ADR 0001: una sola
@@ -193,19 +199,19 @@ func (c *Client) doToken(ctx context.Context, form url.Values) (*TokenSet, error
 // la respuesta en out (si out es no-nil).
 //
 // Estrategia de reintentos:
-//   - 429 y 5xx → reintenta con backoff exponencial respetando Retry-After.
-//   - 401 → reintenta UNA vez (deja al caller la responsabilidad de
-//     refrescar el token antes de llamar; esta capa no conoce al usuario).
-//     401 persistente se devuelve como ErrUnauthorized.
+//   - 429 con Retry-After → dormimos exactamente ese tiempo (cap a
+//     maxRetryAfter) antes de devolver RetryableError; el backoff de
+//     go-retry sigue corriendo encima pero es despreciable (≤ 15 s).
+//     Sin Retry-After → cae al backoff exponencial.
+//   - 5xx → backoff exponencial.
+//   - 401 → NO se reintenta: esta capa no sabe refrescar tokens; el caller
+//     lo hace. 401 persistente se devuelve como ErrUnauthorized.
 //   - Otros 4xx → no reintentar; devolver error inmediato.
+//
+// Rate limit: cada intento HTTP consume UN token local, no UNO por
+// llamada — antes el Acquire estaba fuera del loop y subcontaba contra
+// Strava cuando había reintentos. (issue #169, M1.)
 func (c *Client) doJSON(ctx context.Context, req *http.Request, out any) error {
-	// Slot del rate limiter: bloquea hasta que haya hueco en la cuota.
-	// Si ctx se cancela mientras esperamos, devolvemos ese error.
-	if err := c.limiter.Acquire(ctx); err != nil {
-		return err
-	}
-	defer c.limiter.Release()
-
 	// Reintentos. El cuerpo de la request puede no ser re-readable
 	// (lo consume NewRequest), así que lo guardamos una vez y lo
 	// re-inyectamos en cada intento.
@@ -227,11 +233,23 @@ func (c *Client) doJSON(ctx context.Context, req *http.Request, out any) error {
 	attempt := 0
 	err := retry.Do(ctx, backoff, func(ctx context.Context) error {
 		attempt++
-		if bodyBytes != nil {
-			req.Body = io.NopCloser(bytes.NewReader(bodyBytes))
+
+		// Un Acquire por intento HTTP (issue #169, M1): antes el Acquire
+		// estaba fuera del loop y una llamada con 4 intentos consumía 1
+		// token local y 4 del contador real de Strava, subcontando.
+		if err := c.limiter.Acquire(ctx); err != nil {
+			return err
 		}
 
-		resp, err := c.cfg.HTTPClient.Do(req)
+		// Clon por intento: nunca reusamos un *http.Request entre Do()
+		// calls. Clone copia headers y la referencia a Body; sobreescribimos
+		// Body para que cada intento arranque desde el principio del buffer.
+		attemptReq := req.Clone(ctx)
+		if bodyBytes != nil {
+			attemptReq.Body = io.NopCloser(bytes.NewReader(bodyBytes))
+		}
+
+		resp, err := c.cfg.HTTPClient.Do(attemptReq)
 		if err != nil {
 			// Errores de transporte (DNS, conexión rota, timeout): reintentar.
 			lastErr = err
@@ -246,10 +264,24 @@ func (c *Client) doJSON(ctx context.Context, req *http.Request, out any) error {
 
 		case resp.StatusCode == http.StatusTooManyRequests:
 			ra := parseRetryAfter(resp.Header.Get("Retry-After"))
-			lastErr = fmt.Errorf("%w (Retry-After=%s)", ErrRateLimited, ra)
-			// Sleep dentro del retry lo hace go-retry; el Retry-After
-			// se respeta en la siguiente vuelta del backoff porque
-			// devolvemos RetryableError.
+			if ra > 0 {
+				// Respetamos Retry-After con sleep explícito en vez del
+				// backoff exponencial. Acotamos a maxRetryAfter para que
+				// un servidor malicioso no nos clave 15 minutos.
+				sleep := ra
+				if sleep > maxRetryAfter {
+					sleep = maxRetryAfter
+				}
+				select {
+				case <-ctx.Done():
+					return ctx.Err()
+				case <-time.After(sleep):
+				}
+				lastErr = fmt.Errorf("%w (Retry-After=%s)", ErrRateLimited, ra)
+				return retry.RetryableError(lastErr)
+			}
+			// Sin Retry-After cae al backoff de go-retry.
+			lastErr = fmt.Errorf("%w (sin Retry-After)", ErrRateLimited)
 			return retry.RetryableError(lastErr)
 
 		case resp.StatusCode >= 500:
@@ -280,11 +312,9 @@ func (c *Client) doJSON(ctx context.Context, req *http.Request, out any) error {
 	})
 
 	if err != nil {
-		// No dejamos "attempt=0 se fue sin reintentar" cuando hubo error.
 		if errors.Is(err, ErrUnauthorized) || errors.Is(err, ErrRateLimited) {
 			return err
 		}
-		_ = attempt // solo se usa en depuración si la hicieras
 		if lastErr == nil {
 			lastErr = err
 		}

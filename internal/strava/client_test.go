@@ -312,6 +312,88 @@ func TestDo_RetryOn5xx(t *testing.T) {
 	}
 }
 
+// TestDo_RetryAfterHeaderRespected verifica que un 429 con Retry-After:1
+// duerme ~1 segundo antes de reintentar, no ~500 ms del backoff
+// exponencial (issue #169, M1 AC: "Un 429 con Retry-After: 30 hace
+// esperar ~30 s, no ~0,5 s"). Usamos 1 s para que el test sea rápido.
+func TestDo_RetryAfterHeaderRespected(t *testing.T) {
+	var hits int32
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		n := atomic.AddInt32(&hits, 1)
+		if n < 2 {
+			w.Header().Set("Retry-After", "1")
+			http.Error(w, "slow down", http.StatusTooManyRequests)
+			return
+		}
+		_, _ = io.WriteString(w, `{"ok":true}`)
+	}))
+	defer srv.Close()
+
+	c, _ := NewClient(Config{ClientID: "cid", ClientSecret: "csec", HTTPClient: srv.Client()})
+	c.cfg.HTTPClient.Transport = &rewriteTransport{
+		fromTo: map[string]string{"www.strava.com": strings.TrimPrefix(srv.URL, "http://")},
+		base:   http.DefaultTransport,
+	}
+
+	start := time.Now()
+	var out map[string]bool
+	if err := c.Do(context.Background(), http.MethodGet, "/x", "AT", &out); err != nil {
+		t.Fatalf("Do: %v", err)
+	}
+	elapsed := time.Since(start)
+
+	// 1 s de Retry-After + ~500 ms de backoff de go-retry encima = ~1,5 s
+	// en el peor caso. Permitimos 900 ms de suelo para evitar flakiness.
+	if elapsed < 900*time.Millisecond {
+		t.Errorf("elapsed = %v, esperado ≥ 900ms (Retry-After=1 debe dormirse)", elapsed)
+	}
+	if got := atomic.LoadInt32(&hits); got != 2 {
+		t.Errorf("hits = %d, want 2 (1 retry tras Retry-After + 1 éxito)", got)
+	}
+}
+
+// TestDo_AcquireOneTokenPerAttempt verifica que cada intento HTTP
+// consume UN token del limiter, no uno por llamada (issue #169, M1 AC:
+// "Una llamada con 3 reintentos consume 4 tokens del limiter, no 1").
+// Accedemos a c.limiter (mismo paquete) para inspeccionar shortTokens
+// antes y después.
+func TestDo_AcquireOneTokenPerAttempt(t *testing.T) {
+	var hits int32
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		n := atomic.AddInt32(&hits, 1)
+		if n < 4 {
+			// 429 sin Retry-After: cae al backoff exponencial y a
+			// reintentar rápido hasta que llegue el 4º intento.
+			http.Error(w, "slow down", http.StatusTooManyRequests)
+			return
+		}
+		_, _ = io.WriteString(w, `{"ok":true}`)
+	}))
+	defer srv.Close()
+
+	c, _ := NewClient(Config{ClientID: "cid", ClientSecret: "csec", HTTPClient: srv.Client()})
+	c.cfg.HTTPClient.Transport = &rewriteTransport{
+		fromTo: map[string]string{"www.strava.com": strings.TrimPrefix(srv.URL, "http://")},
+		base:   http.DefaultTransport,
+	}
+
+	tokensBefore := c.limiter.shortTokens
+	var out map[string]bool
+	if err := c.Do(context.Background(), http.MethodGet, "/x", "AT", &out); err != nil {
+		t.Fatalf("Do: %v", err)
+	}
+	tokensAfter := c.limiter.shortTokens
+
+	// 4 intentos HTTP = 4 Acquire = 4 tokens consumidos.
+	wantConsumed := 4
+	if gotConsumed := tokensBefore - tokensAfter; gotConsumed != wantConsumed {
+		t.Errorf("tokens consumidos = %d, want %d (1 Acquire por intento HTTP)", gotConsumed, wantConsumed)
+	}
+	if got := atomic.LoadInt32(&hits); got != int32(wantConsumed) {
+		t.Errorf("hits = %d, want %d", got, wantConsumed)
+	}
+}
+
 // TestDo_Client4xxNoRetry verifica que un 400 (no 401/429) NO se reintenta.
 func TestDo_Client4xxNoRetry(t *testing.T) {
 	var hits int32

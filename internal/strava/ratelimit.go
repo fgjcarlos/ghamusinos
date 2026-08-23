@@ -7,12 +7,12 @@ import (
 )
 
 // rateLimiter implementa el rate limit de Strava: 200 req/15min y 2000/día.
-// Son dos ventanas independientes; una request consume una unidad de cada
-// una. Si cualquiera está agotada, Acquire bloquea hasta que se libere un
-// hueco en esa ventana.
+// Son dos ventanas independientes (fixed window, NO token bucket); una
+// request consume una unidad de cada una. Si cualquiera está agotada,
+// Acquire bloquea hasta que se libere un hueco en esa ventana.
 //
 // Es seguro para uso concurrente (varios goroutines pueden llamar a
-// Acquire/Release a la vez).
+// Acquire a la vez).
 //
 // # Limitaciones conocidas
 //
@@ -25,7 +25,7 @@ import (
 //     calcular refill por-request (tiempo desde la última) en lugar de
 //     por-tick (más suave bajo carga baja).
 //
-// ponytail: token bucket en memoria, suficiente para un único proceso.
+// ponytail: ventana fija en memoria, suficiente para un único proceso.
 // Cuando se escale a N réplicas, mover a Redis (mismas dos ventanas).
 type rateLimiter struct {
 	shortCap int
@@ -120,9 +120,7 @@ func (r *rateLimiter) Acquire(ctx context.Context) error {
 	}
 }
 
-// Release existe por simetría con Acquire y porque algunos patrones de
-// semáforo lo piden. Aquí no hacemos nada: cada Acquire consume un token
-// de forma síncrona y no hay "prestamos" entre goroutines. Está en la API
-// por si en el futuro pasamos a un modelo con Acquire no-bloqueante +
-// Release manual.
-func (r *rateLimiter) Release() {}
+// Release existía por simetría con Acquire pero no hacía nada: cada
+// Acquire consume un token de forma síncrona y no hay "préstamos" entre
+// goroutines. Eliminado en issue #169: era un no-op con un defer delante
+// que sugería lo contrario.
