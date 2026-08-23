@@ -24,7 +24,7 @@ type compareGPXStore struct {
 	err     error
 }
 
-func (s *compareGPXStore) GetDetail(_ context.Context, _ pgtype.UUID, trackID pgtype.UUID) (*gpx.StoredTrackDetail, error) {
+func (s *compareGPXStore) GetDetail(_ context.Context, _ pgtype.UUID, trackID pgtype.UUID, _ int) (*gpx.StoredTrackDetail, error) {
 	if s.err != nil {
 		return nil, s.err
 	}

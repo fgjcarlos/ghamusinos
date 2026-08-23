@@ -14,6 +14,74 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
+// ErrNumericConversion marca un valor que pgtype.Numeric.Scan rechazó
+// (p.ej. +Inf, -Inf, NaN propagado desde una división por cero en el
+// analizador). El handler lo traduce a 422 con "el análisis produjo un
+// valor no representable" en vez de devolver un 500 opaco. Antes el
+// código paniqueaba (issue #170, M8).
+var ErrNumericConversion = errors.New("gpx: numeric conversion failed (non-representable value)")
+
+// analysisNumerics precomputa todos los pgtype.Numeric que se persisten
+// en una fila de gpx_tracks a partir de un *Analysis. Concentrar la
+// conversión aquí permite que createTrack no tenga que tejer un error
+// por cada campo (doce) y, sobre todo, que cualquier +Inf/-Inf/NaN del
+// analizador se detecte y se devuelva con ErrNumericConversion en vez
+// de panickear (issue #170, M8).
+type analysisNumerics struct {
+	DistanceM, DPlusM, DMinusM                             pgtype.Numeric
+	MaxElevationM, MinElevationM                           pgtype.Numeric
+	AverageSlopePct, MaxSlopePct                           pgtype.Numeric
+	EffortIndex, ITRAPoints, LegBreakerIndex, EstimatedVAM pgtype.Numeric
+	RunnabilityPct                                         pgtype.Numeric
+}
+
+// toAnalysisNumerics convierte cada campo numérico de a a
+// pgtype.Numeric. Falla rápido en el primer valor no representable,
+// devolviendo ErrNumericConversion envuelto con el nombre del campo
+// para que el handler pueda construir el 422 con contexto.
+func toAnalysisNumerics(a *Analysis) (analysisNumerics, error) {
+	var n analysisNumerics
+	var err error
+
+	if n.DistanceM, err = numeric(a.DistanceM); err != nil {
+		return analysisNumerics{}, fmt.Errorf("%w: distance_m", ErrNumericConversion)
+	}
+	if n.DPlusM, err = numeric(a.DPlusM); err != nil {
+		return analysisNumerics{}, fmt.Errorf("%w: d_plus_m", ErrNumericConversion)
+	}
+	if n.DMinusM, err = numeric(a.DMinusM); err != nil {
+		return analysisNumerics{}, fmt.Errorf("%w: d_minus_m", ErrNumericConversion)
+	}
+	if n.AverageSlopePct, err = numeric(a.AverageSlopePct); err != nil {
+		return analysisNumerics{}, fmt.Errorf("%w: average_slope_pct", ErrNumericConversion)
+	}
+	if n.MaxSlopePct, err = numeric(a.MaxSlopePct); err != nil {
+		return analysisNumerics{}, fmt.Errorf("%w: max_slope_pct", ErrNumericConversion)
+	}
+	if n.EffortIndex, err = numeric(a.EffortIndex); err != nil {
+		return analysisNumerics{}, fmt.Errorf("%w: effort_index", ErrNumericConversion)
+	}
+	if n.ITRAPoints, err = numeric(a.ITRAPoints); err != nil {
+		return analysisNumerics{}, fmt.Errorf("%w: itra_points", ErrNumericConversion)
+	}
+	if n.LegBreakerIndex, err = numeric(a.LegBreakerIndex); err != nil {
+		return analysisNumerics{}, fmt.Errorf("%w: leg_breaker_index", ErrNumericConversion)
+	}
+	if n.EstimatedVAM, err = numeric(a.EstimatedVAM); err != nil {
+		return analysisNumerics{}, fmt.Errorf("%w: estimated_vam", ErrNumericConversion)
+	}
+	if n.RunnabilityPct, err = numeric(a.RunnabilityPct); err != nil {
+		return analysisNumerics{}, fmt.Errorf("%w: runnability_pct", ErrNumericConversion)
+	}
+	if n.MaxElevationM, err = optionalNumeric(a.MaxElevationM); err != nil {
+		return analysisNumerics{}, fmt.Errorf("%w: max_elevation_m", ErrNumericConversion)
+	}
+	if n.MinElevationM, err = optionalNumeric(a.MinElevationM); err != nil {
+		return analysisNumerics{}, fmt.Errorf("%w: min_elevation_m", ErrNumericConversion)
+	}
+	return n, nil
+}
+
 type SQLCStore struct {
 	q            gpxQuerier
 	transactions transactionRunner
@@ -95,27 +163,35 @@ func (s *SQLCStore) createTrack(ctx context.Context, track *Track, analysis *Ana
 	if err != nil {
 		return sqlc.GpxTrack{}, err
 	}
+	// Convertimos todos los campos numéricos del análisis una sola vez.
+	// Si alguno es +Inf/-Inf/NaN, ErrNumericConversion burbujea al
+	// handler, que responde 422 en vez del 500 opaco anterior
+	// (issue #170, M8).
+	n, err := toAnalysisNumerics(analysis)
+	if err != nil {
+		return sqlc.GpxTrack{}, err
+	}
 	row, err := s.q.CreateGPXTrack(ctx, sqlc.CreateGPXTrackParams{
 		UserID:          track.UserID,
 		Name:            track.Name,
 		FileHash:        track.FileHash,
 		FileSizeBytes:   track.FileSizeBytes,
 		Coordinates:     coordinates,
-		DistanceM:       numeric(analysis.DistanceM),
+		DistanceM:       n.DistanceM,
 		MovingTimeS:     int32(analysis.MovingTimeS),
-		DPlusM:          numeric(analysis.DPlusM),
-		DMinusM:         numeric(analysis.DMinusM),
-		MaxElevationM:   optionalNumeric(analysis.MaxElevationM),
-		MinElevationM:   optionalNumeric(analysis.MinElevationM),
-		AvgSlopePct:     numeric(analysis.AverageSlopePct),
-		MaxSlopePct:     numeric(analysis.MaxSlopePct),
-		EffortIndex:     numeric(analysis.EffortIndex),
-		ItraPoints:      numeric(analysis.ITRAPoints),
-		LegBreakerIndex: numeric(analysis.LegBreakerIndex),
-		EstimatedVam:    numeric(analysis.EstimatedVAM),
+		DPlusM:          n.DPlusM,
+		DMinusM:         n.DMinusM,
+		MaxElevationM:   n.MaxElevationM,
+		MinElevationM:   n.MinElevationM,
+		AvgSlopePct:     n.AverageSlopePct,
+		MaxSlopePct:     n.MaxSlopePct,
+		EffortIndex:     n.EffortIndex,
+		ItraPoints:      n.ITRAPoints,
+		LegBreakerIndex: n.LegBreakerIndex,
+		EstimatedVam:    n.EstimatedVAM,
 		DifficultyScore: int32(analysis.DifficultyScore),
 		DifficultyLabel: string(analysis.DifficultyLabel),
-		RunnabilityPct:  numeric(analysis.RunnabilityPct),
+		RunnabilityPct:  n.RunnabilityPct,
 		KingClimb:       kingJSON,
 		TrackType:       track.TrackType,
 		Direction:       pgtype.Text{String: track.Direction, Valid: track.Direction != ""},
@@ -151,9 +227,21 @@ func (s *SQLCStore) createDetail(ctx context.Context, track *Track, analysis *An
 		return nil, err
 	}
 	for _, climb := range climbs {
+		gainM, err := numeric(climb.GainM)
+		if err != nil {
+			return nil, fmt.Errorf("%w: climb.gain_m", ErrNumericConversion)
+		}
+		distM, err := numeric(climb.DistanceM)
+		if err != nil {
+			return nil, fmt.Errorf("%w: climb.distance_m", ErrNumericConversion)
+		}
+		slope, err := numeric(climb.AvgSlopePct)
+		if err != nil {
+			return nil, fmt.Errorf("%w: climb.avg_slope_pct", ErrNumericConversion)
+		}
 		_, err = s.q.CreateGPXClimb(ctx, sqlc.CreateGPXClimbParams{
 			TrackID: row.ID, IsKingClimb: climb.IsKingClimb, StartIdx: int32(climb.StartIdx), EndIdx: int32(climb.EndIdx),
-			GainM: numeric(climb.GainM), DistanceM: numeric(climb.DistanceM), AvgSlopePct: numeric(climb.AvgSlopePct),
+			GainM: gainM, DistanceM: distM, AvgSlopePct: slope,
 		})
 		if err != nil {
 			return nil, fmt.Errorf("gpx: create climb: %w", err)
@@ -167,7 +255,7 @@ func (s *SQLCStore) createDetail(ctx context.Context, track *Track, analysis *An
 			return nil, fmt.Errorf("gpx: create risk zone: %w", err)
 		}
 	}
-	stored, err := storedTrack(row)
+	stored, err := storedTrack(row, 0)
 	if err != nil {
 		return nil, err
 	}
@@ -182,11 +270,11 @@ func (s *SQLCStore) FindByHash(ctx context.Context, userID pgtype.UUID, fileHash
 	if err != nil {
 		return nil, fmt.Errorf("gpx: find track by hash: %w", err)
 	}
-	return storedTrack(row)
+	return storedTrack(row, 0)
 }
 
-func (s *SQLCStore) GetDetail(ctx context.Context, userID, trackID pgtype.UUID) (*StoredTrackDetail, error) {
-	track, err := s.GetByID(ctx, userID, trackID)
+func (s *SQLCStore) GetDetail(ctx context.Context, userID, trackID pgtype.UUID, resolution int) (*StoredTrackDetail, error) {
+	track, err := s.GetByID(ctx, userID, trackID, resolution)
 	if err != nil {
 		return nil, err
 	}
@@ -231,7 +319,7 @@ func (s *SQLCStore) ListRiskZones(ctx context.Context, trackID pgtype.UUID) ([]R
 	return zones, nil
 }
 
-func (s *SQLCStore) GetByID(ctx context.Context, userID, trackID pgtype.UUID) (*StoredTrack, error) {
+func (s *SQLCStore) GetByID(ctx context.Context, userID, trackID pgtype.UUID, resolution int) (*StoredTrack, error) {
 	if s == nil || s.q == nil {
 		return nil, fmt.Errorf("gpx: store is not initialized")
 	}
@@ -239,7 +327,7 @@ func (s *SQLCStore) GetByID(ctx context.Context, userID, trackID pgtype.UUID) (*
 	if err != nil {
 		return nil, fmt.Errorf("gpx: get track: %w", err)
 	}
-	return storedTrack(row)
+	return storedTrack(row, resolution)
 }
 
 func (s *SQLCStore) List(ctx context.Context, userID pgtype.UUID, params ListParams) (*PaginatedTracks, error) {
@@ -264,7 +352,7 @@ func (s *SQLCStore) List(ctx context.Context, userID pgtype.UUID, params ListPar
 	}
 	result := &PaginatedTracks{Data: make([]StoredTrack, 0, len(rows)), Limit: limit, Offset: params.Offset, HasNext: hasNext}
 	for _, row := range rows {
-		item, convertErr := storedTrack(row)
+		item, convertErr := storedTrack(row, 0)
 		if convertErr != nil {
 			return nil, convertErr
 		}
@@ -318,11 +406,16 @@ func marshalKingClimb(climb *Climb) ([]byte, error) {
 	return data, nil
 }
 
-func storedTrack(row sqlc.GpxTrack) (*StoredTrack, error) {
+func storedTrack(row sqlc.GpxTrack, resolution int) (*StoredTrack, error) {
 	points, err := unmarshalCoordinates(row.Coordinates)
 	if err != nil {
 		return nil, err
 	}
+	// Submuestreo aquí, no en el handler: el JSONB de coordinates puede
+	// traer 200 000 puntos y queremos dejar de moverlos lo antes posible
+	// (issue #170, M9). resolution <= 0 cae a DefaultResolution dentro
+	// de subsamplePoints.
+	points = subsamplePoints(points, resolution)
 	return &StoredTrack{
 		Track: Track{
 			ID: row.ID, UserID: row.UserID, Name: row.Name, FileHash: row.FileHash,
@@ -361,17 +454,90 @@ func unmarshalCoordinates(data []byte) ([]Point, error) {
 	return points, nil
 }
 
-func numeric(value float64) pgtype.Numeric {
-	var result pgtype.Numeric
-	if err := result.Scan(strconv.FormatFloat(value, 'f', -1, 64)); err != nil {
-		panic(fmt.Sprintf("gpx: convert numeric: %v", err))
+// DefaultResolution es el número objetivo de columnas que GetGPX
+// devuelve cuando el caller no especifica uno. El cliente de detalle de
+// ruta (1280 px de ancho, issue #04 del rediseño) tiene menos columnas
+// que eso; el margen es para que el submuestreo no se note en pantalla.
+// Ajustar si el rediseño cambia el ancho.
+const DefaultResolution = 2000
+
+// subsamplePoints reduce la lista de puntos a como mucho ~2*resolution
+// puntos, agrupando por columna X y conservando, en cada grupo, los
+// puntos con elevación mínima y máxima. Si solo hay un extremo
+// distinto en el grupo, devuelve uno. Esto preserva los picos y valles
+// del perfil (algo que un downsampling 1-de-cada-N aplana) y deja en
+// unos 2 000 – 4 000 puntos la respuesta por defecto para un GPX de
+// 200 000 puntos (issue #170, M9).
+//
+// Casos límite:
+//   - n <= resolution: devuelve los puntos tal cual.
+//   - grupo sin elevación: devuelve el primer punto del grupo (evita
+//     perder horizontalidad sin inventar elevación).
+//   - resolution <= 0: cae a DefaultResolution.
+func subsamplePoints(points []Point, resolution int) []Point {
+	if resolution <= 0 {
+		resolution = DefaultResolution
 	}
-	return result
+	n := len(points)
+	if n <= resolution {
+		return points
+	}
+	// bucketSize por techo: si resolution no divide n, el último
+	// grupo cubre el resto y no perdemos puntos por el camino.
+	bucketSize := (n + resolution - 1) / resolution
+	out := make([]Point, 0, 2*resolution)
+	for start := 0; start < n; start += bucketSize {
+		end := start + bucketSize
+		if end > n {
+			end = n
+		}
+		minIdx, maxIdx := -1, -1
+		for i := start; i < end; i++ {
+			if points[i].Ele == nil {
+				continue
+			}
+			if minIdx == -1 || *points[i].Ele < *points[minIdx].Ele {
+				minIdx = i
+			}
+			if maxIdx == -1 || *points[i].Ele > *points[maxIdx].Ele {
+				maxIdx = i
+			}
+		}
+		switch {
+		case minIdx == -1 && maxIdx == -1:
+			// Grupo sin elevación: mantenemos el primer punto del grupo
+			// para no perder su tramo horizontal.
+			out = append(out, points[start])
+		case minIdx == maxIdx:
+			out = append(out, points[minIdx])
+		default:
+			// Preservamos el orden X: índice menor primero.
+			if minIdx < maxIdx {
+				out = append(out, points[minIdx], points[maxIdx])
+			} else {
+				out = append(out, points[maxIdx], points[minIdx])
+			}
+		}
+	}
+	return out
 }
 
-func optionalNumeric(value *float64) pgtype.Numeric {
+// numeric serializa un float64 a pgtype.Numeric. Devuelve error en vez
+// de panicar para que un +Inf propagado desde el análisis no tumbe la
+// goroutine del handler (issue #170, M8). El handler traduce a 422 con
+// "el análisis produjo un valor no representable" en vez de a un 500
+// opaco.
+func numeric(value float64) (pgtype.Numeric, error) {
+	var result pgtype.Numeric
+	if err := result.Scan(strconv.FormatFloat(value, 'f', -1, 64)); err != nil {
+		return pgtype.Numeric{}, fmt.Errorf("%w (input=%v): %v", ErrNumericConversion, value, err)
+	}
+	return result, nil
+}
+
+func optionalNumeric(value *float64) (pgtype.Numeric, error) {
 	if value == nil {
-		return pgtype.Numeric{}
+		return pgtype.Numeric{}, nil
 	}
 	return numeric(*value)
 }
