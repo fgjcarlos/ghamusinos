@@ -7,7 +7,10 @@ import (
 	"time"
 )
 
-// Test token generation produces correct hash
+// Test token generation produces correct hash. El contrato observable
+// tras #173, M15 es: hash == sha256hex(token). Antes hasheábamos los
+// bytes crudos; el día que alguien valide el token hex, fallaría en
+// silencio.
 func TestGenerateTokenAndHash_ValidToken(t *testing.T) {
 	token, hash, err := generateTokenAndHash(32)
 	if err != nil {
@@ -23,9 +26,9 @@ func TestGenerateTokenAndHash_ValidToken(t *testing.T) {
 		t.Fatalf("token not valid hex: %v", err)
 	}
 
-	// Hash debe ser SHA-256 válido del token (en bytes)
-	tokenBytes, _ := hex.DecodeString(token)
-	expectedHash := sha256.Sum256(tokenBytes)
+	// Hash debe ser SHA-256 del token en su forma hex (no de los bytes
+	// aleatorios). Eso es lo que el día de mañana pegará el usuario.
+	expectedHash := sha256.Sum256([]byte(token))
 	expectedHashStr := hex.EncodeToString(expectedHash[:])
 
 	if hash != expectedHashStr {
@@ -101,14 +104,27 @@ func TestCreateInvite_StoresToken(t *testing.T) {
 		t.Fatalf("expected non-empty token and hash")
 	}
 
-	// Verify hash is deterministic (same token -> same hash)
-	tokenBytes, _ := hex.DecodeString(token)
+	// Verify hash is deterministic: mismo token hex → mismo hash.
+	// El hash se calcula sobre la cadena hex, no sobre los bytes
+	// aleatorios, así que rehashear el token produce el mismo hash.
 	hasher := sha256.New()
-	hasher.Write(tokenBytes)
+	hasher.Write([]byte(token))
 	hash2 := hex.EncodeToString(hasher.Sum(nil))
 
 	if hash != hash2 {
 		t.Errorf("hash not deterministic: %q vs %q", hash, hash2)
+	}
+}
+
+// TestParseDuration_RejectsJunk verifica que "7dx" (junk después del
+// número) devuelve error. Antes fmt.Sscanf leía 7 y descartaba el
+// resto sin quejarse — issue #173, bonus.
+func TestParseDuration_RejectsJunk(t *testing.T) {
+	bad := []string{"7dx", "12abc", "d", " "}
+	for _, input := range bad {
+		if _, err := parseDuration(input); err == nil {
+			t.Errorf("parseDuration(%q) debería devolver error, obtuvo nil", input)
+		}
 	}
 }
 
