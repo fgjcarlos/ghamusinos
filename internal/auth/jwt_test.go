@@ -3,6 +3,7 @@ package auth
 import (
 	"context"
 	"crypto"
+	"encoding/base64"
 	"testing"
 	"time"
 )
@@ -23,7 +24,7 @@ func TestJWTValidator_ValidToken(t *testing.T) {
 	}, nil)
 
 	cache := &mockJWKSCache{key: kp.PublicKey}
-	validator := NewJWTValidator(cache, "test-audience")
+	validator := NewJWTValidator(cache, "https://accounts.clerk.test", "test-audience")
 
 	ctx := context.Background()
 	claims, err := validator.Validate(ctx, token)
@@ -55,7 +56,7 @@ func TestJWTValidator_ExpiredToken(t *testing.T) {
 		})
 
 	cache := &mockJWKSCache{key: kp.PublicKey}
-	validator := NewJWTValidator(cache, "test-audience")
+	validator := NewJWTValidator(cache, "https://accounts.clerk.test", "test-audience")
 
 	ctx := context.Background()
 	_, err := validator.Validate(ctx, token)
@@ -75,7 +76,7 @@ func TestJWTValidator_MissingSubClaim(t *testing.T) {
 		nil)
 
 	cache := &mockJWKSCache{key: kp.PublicKey}
-	validator := NewJWTValidator(cache, "test-audience")
+	validator := NewJWTValidator(cache, "https://accounts.clerk.test", "test-audience")
 
 	ctx := context.Background()
 	_, err := validator.Validate(ctx, token)
@@ -97,7 +98,7 @@ func TestJWTValidator_WrongAudience(t *testing.T) {
 		})
 
 	cache := &mockJWKSCache{key: kp.PublicKey}
-	validator := NewJWTValidator(cache, "expected-audience")
+	validator := NewJWTValidator(cache, "https://accounts.clerk.test", "expected-audience")
 
 	ctx := context.Background()
 	_, err := validator.Validate(ctx, token)
@@ -117,7 +118,7 @@ func TestJWTValidator_InvalidSignature(t *testing.T) {
 	// Generate a different key pair to create an invalid signature
 	wrongKp := GenerateTestKeyPair(t, "wrong-key")
 	cache := &mockJWKSCache{key: wrongKp.PublicKey}
-	validator := NewJWTValidator(cache, "test-audience")
+	validator := NewJWTValidator(cache, "https://accounts.clerk.test", "test-audience")
 
 	ctx := context.Background()
 	_, err := validator.Validate(ctx, token)
@@ -139,12 +140,53 @@ func TestJWTValidator_MissingNbf(t *testing.T) {
 		})
 
 	cache := &mockJWKSCache{key: kp.PublicKey}
-	validator := NewJWTValidator(cache, "test-audience")
+	validator := NewJWTValidator(cache, "https://accounts.clerk.test", "test-audience")
 
 	ctx := context.Background()
 	_, err := validator.Validate(ctx, token)
 	if err != ErrExpiredToken {
 		t.Errorf("expected ErrExpiredToken for future nbf, got: %v", err)
+	}
+}
+
+// TestJWTValidator_WrongIssuer verifica que un token firmado correctamente
+// pero con `iss` distinto al configurado se rechaza. Sin la verificación
+// de emisor, cualquier token firmado por una clave del JWKS configurado
+// entraría, aunque no sea del tenant. Issue #167.
+func TestJWTValidator_WrongIssuer(t *testing.T) {
+	kp := GenerateTestKeyPair(t, "test-key-1")
+	token := kp.SignToken(t,
+		map[string]interface{}{"sub": "user_123"},
+		map[string]interface{}{"iss": "https://attacker.example.com"})
+
+	cache := &mockJWKSCache{key: kp.PublicKey}
+	// El validador espera un emisor DISTINTO al del token.
+	validator := NewJWTValidator(cache, "https://accounts.clerk.test", "test-audience")
+
+	_, err := validator.Validate(context.Background(), token)
+	if err != ErrUnauthenticated {
+		t.Errorf("expected ErrUnauthenticated for wrong issuer, got: %v", err)
+	}
+}
+
+// TestJWTValidator_JWSWithoutSignatures verifica que un JWS con cero
+// firmas devuelve ErrUnauthenticated sin panic. Antes de #167,
+// jwt.go hacía `msg.Signatures()[0]` sin comprobar la longitud; el
+// Recoverer lo cazaba como 500. Ahora devolvemos 401 directamente.
+func TestJWTValidator_JWSWithoutSignatures(t *testing.T) {
+	// Un JWS compact sin firma tiene la forma `header.payload.` con
+	// la tercera parte vacía. jws.Parse lo acepta como mensaje con
+	// cero firmas (no como error de parseo).
+	header := base64.RawURLEncoding.EncodeToString([]byte(`{"alg":"none","kid":"test-key-1"}`))
+	payload := base64.RawURLEncoding.EncodeToString([]byte(`{"sub":"user_123","iss":"https://accounts.clerk.test"}`))
+	token := header + "." + payload + "."
+
+	cache := &mockJWKSCache{key: nil}
+	validator := NewJWTValidator(cache, "https://accounts.clerk.test", "test-audience")
+
+	_, err := validator.Validate(context.Background(), token)
+	if err != ErrUnauthenticated {
+		t.Errorf("expected ErrUnauthenticated for JWS without signatures, got: %v", err)
 	}
 }
 
