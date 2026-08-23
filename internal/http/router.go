@@ -39,6 +39,11 @@ type Server struct {
 	// Webhook store (optional, phase 1.2 issue #86). Routes are mounted before
 	// authentication because Strava calls them directly.
 	webhookStore strava.ActivityEventStore
+	// InvitePromoter (issue #168): performs the atomic
+	// MarkInviteAccepted + UpdateUserInviteStatus pair when a pending user
+	// presents a valid invite. Required whenever /api/* is mounted with the
+	// invite gate; nil-safe when AUTH_DISABLED bypasses Clerk and the gate.
+	invitePromoter auth.InvitePromoter
 	// GPX Lab dependencies are optional so focused router tests and commands that
 	// do not initialize the feature keep their existing construction path.
 	gpxStore         gpx.GPXStore
@@ -76,6 +81,15 @@ func (s *Server) WithStrava(client *strava.Client, store strava.TokenStore, enqu
 // tanto la encolada de eventos como la encolada de jobs River.
 func (s *Server) WithWebhooks(store strava.ActivityEventStore) *Server {
 	s.webhookStore = store
+	return s
+}
+
+// WithInvitePromoter cablea el promotor transaccional de invitaciones
+// (issue #168). El middleware InviteGateMiddleware lo necesita para
+// promover pending → active atómicamente. nil solo es válido cuando
+// AUTH_DISABLED=true salta el invite gate.
+func (s *Server) WithInvitePromoter(p auth.InvitePromoter) *Server {
+	s.invitePromoter = p
 	return s
 }
 
@@ -176,7 +190,7 @@ func (s *Server) Router() http.Handler {
 		} else {
 			r.Use(auth.AuthMiddleware(validator))
 			r.Use(auth.ResolveMiddleware(resolver))
-			r.Use(auth.InviteGateMiddleware(s.queries))
+			r.Use(auth.InviteGateMiddleware(s.queries, s.invitePromoter))
 		}
 
 		// v1 API routes

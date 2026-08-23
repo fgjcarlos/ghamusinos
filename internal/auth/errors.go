@@ -20,4 +20,10 @@ var (
 
 	// ErrNoActiveInvite is returned when a user has no valid invitation.
 	ErrNoActiveInvite = errors.New("no active invite")
+
+	// ErrEmailTaken is returned when a Clerk account tries to register
+	// with an email that another account already owns (issue #168).
+	// The middleware translates this to a 409 with a clear message
+	// instead of an opaque 500.
+	ErrEmailTaken = errors.New("email already in use by another account")
 )

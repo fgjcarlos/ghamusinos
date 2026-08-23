@@ -99,7 +99,7 @@ func TestResolveUser_RaceCondition_Conflict(t *testing.T) {
 				Email:        email,
 				InviteStatus: "pending",
 			}
-			err := &pgconn.PgError{Code: "23505"} // UNIQUE_VIOLATION
+			err := &pgconn.PgError{Code: "23505", ConstraintName: "users_clerk_user_id_key"} // UNIQUE_VIOLATION (race on clerk_user_id, not email)
 			return sqlc.User{}, err
 		}
 		// Should not reach here after conflict
@@ -142,6 +142,33 @@ func TestResolveUser_CreateError(t *testing.T) {
 	}
 	if !errors.Is(err, dbErr) {
 		t.Errorf("expected %v, got %v", dbErr, err)
+	}
+}
+
+// Test 3.4b: UNIQUE violation on idx_users_email returns ErrEmailTaken
+// so the middleware can answer 409 instead of an opaque 500 (issue #168).
+func TestResolveUser_EmailCollision_ReturnsErrEmailTaken(t *testing.T) {
+	mockQ := &mockQuerier{
+		users: make(map[string]sqlc.User),
+	}
+
+	mockQ.onCreateUser = func(clerkID, email, name string) (sqlc.User, error) {
+		// Another Clerk account already owns this email.
+		return sqlc.User{}, &pgconn.PgError{Code: "23505", ConstraintName: "idx_users_email"}
+	}
+
+	resolver := NewUserResolver(mockQ)
+	claims := &Claims{Subject: "clerk_duplicate_email", Email: "taken@example.com"}
+
+	user, err := resolver.Resolve(context.Background(), claims)
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	if user != nil {
+		t.Errorf("user should be nil on email collision, got %+v", user)
+	}
+	if !errors.Is(err, ErrEmailTaken) {
+		t.Errorf("expected ErrEmailTaken, got %v", err)
 	}
 }
 
