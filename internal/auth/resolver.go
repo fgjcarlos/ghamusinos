@@ -62,13 +62,30 @@ func (r *dbUserResolver) Resolve(ctx context.Context, claims *Claims) (*sqlc.Use
 		return nil, err
 	}
 
-	// Race condition detected: someone else inserted the same clerk_user_id.
-	// Re-fetch the user.
-	user, err = r.q.GetUserByClerkID(ctx, claims.Subject)
-	if err != nil {
-		// If re-fetch also fails, return the original create error
+	// Distinguish the two UNIQUE constraints on users (issue #168, A1):
+	//
+	//   users_clerk_user_id_key — race condition we already handle: someone
+	//     else inserted the same Clerk subject. Re-fetch wins.
+	//
+	//   idx_users_email — a different Clerk account (different sub, possibly
+	//     social-login + email/password) is already bound to the same email.
+	//     This is a real collision, not a race: returning ErrEmailTaken lets
+	//     the middleware translate to a 409 with a meaningful message instead
+	//     of an opaque 500.
+	switch pgErr.ConstraintName {
+	case "idx_users_email":
+		return nil, ErrEmailTaken
+	case "users_clerk_user_id_key":
+		// Re-fetch the user we lost the race against.
+		user, err = r.q.GetUserByClerkID(ctx, claims.Subject)
+		if err != nil {
+			// If re-fetch also fails, return the original create error
+			return nil, err
+		}
+		return &user, nil
+	default:
+		// Unknown UNIQUE constraint — be conservative and surface the raw
+		// error rather than silently treating it as a race.
 		return nil, err
 	}
-
-	return &user, nil
 }

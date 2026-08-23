@@ -14,6 +14,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/riverqueue/river"
 
+	"github.com/fgjcarlos/ghamusinos/internal/auth"
 	"github.com/fgjcarlos/ghamusinos/internal/config"
 	"github.com/fgjcarlos/ghamusinos/internal/db"
 	"github.com/fgjcarlos/ghamusinos/internal/db/sqlc"
@@ -168,6 +169,10 @@ func run(ctx context.Context) error {
 // OAuth callback is not mounted, so the seam stays nil-safe.
 func buildRouter(cfg *config.Config, pool *pgxpool.Pool, queries sqlc.Querier, stravaEnqueuer strava.RiverEnqueuer, webhookStore strava.ActivityEventStore) http.Handler {
 	server := apphttp.NewServer(pool, queries, cfg)
+	// Wire the transactional invite promoter (issue #168, A1). The promoter
+	// is what commits MarkInviteAccepted + UpdateUserInviteStatus atomically;
+	// nil is only acceptable when AUTH_DISABLED=true skips the invite gate.
+	server.WithInvitePromoter(auth.NewPGXInvitePromoter(pool))
 	server.WithGPX(
 		gpx.NewTransactionalSQLCStore(pool),
 		gpx.Parser{},
