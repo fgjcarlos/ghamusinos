@@ -13,7 +13,6 @@ package auth
 
 import (
 	"context"
-	"errors"
 	"os"
 	"testing"
 	"time"
@@ -165,9 +164,6 @@ func TestPGXInvitePromoter_RollsBackOnUpdateFailure(t *testing.T) {
 	_, err = promoter.PromotePendingInvite(ctx, invite.ID, bogus)
 	if err == nil {
 		t.Fatal("expected error from PromotePendingInvite, got nil")
-	}
-	if !errors.Is(err, err) {
-		// just keep err alive; the real assertion is below
 	}
 
 	// Invite must still be pending after the rollback.
