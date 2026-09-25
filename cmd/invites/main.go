@@ -7,6 +7,10 @@
 // El comando create genera un token de invitación criptográficamente seguro,
 // almacena su hash en la base de datos, e imprime el token original una sola
 // vez en stdout para que el administrador lo comparta con el usuario invitado.
+//
+// Sólo lee DATABASE_URL del entorno: una herramienta de administración de
+// invitaciones no necesita la configuración de JWKS, Strava ni nada de lo
+// que config.Load() valida — issue #173, M14.
 package main
 
 import (
@@ -19,7 +23,6 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	"github.com/fgjcarlos/ghamusinos/internal/config"
 	"github.com/fgjcarlos/ghamusinos/internal/db/sqlc"
 	"github.com/fgjcarlos/ghamusinos/internal/db/status"
 )
@@ -61,16 +64,19 @@ func runCreate(args []string) error {
 		return fmt.Errorf("--token-length debe ser >= 16")
 	}
 
-	cfg, err := config.Load()
-	if err != nil {
-		return fmt.Errorf("error al cargar configuración: %w", err)
+	// Sólo DATABASE_URL — el resto de la configuración (Clerk, Strava,
+	// frontend, ...) no aplica a una herramienta admin de invitaciones.
+	// Mismo patrón que cmd/migrate/main.go.
+	databaseURL := os.Getenv("DATABASE_URL")
+	if databaseURL == "" {
+		return fmt.Errorf("invites: DATABASE_URL es obligatoria y está vacía")
 	}
 
-	pool, err := pgxpool.New(context.Background(), cfg.DatabaseURL)
+	pool, err := pgxpool.New(context.Background(), databaseURL)
 	if err != nil {
 		return fmt.Errorf("error al conectar a la base de datos: %w", err)
 	}
-	defer pool.Close()
+	defer func() { pool.Close() }()
 
 	queries := sqlc.New(pool)
 
