@@ -3,7 +3,6 @@ package auth
 import (
 	"context"
 	"crypto"
-	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -175,8 +174,3 @@ func (c *inMemoryJWKSCache) fetchOnce(ctx context.Context) (jwk.Set, error) {
 
 	return keyset, nil
 }
-
-// errJWKSUnknownKid se devuelve al caller cuando un kid no está y el
-// cooldown de refetch sigue vivo. Es interno — el caller lo convierte
-// a ErrUnauthenticated o a un error con contexto.
-var errJWKSUnknownKid = errors.New("auth: unknown kid, refetch cooldown active")

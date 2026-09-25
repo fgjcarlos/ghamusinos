@@ -33,3 +33,4 @@ coverage.out
 
 # Herramientas del agente
 .atl/
+.sdd-pr/
