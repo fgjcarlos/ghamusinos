@@ -2,8 +2,6 @@ package jobs
 
 import (
 	"time"
-
-	"github.com/riverqueue/river"
 )
 
 // Job kind constants for River job types
@@ -49,10 +47,4 @@ type ImportStravaStreamsArgs struct {
 // Kind returns the job kind for ImportStravaStreamsArgs
 func (a ImportStravaStreamsArgs) Kind() string {
 	return string(KindImportStravaStreams)
-}
-
-// RegisterHandlers creates and returns a river.Workers instance.
-// Job registration happens in workers.go via the Workers type.
-func RegisterHandlers() *river.Workers {
-	return river.NewWorkers()
 }
