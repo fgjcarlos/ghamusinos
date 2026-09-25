@@ -4,13 +4,15 @@ Guía para levantar Ghamusinos en local. Stack: Go (binario único) + React/Vite
 
 ## Requisitos
 
-| Herramienta | Versión | Notas |
-|---|---|---|
-| Go | 1.22 | El proyecto fija `go 1.22`. Usa `GOTOOLCHAIN=local` para evitar descargas de toolchain |
-| Node | 22+ | Frontend con Vite |
-| pnpm | 10+ | Gestor de paquetes del frontend |
-| Docker | — | PostgreSQL local vía `docker-compose` |
-| sqlc | — | Se ejecuta vía Docker (`make generate`), no requiere instalación |
+Las versiones exactas viven en `go.mod` y `web/package.json` (y se resuelven con `pnpm-lock.yaml`). Este doc no las duplica: cada bump de dependencia se sincroniza en su sitio canónico.
+
+| Herramienta | Notas |
+|---|---|
+| Go | La fija el toolchain en `go.mod`. Usa `GOTOOLCHAIN=local` para evitar descargas automáticas |
+| Node | La fija `web/package.json` (`engines.node`). Vite gira sobre ella |
+| pnpm | Versión gestionada por `packageManager` en `web/package.json` |
+| Docker | PostgreSQL local vía `docker-compose` |
+| sqlc | Se ejecuta vía Docker (`make generate`), no requiere instalación |
 
 ## Quick path
 
@@ -55,7 +57,7 @@ Healthcheck: `curl http://localhost:8080/healthz` → `{"status":"ok"}`.
 
 ## Notas de toolchain
 
-- **Go 1.22**: usa siempre `GOTOOLCHAIN=local`. Las dependencias están fijadas a versiones compatibles (chi `v5.0.14`, pgx `v5.6.0`, goose `v3.21.1`).
+- **Go**: usa siempre `GOTOOLCHAIN=local`. Las versiones exactas de las dependencias están en `go.mod`; este doc no las duplica porque se desactualizan solas.
 - **sqlc** se ejecuta como contenedor Docker (`sqlc/sqlc:1.31.1`), no por `go install`. La versión está fijada para que el código generado sea reproducible.
 - **goose** se usa como librería dentro de `cmd/migrate` (no el CLI); las migraciones se embeben con `embed.FS`.
 - El frontend se compila a `internal/frontend/dist` (no a `web/dist`) porque `go:embed` no admite rutas con `..`.
