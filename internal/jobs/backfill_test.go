@@ -545,7 +545,6 @@ func (m *mockSyncSessionStoreTracker) UpdateSyncSessionProgress(_ context.Contex
 // last page's count.
 type pageFetcher struct {
 	pages [][]strava.ActivitySummary
-	call  int
 }
 
 func (p *pageFetcher) GetActivities(_ context.Context, _ string, _, _ time.Time, page, _ int) ([]strava.ActivitySummary, error) {
