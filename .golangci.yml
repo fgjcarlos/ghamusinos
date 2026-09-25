@@ -2,7 +2,7 @@
 # Versión objetivo: v2.x (alineada con la CI).
 # Docs: https://golangci-lint.run/product/configuration-v2/
 #
-# Conjunto de linters v2 activo (issue #24, ampliado en #62):
+# Conjunto de linters v2 activo (issue #24, ampliado en #62 y #174):
 #   - govet: sustituye al paso `go vet` previo.
 #   - noctx: protege contra http.Get/Post/etc. sin context.Context.
 #   - errcheck: detecta errores ignorados; `check-blank: false` permite
@@ -13,6 +13,11 @@
 #     `SA*`, `ST*`, `S1xxx`). El código actual pasa con 0 hallazgos.
 #   - exhaustive: fuerza a listar todos los casos en `switch` sobre
 #     tipos enumerados. El código actual pasa con 0 hallazgos.
+#   - unused: marca funciones, métodos, tipos, variables, constantes y
+#     campos de struct no referenciados (#174, H1). Introduce limpieza
+#     real: con él activo saltan RegisterHandlers (internal/jobs) y
+#     FromContext/loggerKey (internal/logging) que #174 lista como
+#     código muerto residual tras las rondas de auditoría.
 
 version: "2"
 
@@ -24,6 +29,7 @@ linters:
     - errcheck
     - staticcheck
     - exhaustive
+    - unused
   settings:
     errcheck:
       # `check-blank: false` ignora asignaciones a `_` (p.ej.
