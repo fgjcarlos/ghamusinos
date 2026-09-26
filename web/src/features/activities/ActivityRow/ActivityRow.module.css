@@ -1,0 +1,62 @@
+/* ActivityRow. Issue 158. Colours from tokens.css. 7-column grid. */
+
+.row {
+  display: grid;
+  grid-template-columns:
+    minmax(72px, auto) /* date */
+    minmax(0, 1fr) /* name */
+    minmax(60px, auto) /* sport */
+    minmax(72px, auto) /* distance */
+    minmax(72px, auto) /* duration */
+    minmax(72px, auto) /* elevation */
+    minmax(72px, auto); /* zones */
+  gap: var(--gh-s-3);
+  align-items: center;
+  padding: var(--gh-s-3) var(--gh-s-4);
+  border-bottom: 1px solid var(--gh-line);
+  color: var(--gh-text);
+  text-decoration: none;
+  transition: background-color 0.15s ease;
+}
+
+.row:hover {
+  background: var(--gh-surface);
+}
+
+.row:focus-visible {
+  outline: 2px solid var(--gh-accent);
+  outline-offset: -2px;
+}
+
+.date,
+.distance,
+.duration,
+.elevation {
+  font-family: var(--gh-font-mono);
+  font-size: 13px;
+  color: var(--gh-text-2);
+  font-variant-numeric: tabular-nums;
+}
+
+.name {
+  font-family: var(--gh-font-body);
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--gh-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sport {
+  font-family: var(--gh-font-body);
+  font-size: 12px;
+  color: var(--gh-text-3);
+  letter-spacing: 0.02em;
+}
+
+.zones {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+}
