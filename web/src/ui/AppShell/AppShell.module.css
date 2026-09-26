@@ -1,0 +1,44 @@
+/* AppShell. Issue 155. Colours from tokens.css. */
+
+.shell {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  background: var(--gh-bg);
+}
+
+.main {
+  flex: 1 1 auto;
+  padding: var(--gh-s-4);
+}
+
+/* BottomNav: visible only on narrow viewports (<768 px).
+   At wider viewports it stays in the DOM but is hidden via CSS,
+   so keyboard / screen-reader users can still navigate if needed
+   (we keep aria-label and the links themselves accessible). */
+.bottomNav {
+  display: none;
+}
+
+@media (max-width: 767px) {
+  .bottomNav {
+    position: sticky;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    display: flex;
+    align-items: center;
+    justify-content: space-around;
+    height: 64px;
+    padding: var(--gh-s-1) var(--gh-s-2);
+    background: var(--gh-bg);
+    border-top: 1px solid var(--gh-line);
+    gap: var(--gh-s-1);
+  }
+}
+
+.placeholder {
+  display: inline-flex;
+  align-items: center;
+  opacity: 0.55;
+}
