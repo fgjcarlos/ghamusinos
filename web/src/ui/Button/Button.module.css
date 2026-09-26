@@ -1,0 +1,63 @@
+/* Button. Issue #154. Colours come exclusively from tokens.css. */
+
+.button {
+  min-height: 44px; /* zona táctil mínima (accesibilidad + wcag 2.5.5) */
+  min-width: 44px;
+  padding: var(--gh-s-2) var(--gh-s-4);
+  border: 1px solid transparent;
+  border-radius: var(--gh-r-control);
+  font-family: var(--gh-font-body);
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1;
+  cursor: pointer;
+  transition:
+    background-color 0.15s ease,
+    color 0.15s ease,
+    border-color 0.15s ease;
+}
+
+.primary {
+  background: var(--gh-accent);
+  color: var(--gh-accent-ink);
+  border-color: var(--gh-accent);
+}
+
+.primary:hover:not(:disabled) {
+  background: var(--gh-accent-dim);
+  border-color: var(--gh-accent-dim);
+}
+
+.secondary {
+  background: var(--gh-surface-2);
+  color: var(--gh-text);
+  border-color: var(--gh-line-2);
+}
+
+.secondary:hover:not(:disabled) {
+  background: var(--gh-surface);
+  border-color: var(--gh-accent);
+}
+
+.destructive {
+  background: var(--gh-risk);
+  color: var(--gh-accent-ink);
+  border-color: var(--gh-risk);
+}
+
+.destructive:hover:not(:disabled) {
+  background: var(--gh-risk-deep);
+  border-color: var(--gh-risk-deep);
+}
+
+.disabled {
+  background: var(--gh-bg-2);
+  color: var(--gh-text-3);
+  border-color: var(--gh-line);
+  cursor: not-allowed;
+}
+
+.button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
