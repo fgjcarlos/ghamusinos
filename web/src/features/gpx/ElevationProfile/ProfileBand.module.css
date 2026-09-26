@@ -1,0 +1,18 @@
+/* ProfileBand. Issue 156. Colours from tokens.css. */
+
+.climb {
+  fill: var(--gh-accent);
+  fill-opacity: 0.14;
+  stroke: var(--gh-accent);
+  stroke-opacity: 0.55;
+  stroke-width: 0.5;
+}
+
+.risk {
+  fill: var(--gh-risk);
+  fill-opacity: 0.12;
+  stroke: var(--gh-risk);
+  stroke-opacity: 0.5;
+  stroke-width: 0.5;
+  stroke-dasharray: 3 2;
+}
