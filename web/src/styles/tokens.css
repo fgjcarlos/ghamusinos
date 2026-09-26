@@ -1,0 +1,69 @@
+/* Design tokens for ghamusinos-web. Issue #153.
+ *
+ * Dark-first, green. Single layer of CSS custom properties consumed by
+ * every component and screen. No TypeScript objects, no theming
+ * library: `var(--gh-accent)` works in `style={{}}`, in CSS Modules,
+ * inside an `<svg>`, and in `@media`. Migrating to a light mode later
+ * is just redefining this block.
+ *
+ * Prefix `--gh-` to avoid collisions with MapLibre or ECharts, which
+ * also inject custom properties on `:root`.
+ *
+ * Greys lean green (h ≈ 160 in oklch) on purpose so the background
+ * does not compete with the accent. Amber (`--gh-warn`) and red
+ * (`--gh-risk`) share lightness and chroma with the green.
+ *
+ * Rule: a new colour is added here, never in the component. */
+
+:root {
+  /* Backgrounds. Darkest to lightest. */
+  --gh-bg: #0a0f0d; /* primary canvas */
+  --gh-bg-2: #0f1411; /* sections inside a container */
+  --gh-surface: #141a16; /* cards, panels */
+  --gh-surface-2: #1a221c; /* nested cards, hover */
+
+  /* Borders. */
+  --gh-line: #1f2a23; /* soft separator */
+  --gh-line-2: #273329; /* hover or focus border */
+
+  /* Text. */
+  --gh-text: #e6f0e8; /* primary (on dark backgrounds) */
+  --gh-text-2: #a8b8ad; /* secondary (subtitles, labels) */
+  --gh-text-3: #6a7a70; /* tertiary (metadata, captions) */
+
+  /* Accent (brand green). Action and positive elevation. Nothing else. */
+  --gh-accent: #7fc689;
+  --gh-accent-dim: #5fa668; /* hover / pressed on accent */
+  --gh-accent-deep: #3d8050; /* active on light background */
+  --gh-accent-ink: #0d2e1c; /* text on accent (high contrast) */
+
+  /* Signals. */
+  --gh-warn: #f5c451;
+  --gh-warn-deep: #9e7a1f;
+  --gh-risk: #f0735a;
+  --gh-risk-deep: #8c3324;
+
+  /* Typography. Maps to the three self-hosted families (see
+   * web/src/styles/fonts.css). Each token ships a fallback stack so
+   * that with the font network down the app remains readable. */
+  --gh-font-display:
+    'Archivo', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+  --gh-font-body: 'Instrument Sans', system-ui, sans-serif;
+  --gh-font-mono: 'Spline Sans Mono', ui-monospace, 'SF Mono', Menlo, 'Courier New', monospace;
+
+  /* Radii. */
+  --gh-r-chip: 5px;
+  --gh-r-control: 7px;
+  --gh-r-card: 9px;
+  --gh-r-panel: 12px;
+
+  /* Spacing (4..40 px scale). */
+  --gh-s-1: 4px;
+  --gh-s-2: 8px;
+  --gh-s-3: 12px;
+  --gh-s-4: 16px;
+  --gh-s-5: 20px;
+  --gh-s-6: 24px;
+  --gh-s-7: 32px;
+  --gh-s-8: 40px;
+}

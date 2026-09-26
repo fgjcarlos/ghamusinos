@@ -1,3 +1,5 @@
+@import './styles/tokens.css';
+
 *,
 *::before,
 *::after {
@@ -8,4 +10,18 @@ html,
 body {
   margin: 0;
   padding: 0;
+}
+
+body {
+  background: var(--gh-bg);
+  color: var(--gh-text);
+  font-family: var(--gh-font-body);
+}
+
+a {
+  color: var(--gh-accent);
+}
+
+a:hover {
+  color: var(--gh-accent-dim);
 }

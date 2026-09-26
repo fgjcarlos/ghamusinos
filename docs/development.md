@@ -101,6 +101,14 @@ Existe un tercer job, `release`, que depende de `backend` y `frontend`. En un mi
 
 Para probarlo sin clonar el repo: abrir la página de la run del job `release` en GitHub Actions y bajar el artefacto. Es el mismo binario que la SPA embebida y, por tanto, el que se desplegaría. Sin firma ni SBOM todavía — eso entra cuando haya releases que publicar.
 
+## Sistema de diseño (frontend)
+
+El frontend mantiene una única capa de design tokens en `web/src/styles/tokens.css`. Cubre fondos, bordes, texto, acento verde, señales, tipografía, radios y espaciado. El prefijo `--gh-` evita colisiones con tokens que inyectan MapLibre o ECharts.
+
+**Regla: un color nuevo se añade a `tokens.css`, no en el componente.** Los tokens son la única fuente de verdad del color; los componentes los consumen como `var(--gh-*)` desde CSS, CSS Modules o `style={{}}`. Los grises llevan sesgo verde (h ≈ 160 en oklch) a propósito para que el fondo no compita con el acento.
+
+El dark-first verde se redefine en este único bloque cuando se decida añadir un modo claro: ningún componente cambia.
+
 ## Flujo de trabajo con ramas y PRs
 
 El repo sigue una disciplina estricta para evitar acumulación de ramas muertas:
