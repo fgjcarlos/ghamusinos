@@ -10,6 +10,9 @@ pnpm-lock.yaml
 # Cache
 .eslintcache
 .vite
+.vitest
+coverage
+*.tsbuildinfo
 
 # Logs
 npm-debug.log*
