@@ -1,0 +1,76 @@
+/* RouteDetailContainer. Issue 157. Colours from tokens.css. */
+
+.skeleton,
+.error {
+  display: flex;
+  flex-direction: column;
+  gap: var(--gh-s-4);
+  max-width: 960px;
+  margin: 0 auto;
+  padding: var(--gh-s-4);
+}
+
+.skeleton {
+  /* Pulsing placeholder while the backend resolves. */
+}
+
+.skeletonHeader {
+  height: 48px;
+  background: var(--gh-surface);
+  border-radius: var(--gh-r-control);
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+.skeletonMetrics {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: var(--gh-s-3);
+}
+
+.skeletonTile {
+  height: 80px;
+  background: var(--gh-surface);
+  border-radius: var(--gh-r-card);
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+.skeletonProfile {
+  height: 200px;
+  background: var(--gh-surface);
+  border-radius: var(--gh-r-card);
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%,
+  100% {
+    opacity: 0.6;
+  }
+  50% {
+    opacity: 0.3;
+  }
+}
+
+.error {
+  background: var(--gh-surface);
+  border: 1px solid var(--gh-risk);
+  border-radius: var(--gh-r-card);
+  color: var(--gh-text);
+  font-family: var(--gh-font-body);
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.error a {
+  color: var(--gh-accent);
+  text-decoration: none;
+}
+
+.error code {
+  font-family: var(--gh-font-mono);
+  font-size: 13px;
+  color: var(--gh-text-2);
+  background: var(--gh-bg-2);
+  padding: 1px 4px;
+  border-radius: 3px;
+}
