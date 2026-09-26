@@ -199,7 +199,7 @@ func markKingClimb(climbs []gpx.Climb, king *gpx.Climb) {
 func analyzeUploadedTrack(track *gpx.Track, analyzer gpx.GPXAnalyzer) *gpx.Analysis {
 	points := track.Points
 	distance := analyzer.CalculatePathDistance(points)
-	dPlus, dMinus := analyzer.CalculateTotalDPlus(points, 30), analyzer.CalculateTotalDMinus(points, 30)
+	elevation := analyzer.CalculateElevation(points, 30)
 	movingTime := analyzer.CalculateMovingTime(points, 60)
 	slopes := make([]float64, 0, len(points)-1)
 	var maxSlope float64
@@ -213,10 +213,25 @@ func analyzeUploadedTrack(track *gpx.Track, analyzer gpx.GPXAnalyzer) *gpx.Analy
 		maxSlope = math.Max(maxSlope, math.Abs(slope))
 	}
 	maximum, minimum := elevationRange(points)
+
+	// Downstream calculators take float64 dPlus. When the elevation
+	// coverage is insufficient we pass 0 — the semantics (no usable
+	// D+) are propagated through Effort/ITRA/VAM/Slope without
+	// inventing a number from a null. The Analysis itself carries the
+	// nullable D+/D- so the API can communicate the "insufficient
+	// data" state honestly. Issue #171, A8.
+	var dPlus float64
+	if elevation.DPlusM != nil {
+		dPlus = *elevation.DPlusM
+	}
+	coverage := elevation.Coverage
+
 	label := analyzer.CalculateDifficulty(distance, dPlus, maxSlope)
 	return &gpx.Analysis{
-		DistanceM: distance, MovingTimeS: movingTime, DPlusM: dPlus, DMinusM: dMinus,
-		MaxElevationM: maximum, MinElevationM: minimum,
+		DistanceM: distance, MovingTimeS: movingTime,
+		DPlusM: elevation.DPlusM, DMinusM: elevation.DMinusM,
+		ElevationCoverage: &coverage,
+		MaxElevationM:      maximum, MinElevationM: minimum,
 		AverageSlopePct: analyzer.CalculateAverageSlope(distance, dPlus), MaxSlopePct: maxSlope,
 		EffortIndex: analyzer.CalculateEffortIndex(distance/1000, dPlus), ITRAPoints: analyzer.CalculateITRAPoints(distance/1000, dPlus),
 		LegBreakerIndex: analyzer.CalculateLegBreakerIndex(slopes), EstimatedVAM: analyzer.CalculateEstimatedVAM(distance, dPlus, float64(movingTime)),
