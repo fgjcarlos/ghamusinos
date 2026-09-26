@@ -10,10 +10,23 @@ import (
 
 	"github.com/fgjcarlos/ghamusinos/internal/auth"
 	"github.com/fgjcarlos/ghamusinos/internal/db/sqlc"
+	"github.com/go-chi/chi/v5"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/stretchr/testify/require"
 )
+
+// reqWithActivityID builds a GET /api/v1/activities/{idStr} request with
+// both the auth user and the chi RouteCtx so chi.URLParam(r, "id")
+// inside the handler returns idStr. Replaces the previous pattern that
+// relied on r.URL.Path parsing — GetActivity now uses chi.URLParam.
+func reqWithActivityID(t *testing.T, user *auth.User, idStr string) *http.Request {
+	t.Helper()
+	rctx := chi.NewRouteContext()
+	rctx.URLParams.Add("id", idStr)
+	ctx := auth.WithAuthUser(context.WithValue(context.Background(), chi.RouteCtxKey, rctx), user)
+	return httptest.NewRequestWithContext(ctx, "GET", "/api/v1/activities/"+idStr, nil)
+}
 
 // T1.1: GET /api/v1/activities returns user's activities sorted by started_at DESC, paginated (limit/offset)
 func TestListActivities_ReturnsActivitiesSortedAndPaginated(t *testing.T) {
@@ -232,15 +245,10 @@ func TestGetActivity_ReturnsActivityOwnedByUser(t *testing.T) {
 	}
 
 	handler := GetActivity(mockQ)
-	req := httptest.NewRequestWithContext(
-		auth.WithAuthUser(context.Background(), &auth.User{
-			ID:          "00000000-0000-0000-0000-000000000001",
-			ClerkUserID: "clerk_123",
-		}),
-		"GET",
-		"/api/v1/activities/123",
-		nil,
-	)
+	req := reqWithActivityID(t, &auth.User{
+		ID:          "00000000-0000-0000-0000-000000000001",
+		ClerkUserID: "clerk_123",
+	}, "123")
 	w := httptest.NewRecorder()
 	handler.ServeHTTP(w, req)
 
@@ -267,15 +275,10 @@ func TestGetActivity_NotFoundWhenActivityDoesNotExist(t *testing.T) {
 	}
 
 	handler := GetActivity(mockQ)
-	req := httptest.NewRequestWithContext(
-		auth.WithAuthUser(context.Background(), &auth.User{
-			ID:          "00000000-0000-0000-0000-000000000001",
-			ClerkUserID: "clerk_123",
-		}),
-		"GET",
-		"/api/v1/activities/123",
-		nil,
-	)
+	req := reqWithActivityID(t, &auth.User{
+		ID:          "00000000-0000-0000-0000-000000000001",
+		ClerkUserID: "clerk_123",
+	}, "123")
 	w := httptest.NewRecorder()
 	handler.ServeHTTP(w, req)
 
@@ -315,15 +318,10 @@ func TestGetActivity_ForbiddenWhenActivityBelongsToAnotherUser(t *testing.T) {
 	}
 
 	handler := GetActivity(mockQ)
-	req := httptest.NewRequestWithContext(
-		auth.WithAuthUser(context.Background(), &auth.User{
-			ID:          "user-123",
-			ClerkUserID: "clerk_123",
-		}),
-		"GET",
-		"/api/v1/activities/123",
-		nil,
-	)
+	req := reqWithActivityID(t, &auth.User{
+		ID:          "user-123",
+		ClerkUserID: "clerk_123",
+	}, "123")
 	w := httptest.NewRecorder()
 	handler.ServeHTTP(w, req)
 
