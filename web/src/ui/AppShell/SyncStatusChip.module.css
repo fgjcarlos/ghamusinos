@@ -1,0 +1,42 @@
+/* SyncStatusChip. Issue 155. Colours from tokens.css. */
+
+.active {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--gh-s-2);
+  min-height: 28px;
+  padding: var(--gh-s-1) var(--gh-s-3);
+  border-radius: var(--gh-r-chip);
+  font-family: var(--gh-font-body);
+  font-size: 12px;
+  color: var(--gh-text-2);
+  background: var(--gh-surface);
+}
+
+.idle {
+  display: inline-flex;
+  align-items: center;
+  width: 10px;
+  height: 10px;
+}
+
+.dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--gh-accent);
+  flex-shrink: 0;
+}
+
+.idle::before {
+  content: '';
+  display: block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--gh-text-3);
+}
+
+.text {
+  white-space: nowrap;
+}
