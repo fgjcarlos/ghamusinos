@@ -1,0 +1,63 @@
+/* PeriodSummary. Issue 158. Colours from tokens.css. */
+
+.summary {
+  display: flex;
+  flex-direction: column;
+  gap: var(--gh-s-3);
+  padding: var(--gh-s-4);
+  background: var(--gh-surface);
+  border: 1px solid var(--gh-line);
+  border-radius: var(--gh-r-card);
+}
+
+.header {
+  display: flex;
+  align-items: baseline;
+  gap: var(--gh-s-2);
+  flex-wrap: wrap;
+}
+
+.title {
+  margin: 0;
+  font-family: var(--gh-font-display);
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--gh-text);
+}
+
+.note {
+  font-family: var(--gh-font-body);
+  font-size: 12px;
+  color: var(--gh-text-3);
+  font-style: italic;
+}
+
+.tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: var(--gh-s-3);
+}
+
+.tile {
+  display: flex;
+  flex-direction: column;
+  gap: var(--gh-s-1);
+  padding: var(--gh-s-3);
+  background: var(--gh-bg-2);
+  border-radius: var(--gh-r-control);
+}
+
+.tileLabel {
+  font-family: var(--gh-font-body);
+  font-size: 11px;
+  color: var(--gh-text-2);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.tileValue {
+  font-family: var(--gh-font-display);
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--gh-text);
+}

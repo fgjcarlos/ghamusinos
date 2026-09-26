@@ -1,0 +1,105 @@
+/* ActivityList. Issue 158. Colours from tokens.css. */
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--gh-s-4);
+  max-width: 960px;
+  margin: 0 auto;
+  padding: var(--gh-s-4);
+}
+
+.header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--gh-s-2);
+}
+
+.title {
+  margin: 0;
+  font-family: var(--gh-font-display);
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--gh-text);
+}
+
+.rows {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  background: var(--gh-surface);
+  border: 1px solid var(--gh-line);
+  border-radius: var(--gh-r-card);
+  overflow: hidden;
+}
+
+.rowItem {
+  list-style: none;
+}
+
+.rowItem:last-child :global(.activity-row),
+.rowItem:last-child > a {
+  border-bottom: none;
+}
+
+.empty {
+  display: flex;
+  flex-direction: column;
+  gap: var(--gh-s-2);
+  padding: var(--gh-s-6) var(--gh-s-4);
+  background: var(--gh-surface);
+  border: 1px dashed var(--gh-line-2);
+  border-radius: var(--gh-r-card);
+  text-align: center;
+  color: var(--gh-text-2);
+}
+
+.emptyHint {
+  margin: 0;
+  font-size: 13px;
+  color: var(--gh-text-3);
+}
+
+.pager {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--gh-s-4);
+}
+
+.pagerBtn {
+  min-height: 44px;
+  padding: var(--gh-s-2) var(--gh-s-4);
+  border: 1px solid var(--gh-line-2);
+  border-radius: var(--gh-r-control);
+  background: var(--gh-surface);
+  color: var(--gh-text);
+  font-family: var(--gh-font-body);
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition:
+    background-color 0.15s ease,
+    border-color 0.15s ease;
+}
+
+.pagerBtn:hover:not(:disabled) {
+  background: var(--gh-bg-2);
+  border-color: var(--gh-accent);
+}
+
+.pagerBtn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.pagerInfo {
+  font-family: var(--gh-font-mono);
+  font-size: 13px;
+  color: var(--gh-text-2);
+  font-variant-numeric: tabular-nums;
+  min-width: 96px;
+  text-align: center;
+}

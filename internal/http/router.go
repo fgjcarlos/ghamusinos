@@ -197,6 +197,12 @@ func (s *Server) Router() http.Handler {
 		r.Route("/v1", func(r chi.Router) {
 			r.Get("/me", handlers.Me(s.queries).ServeHTTP)
 
+			if s.queries != nil {
+				r.Get("/activities", handlers.ListActivities(s.queries).ServeHTTP)
+				r.Get("/activities/{id}", handlers.GetActivity(s.queries).ServeHTTP)
+				r.Get("/sync/status", handlers.SyncStatus(s.queries).ServeHTTP)
+			}
+
 			if s.gpxStore != nil {
 				r.Route("/gpx", func(r chi.Router) {
 					r.Post("/upload", handlers.UploadGPX(s.gpxStore, s.gpxParser, s.gpxValidator, s.gpxAnalyzer, s.gpxClimbDetector, s.gpxRiskDetector, s.gpxTypeDetector, s.gpxHasher).ServeHTTP)

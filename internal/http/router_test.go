@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/go-chi/chi/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 
 	"github.com/fgjcarlos/ghamusinos/internal/config"
@@ -295,6 +296,37 @@ func TestWithGPXStoresSegregatedDependencies(t *testing.T) {
 	require.NotNil(t, server.gpxRiskDetector)
 	require.NotNil(t, server.gpxTypeDetector)
 	require.NotNil(t, server.gpxHasher)
+}
+
+// TestRouterMountsActivitiesRoutesViaChiWalk walks the chi router tree and
+// asserts that the three activities endpoints are mounted. If anyone
+// removes any of the three routes from router.go, this test fails.
+//
+// This is the regression guard the issue #158 calls for: prior to
+// this fix, /api/v1/activities and friends returned 404 because
+// nobody had mounted them on the router — yet the handlers had been
+// written and tested for a year.
+func TestRouterMountsActivitiesRoutesViaChiWalk(t *testing.T) {
+	srv := nuevoServidor(t)
+	require.NotNil(t, srv)
+
+	mux, ok := srv.Config.Handler.(*chi.Mux)
+	require.True(t, ok, "expected *chi.Mux, got %T", srv.Config.Handler)
+
+	var routes []string
+	if err := chi.Walk(mux, func(method, route string, _ http.Handler, _ ...func(http.Handler) http.Handler) error {
+		routes = append(routes, method+" "+route)
+		return nil
+	}); err != nil {
+		t.Fatalf("chi.Walk failed: %v", err)
+	}
+
+	require.Contains(t, routes, "GET /api/v1/activities",
+		"missing route GET /api/v1/activities — ListActivities handler not mounted in router.go")
+	require.Contains(t, routes, "GET /api/v1/activities/{id}",
+		"missing route GET /api/v1/activities/{id} — GetActivity handler not mounted in router.go")
+	require.Contains(t, routes, "GET /api/v1/sync/status",
+		"missing route GET /api/v1/sync/status — SyncStatus handler not mounted in router.go")
 }
 
 // TestRouterAPIv1MeBypassAuthDisabled verifica que con cfg.AuthDisabled=true
