@@ -7,6 +7,7 @@ import Profile from './routes/profile';
 import Lab from './routes/lab';
 import LabTrackDetail from './routes/lab-detail';
 import LabCompare from './routes/lab-compare';
+import './styles/fonts.css';
 import './index.css';
 
 createRoot(document.getElementById('root')!).render(
