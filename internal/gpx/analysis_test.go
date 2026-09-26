@@ -22,18 +22,163 @@ func TestCalculatePathDistance(t *testing.T) {
 	require.Zero(t, a.CalculatePathDistance(points[:1]))
 }
 
-func TestCalculateTotalDPlus(t *testing.T) {
+func TestCalculateElevation_FullCoverage(t *testing.T) {
 	a := Analyzer{}
-	points := []Point{{Ele: elevation(100)}, {Ele: elevation(150)}, {Ele: elevation(125)}, {Ele: elevation(180)}}
-	require.InDelta(t, 80, a.CalculateTotalDPlus(points, 30), 0.001)
-	require.Zero(t, a.CalculateTotalDPlus([]Point{{Ele: nil}, {Ele: nil}}, 30))
+	// 4 puntos en línea recta (~111 m entre pares) con elevación
+	// continua. Coverage debe ser 1.0, status Full.
+	points := []Point{
+		{Lat: 0, Lon: 0, Ele: elevation(100)},
+		{Lat: 0.001, Lon: 0, Ele: elevation(150)},
+		{Lat: 0.002, Lon: 0, Ele: elevation(125)},
+		{Lat: 0.003, Lon: 0, Ele: elevation(180)},
+	}
+	res := a.CalculateElevation(points, 30)
+	require.Equal(t, CoverageFull, res.Status)
+	require.InDelta(t, 1.0, res.Coverage, 0.001)
+	require.NotNil(t, res.DPlusM)
+	require.InDelta(t, 80, *res.DPlusM, 0.001)
+	require.NotNil(t, res.DMinusM)
+	require.InDelta(t, 0, *res.DMinusM, 0.001)
 }
 
-func TestCalculateTotalDMinus(t *testing.T) {
+func TestCalculateElevation_NilPointsInsufficient(t *testing.T) {
 	a := Analyzer{}
-	points := []Point{{Ele: elevation(200)}, {Ele: elevation(150)}, {Ele: elevation(175)}, {Ele: elevation(100)}}
-	require.InDelta(t, 100, a.CalculateTotalDMinus(points, 30), 0.001)
-	require.Zero(t, a.CalculateTotalDMinus([]Point{{Ele: elevation(100)}, {Ele: elevation(100)}}, 30))
+	// 2 puntos sin elevación y a distancia cero → coverage 0, nil D+/D-.
+	res := a.CalculateElevation([]Point{{Lat: 0, Lon: 0, Ele: nil}, {Lat: 0, Lon: 0, Ele: nil}}, 30)
+	require.Equal(t, CoverageInsufficient, res.Status)
+	require.Zero(t, res.Coverage)
+	require.Nil(t, res.DPlusM)
+	require.Nil(t, res.DMinusM)
+}
+
+func TestCalculateElevation_FlatTrack(t *testing.T) {
+	a := Analyzer{}
+	points := []Point{
+		{Lat: 0, Lon: 0, Ele: elevation(100)},
+		{Lat: 0.001, Lon: 0, Ele: elevation(100)},
+	}
+	res := a.CalculateElevation(points, 30)
+	require.Equal(t, CoverageFull, res.Status)
+	require.InDelta(t, 0, *res.DPlusM, 0.001)
+	require.InDelta(t, 0, *res.DMinusM, 0.001)
+}
+
+func TestCalculateElevation_TwoPoints(t *testing.T) {
+	a := Analyzer{}
+	points := []Point{
+		{Lat: 0, Lon: 0, Ele: elevation(150)},
+		{Lat: 0.001, Lon: 0, Ele: elevation(100)},
+	}
+	res := a.CalculateElevation(points, 30)
+	require.Equal(t, CoverageFull, res.Status)
+	require.InDelta(t, 0, *res.DPlusM, 0.001)
+	require.InDelta(t, 50, *res.DMinusM, 0.001)
+}
+
+// Acceptance: track with one missing elevation in 1000 must produce
+// the same D+ as the full track, not zero.
+func TestCalculateElevation_OneGapInMiddle(t *testing.T) {
+	a := Analyzer{}
+	full := make([]Point, 1000)
+	for i := range full {
+		full[i] = Point{Lat: 40 + float64(i)*0.0001, Lon: -3, Ele: elevation(100 + float64(i)*0.1)}
+	}
+	fullRes := a.CalculateElevation(full, 30)
+	require.Equal(t, CoverageFull, fullRes.Status)
+
+	// Insert a single missing-ele at index 500.
+	withGap := append([]Point{}, full...)
+	withGap[500] = Point{Lat: withGap[500].Lat, Lon: withGap[500].Lon, Ele: nil}
+	gapRes := a.CalculateElevation(withGap, 30)
+
+	require.Equal(t, CoverageFull, gapRes.Status,
+		"missing a single point must not drop coverage below Full")
+	require.InDelta(t, *fullRes.DPlusM, *gapRes.DPlusM, 1.0,
+		"a single gap must not change D+ meaningfully")
+}
+
+// Acceptance: a hueco spanning a real elevation jump must not fabricate
+// the climb across it. We build two tramos — climb from 100 to 500,
+// gap, climb from 500 to 800 — and assert that the across-gap jump
+// (100→800) is NOT summed.
+func TestCalculateElevation_LargeGapDoesNotFabricate(t *testing.T) {
+	a := Analyzer{}
+	tramoA := []Point{
+		{Lat: 0, Lon: 0, Ele: elevation(100)},
+		{Lat: 0.001, Lon: 0, Ele: elevation(300)},
+		{Lat: 0.002, Lon: 0, Ele: elevation(500)},
+	}
+	// Hueco: 2 puntos sin elevación, entre los dos tramos.
+	farGap := []Point{
+		{Lat: 0.003, Lon: 0, Ele: nil},
+		{Lat: 0.004, Lon: 0, Ele: nil},
+	}
+	tramoB := []Point{
+		{Lat: 0.005, Lon: 0, Ele: elevation(500)},
+		{Lat: 0.006, Lon: 0, Ele: elevation(700)},
+		{Lat: 0.007, Lon: 0, Ele: elevation(800)},
+	}
+	points := append(append(tramoA, farGap...), tramoB...)
+
+	res := a.CalculateElevation(points, 30)
+	// 4 de 6 pares tienen elevación → coverage 4/6 ≈ 0.67, status Partial.
+	require.Equal(t, CoveragePartial, res.Status,
+		"a partial gap should land in Partial territory")
+	require.NotNil(t, res.DPlusM)
+	// Tramo A contributed +400 (100→500) and tramo B +300 (500→800).
+	// El salto artificial entre el último de A (500) y el primero de B
+	// (500) es cero; si el algoritmo sumara cualquier salto cross-gap
+	// inventado por error, este test lo cazaría.
+	require.InDelta(t, 700, *res.DPlusM, 5.0,
+		"D+ should sum 400 (tramoA) + 300 (tramoB), not 400+300+synthetic-gap-fabrication")
+}
+
+// Acceptance: coverage reflects the fraction of distance with usable
+// elevation. Single punto sin elevación en medio de 4 → 2 de 4 pares
+// cubiertos = 0.5.
+func TestCalculateElevation_CoverageFraction(t *testing.T) {
+	a := Analyzer{}
+	points := []Point{
+		{Lat: 0, Lon: 0, Ele: elevation(100)},
+		{Lat: 0.001, Lon: 0, Ele: elevation(110)},
+		{Lat: 0.002, Lon: 0, Ele: nil}, // hueco
+		{Lat: 0.003, Lon: 0, Ele: elevation(120)},
+		{Lat: 0.004, Lon: 0, Ele: elevation(130)},
+	}
+	res := a.CalculateElevation(points, 30)
+	require.InDelta(t, 0.5, res.Coverage, 0.01,
+		"a single mid-track gap affects 2 of 4 pairs (one before, one after)")
+	require.Equal(t, CoveragePartial, res.Status)
+	require.NotNil(t, res.DPlusM)
+}
+
+// Acceptance: with coverage < 0.5 the D+ must be nil, not zero.
+func TestCalculateElevation_InsufficientCoverageReturnsNilDPlus(t *testing.T) {
+	a := Analyzer{}
+	// 1 punto con elevación + 9 sin elevación → 1 de 9 pares cubiertos ≈ 11%.
+	points := []Point{{Lat: 0, Lon: 0, Ele: elevation(100)}}
+	for i := 1; i < 10; i++ {
+		points = append(points, Point{Lat: float64(i) * 0.001, Lon: 0, Ele: nil})
+	}
+	res := a.CalculateElevation(points, 30)
+	require.Equal(t, CoverageInsufficient, res.Status)
+	require.Nil(t, res.DPlusM)
+	require.Nil(t, res.DMinusM)
+}
+
+// Acceptance: a track with no elevation at all → coverage 0, D+ nil.
+func TestCalculateElevation_NoElevationInTrack(t *testing.T) {
+	a := Analyzer{}
+	points := []Point{
+		{Lat: 0, Lon: 0, Ele: nil},
+		{Lat: 0.001, Lon: 0, Ele: nil},
+		{Lat: 0.002, Lon: 0, Ele: nil},
+	}
+	res := a.CalculateElevation(points, 30)
+	require.Equal(t, CoverageInsufficient, res.Status)
+	require.Zero(t, res.Coverage)
+	require.Nil(t, res.DPlusM)
+	require.Nil(t, res.DMinusM)
 }
 
 func TestCalculateAverageSlope(t *testing.T) {
@@ -98,14 +243,26 @@ func TestCalculateMovingTime(t *testing.T) {
 	require.Zero(t, a.CalculateMovingTime([]Point{{}, {}}, 60))
 }
 
-func TestCalculateTotalDPlusFlatTrack(t *testing.T) {
-	points := []Point{{Ele: elevation(100)}, {Ele: elevation(100)}}
-	require.Zero(t, (Analyzer{}).CalculateTotalDPlus(points, 30))
+func TestCalculateElevation_RegressionFlat(t *testing.T) {
+	points := []Point{
+		{Lat: 0, Lon: 0, Ele: elevation(100)},
+		{Lat: 0.001, Lon: 0, Ele: elevation(100)},
+	}
+	res := (Analyzer{}).CalculateElevation(points, 30)
+	require.Equal(t, CoverageFull, res.Status)
+	require.InDelta(t, 0, *res.DPlusM, 0.001)
+	require.InDelta(t, 0, *res.DMinusM, 0.001)
 }
 
-func TestCalculateTotalDMinusTwoPoints(t *testing.T) {
-	points := []Point{{Ele: elevation(150)}, {Ele: elevation(100)}}
-	require.InDelta(t, 50, (Analyzer{}).CalculateTotalDMinus(points, 30), 0.001)
+func TestCalculateElevation_RegressionTwoPoints(t *testing.T) {
+	points := []Point{
+		{Lat: 0, Lon: 0, Ele: elevation(150)},
+		{Lat: 0.001, Lon: 0, Ele: elevation(100)},
+	}
+	res := (Analyzer{}).CalculateElevation(points, 30)
+	require.Equal(t, CoverageFull, res.Status)
+	require.InDelta(t, 0, *res.DPlusM, 0.001)
+	require.InDelta(t, 50, *res.DMinusM, 0.001)
 }
 
 func TestCalculateAdjustedSpeedExtremeDownhill(t *testing.T) {

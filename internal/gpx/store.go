@@ -46,10 +46,10 @@ func toAnalysisNumerics(a *Analysis) (analysisNumerics, error) {
 	if n.DistanceM, err = numeric(a.DistanceM); err != nil {
 		return analysisNumerics{}, fmt.Errorf("%w: distance_m", ErrNumericConversion)
 	}
-	if n.DPlusM, err = numeric(a.DPlusM); err != nil {
+	if n.DPlusM, err = optionalNumeric(a.DPlusM); err != nil {
 		return analysisNumerics{}, fmt.Errorf("%w: d_plus_m", ErrNumericConversion)
 	}
-	if n.DMinusM, err = numeric(a.DMinusM); err != nil {
+	if n.DMinusM, err = optionalNumeric(a.DMinusM); err != nil {
 		return analysisNumerics{}, fmt.Errorf("%w: d_minus_m", ErrNumericConversion)
 	}
 	if n.AverageSlopePct, err = numeric(a.AverageSlopePct); err != nil {
@@ -466,7 +466,7 @@ func storedTrack(row sqlc.GpxTrack, resolution int) (*StoredTrack, error) {
 		},
 		Analysis: Analysis{
 			DistanceM: numericValue(row.DistanceM), MovingTimeS: int(row.MovingTimeS),
-			DPlusM: numericValue(row.DPlusM), DMinusM: numericValue(row.DMinusM),
+			DPlusM: numericPointer(row.DPlusM), DMinusM: numericPointer(row.DMinusM),
 			MaxElevationM: numericPointer(row.MaxElevationM), MinElevationM: numericPointer(row.MinElevationM),
 			AverageSlopePct: numericValue(row.AvgSlopePct), MaxSlopePct: numericValue(row.MaxSlopePct),
 			EffortIndex: numericValue(row.EffortIndex), ITRAPoints: numericValue(row.ItraPoints),
