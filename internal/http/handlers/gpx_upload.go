@@ -231,7 +231,7 @@ func analyzeUploadedTrack(track *gpx.Track, analyzer gpx.GPXAnalyzer) *gpx.Analy
 		DistanceM: distance, MovingTimeS: movingTime,
 		DPlusM: elevation.DPlusM, DMinusM: elevation.DMinusM,
 		ElevationCoverage: &coverage,
-		MaxElevationM:      maximum, MinElevationM: minimum,
+		MaxElevationM:     maximum, MinElevationM: minimum,
 		AverageSlopePct: analyzer.CalculateAverageSlope(distance, dPlus), MaxSlopePct: maxSlope,
 		EffortIndex: analyzer.CalculateEffortIndex(distance/1000, dPlus), ITRAPoints: analyzer.CalculateITRAPoints(distance/1000, dPlus),
 		LegBreakerIndex: analyzer.CalculateLegBreakerIndex(slopes), EstimatedVAM: analyzer.CalculateEstimatedVAM(distance, dPlus, float64(movingTime)),

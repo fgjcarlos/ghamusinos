@@ -36,8 +36,8 @@ const (
 )
 
 type Analysis struct {
-	DistanceM         float64         `json:"distance_m"`
-	MovingTimeS       int             `json:"moving_time_s"`
+	DistanceM   float64 `json:"distance_m"`
+	MovingTimeS int     `json:"moving_time_s"`
 	// DPlusM and DMinusM are nullable because a track with insufficient
 	// elevation coverage (< CoverageMinThreshold) does not publish a
 	// number — a zero would be a lie. Coverage captures the fraction

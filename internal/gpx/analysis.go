@@ -36,10 +36,10 @@ func (Analyzer) CalculateElevation(points []Point, threshold float64) ElevationR
 	}
 
 	var (
-		dPlus, dMinus     float64
-		coveredDistance   float64
-		totalDistance     float64
-		plusStart, plusMax *float64
+		dPlus, dMinus        float64
+		coveredDistance      float64
+		totalDistance        float64
+		plusStart, plusMax   *float64
 		minusStart, minusMin *float64
 	)
 
