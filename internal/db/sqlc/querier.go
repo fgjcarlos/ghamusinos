@@ -13,6 +13,10 @@ import (
 type Querier interface {
 	CreateGPXClimb(ctx context.Context, arg CreateGPXClimbParams) (GpxClimb, error)
 	CreateGPXRiskZone(ctx context.Context, arg CreateGPXRiskZoneParams) (GpxRiskZone, error)
+	// Issue #171, A8: d_plus_m / d_minus_m admiten NULL cuando la cobertura
+	// de elevación es insuficiente (ver migración 00010). elevation_coverage
+	// (0..1) se persiste junto al track para que la API pueda avisar al
+	// frontend. NULL d+/d- con elevation_coverage conocido es el contrato.
 	CreateGPXTrack(ctx context.Context, arg CreateGPXTrackParams) (GpxTrack, error)
 	CreateInvite(ctx context.Context, arg CreateInviteParams) (Invite, error)
 	// Crea una nueva sesión de sincronización en estado 'pending'. El caller la

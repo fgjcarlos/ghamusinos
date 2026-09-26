@@ -92,11 +92,14 @@ func CompareGPX(store GPXCompareStore) http.Handler {
 // compareMetric representa una métrica en el diff: su valor por track
 // (index = posición del track en el array de entrada) y qué track
 // tiene el valor "best" (mayor para distancia, D+, ITRA; menor para
-// duración — heurística básica).
+// duración — heurística básica). Values es []*float64 porque desde
+// #171 D+/D- pueden ser nil cuando la cobertura de elevación es
+// insuficiente: un track "no publicable" no debería ganar el "best"
+// en una métrica que no tiene.
 type compareMetric struct {
-	Values    []float64 `json:"values"`
-	BestTrack int       `json:"best_track"`
-	Unit      string    `json:"unit"`
+	Values    []*float64 `json:"values"`
+	BestTrack int        `json:"best_track"`
+	Unit      string     `json:"unit"`
 }
 
 // computeDiff extrae métricas numéricas comparables. Trabaja sobre
@@ -116,33 +119,60 @@ func computeDiff(tracks []*gpx.StoredTrackDetail) map[string]compareMetric {
 	metrics := []struct {
 		name string
 		unit string
-		get  func(*gpx.StoredTrackDetail) float64
+		get  func(*gpx.StoredTrackDetail) *float64
 	}{
 		// Distancia y elevación: mayores son "mejores" (más desafiante).
-		{"distance_m", "m", func(t *gpx.StoredTrackDetail) float64 { return t.Track.Analysis.DistanceM }},
-		{"d_plus_m", "m", func(t *gpx.StoredTrackDetail) float64 { return t.Track.Analysis.DPlusM }},
-		{"d_minus_m", "m", func(t *gpx.StoredTrackDetail) float64 { return t.Track.Analysis.DMinusM }},
+		{"distance_m", "m", func(t *gpx.StoredTrackDetail) *float64 {
+			d := t.Track.Analysis.DistanceM
+			return &d
+		}},
+		{"d_plus_m", "m", func(t *gpx.StoredTrackDetail) *float64 { return t.Track.Analysis.DPlusM }},
+		{"d_minus_m", "m", func(t *gpx.StoredTrackDetail) *float64 { return t.Track.Analysis.DMinusM }},
 		// Difficulty y leg-breaker: mayores son "mejores" (más difícil).
-		{"difficulty_score", "score", func(t *gpx.StoredTrackDetail) float64 { return float64(t.Track.Analysis.DifficultyScore) }},
-		{"leg_breaker_index", "score", func(t *gpx.StoredTrackDetail) float64 { return t.Track.Analysis.LegBreakerIndex }},
-		{"itra_points", "points", func(t *gpx.StoredTrackDetail) float64 { return t.Track.Analysis.ITRAPoints }},
+		{"difficulty_score", "score", func(t *gpx.StoredTrackDetail) *float64 {
+			s := float64(t.Track.Analysis.DifficultyScore)
+			return &s
+		}},
+		{"leg_breaker_index", "score", func(t *gpx.StoredTrackDetail) *float64 {
+			s := t.Track.Analysis.LegBreakerIndex
+			return &s
+		}},
+		{"itra_points", "points", func(t *gpx.StoredTrackDetail) *float64 {
+			s := t.Track.Analysis.ITRAPoints
+			return &s
+		}},
 		// Duración: mayor = más largo. Ponytail dice "biggerIsBetter=true"
 		// para todas por simplicidad; si el comparator quiere "menor es
 		// mejor" para pace/duración, refactorizar como se documenta arriba.
-		{"moving_time_s", "s", func(t *gpx.StoredTrackDetail) float64 { return float64(t.Track.Analysis.MovingTimeS) }},
+		{"moving_time_s", "s", func(t *gpx.StoredTrackDetail) *float64 {
+			s := float64(t.Track.Analysis.MovingTimeS)
+			return &s
+		}},
 	}
 
 	for _, m := range metrics {
 		cm := compareMetric{
-			Values: make([]float64, len(tracks)),
+			Values: make([]*float64, len(tracks)),
 			Unit:   m.unit,
 		}
-		bestIdx := 0
-		bestVal := m.get(tracks[0])
+		// Best track es el primero con dato. Si todos son nil (caso
+		// degenerado: comparar tracks sin elevación ninguno), BestTrack
+		// queda en 0 igualmente — el frontend debe entender que la métrica
+		// no es publicable.
+		bestIdx := -1
+		var bestVal *float64
 		for i, t := range tracks {
 			v := m.get(t)
 			cm.Values[i] = v
-			if (biggerIsBetter && v > bestVal) || (!biggerIsBetter && v < bestVal) {
+			if v == nil {
+				continue
+			}
+			if bestVal == nil {
+				bestVal = v
+				bestIdx = i
+				continue
+			}
+			if (biggerIsBetter && *v > *bestVal) || (!biggerIsBetter && *v < *bestVal) {
 				bestVal = v
 				bestIdx = i
 			}

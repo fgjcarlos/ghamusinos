@@ -34,6 +34,11 @@ func (s *compareGPXStore) GetDetail(_ context.Context, _ pgtype.UUID, trackID pg
 	return nil, errors.New("not found")
 }
 
+// ptrFloat64 returns a pointer to v. Used to populate the nullable
+// fields on gpx.Analysis (DPlusM / DMinusM / ElevationCoverage) from
+// tests. Mirrors the helper in internal/gpx/analysis_test.go.
+func ptrFloat64(v float64) *float64 { return &v }
+
 func compareGPXRequest(authenticated bool, body string) *http.Request {
 	req := httptest.NewRequestWithContext(context.Background(), http.MethodPost, "/api/v1/gpx/compare", bytes.NewBufferString(body))
 	req.Header.Set("Content-Type", "application/json")
@@ -86,13 +91,13 @@ func TestCompareGPXWithTwoTracksComputesDiff(t *testing.T) {
 			uuid1: {
 				Track: gpx.StoredTrack{
 					Track:    gpx.Track{ID: pguuid1},
-					Analysis: gpx.Analysis{DistanceM: 10000, DPlusM: 500, DifficultyScore: 60, ITRAPoints: 8},
+					Analysis: gpx.Analysis{DistanceM: 10000, DPlusM: ptrFloat64(500), DifficultyScore: 60, ITRAPoints: 8},
 				},
 			},
 			uuid2: {
 				Track: gpx.StoredTrack{
 					Track:    gpx.Track{ID: pguuid2},
-					Analysis: gpx.Analysis{DistanceM: 20000, DPlusM: 1200, DifficultyScore: 85, ITRAPoints: 14},
+					Analysis: gpx.Analysis{DistanceM: 20000, DPlusM: ptrFloat64(1200), DifficultyScore: 85, ITRAPoints: 14},
 				},
 			},
 		},
@@ -111,7 +116,7 @@ func TestCompareGPXWithTwoTracksComputesDiff(t *testing.T) {
 	require.Len(t, resp.Tracks, 2)
 
 	// DistanceM: track 2 (20000) > track 1 (10000), best=1
-	require.Equal(t, []float64{10000, 20000}, resp.Diff["distance_m"].Values)
+	require.Equal(t, []*float64{ptrFloat64(10000), ptrFloat64(20000)}, resp.Diff["distance_m"].Values)
 	require.Equal(t, 1, resp.Diff["distance_m"].BestTrack)
 	// DifficultyScore: track 2 (85) > track 1 (60), best=1
 	require.Equal(t, 1, resp.Diff["difficulty_score"].BestTrack)

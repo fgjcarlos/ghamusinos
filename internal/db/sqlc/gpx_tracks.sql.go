@@ -14,48 +14,53 @@ import (
 const createGPXTrack = `-- name: CreateGPXTrack :one
 INSERT INTO gpx_tracks (
     user_id, name, file_hash, file_size_bytes, coordinates,
-    distance_m, moving_time_s, d_plus_m, d_minus_m,
+    distance_m, moving_time_s, d_plus_m, d_minus_m, elevation_coverage,
     max_elevation_m, min_elevation_m, avg_slope_pct, max_slope_pct,
     effort_index, itra_points, leg_breaker_index, estimated_vam,
     difficulty_score, difficulty_label, runnability_pct,
     king_climb, track_type, direction
 ) VALUES (
     $1, $2, $3, $4, $5,
-    $6, $7, $8, $9,
-    $10, $11, $12, $13,
-    $14, $15, $16, $17,
-    $18, $19, $20,
-    $21, $22, $23
+    $6, $7, $8, $9, $10,
+    $11, $12, $13, $14,
+    $15, $16, $17, $18,
+    $19, $20, $21,
+    $22, $23, $24
 )
-RETURNING id, user_id, name, file_hash, file_size_bytes, coordinates, distance_m, moving_time_s, d_plus_m, d_minus_m, max_elevation_m, min_elevation_m, avg_slope_pct, max_slope_pct, effort_index, itra_points, leg_breaker_index, estimated_vam, difficulty_score, difficulty_label, runnability_pct, king_climb, track_type, direction, created_at, analyzed_at, updated_at
+RETURNING id, user_id, name, file_hash, file_size_bytes, coordinates, distance_m, moving_time_s, d_plus_m, d_minus_m, elevation_coverage, max_elevation_m, min_elevation_m, avg_slope_pct, max_slope_pct, effort_index, itra_points, leg_breaker_index, estimated_vam, difficulty_score, difficulty_label, runnability_pct, king_climb, track_type, direction, created_at, analyzed_at, updated_at
 `
 
 type CreateGPXTrackParams struct {
-	UserID          pgtype.UUID    `json:"user_id"`
-	Name            string         `json:"name"`
-	FileHash        string         `json:"file_hash"`
-	FileSizeBytes   int64          `json:"file_size_bytes"`
-	Coordinates     []byte         `json:"coordinates"`
-	DistanceM       pgtype.Numeric `json:"distance_m"`
-	MovingTimeS     int32          `json:"moving_time_s"`
-	DPlusM          pgtype.Numeric `json:"d_plus_m"`
-	DMinusM         pgtype.Numeric `json:"d_minus_m"`
-	MaxElevationM   pgtype.Numeric `json:"max_elevation_m"`
-	MinElevationM   pgtype.Numeric `json:"min_elevation_m"`
-	AvgSlopePct     pgtype.Numeric `json:"avg_slope_pct"`
-	MaxSlopePct     pgtype.Numeric `json:"max_slope_pct"`
-	EffortIndex     pgtype.Numeric `json:"effort_index"`
-	ItraPoints      pgtype.Numeric `json:"itra_points"`
-	LegBreakerIndex pgtype.Numeric `json:"leg_breaker_index"`
-	EstimatedVam    pgtype.Numeric `json:"estimated_vam"`
-	DifficultyScore int32          `json:"difficulty_score"`
-	DifficultyLabel string         `json:"difficulty_label"`
-	RunnabilityPct  pgtype.Numeric `json:"runnability_pct"`
-	KingClimb       []byte         `json:"king_climb"`
-	TrackType       string         `json:"track_type"`
-	Direction       pgtype.Text    `json:"direction"`
+	UserID            pgtype.UUID    `json:"user_id"`
+	Name              string         `json:"name"`
+	FileHash          string         `json:"file_hash"`
+	FileSizeBytes     int64          `json:"file_size_bytes"`
+	Coordinates       []byte         `json:"coordinates"`
+	DistanceM         pgtype.Numeric `json:"distance_m"`
+	MovingTimeS       int32          `json:"moving_time_s"`
+	DPlusM            pgtype.Numeric `json:"d_plus_m"`
+	DMinusM           pgtype.Numeric `json:"d_minus_m"`
+	ElevationCoverage pgtype.Numeric `json:"elevation_coverage"`
+	MaxElevationM     pgtype.Numeric `json:"max_elevation_m"`
+	MinElevationM     pgtype.Numeric `json:"min_elevation_m"`
+	AvgSlopePct       pgtype.Numeric `json:"avg_slope_pct"`
+	MaxSlopePct       pgtype.Numeric `json:"max_slope_pct"`
+	EffortIndex       pgtype.Numeric `json:"effort_index"`
+	ItraPoints        pgtype.Numeric `json:"itra_points"`
+	LegBreakerIndex   pgtype.Numeric `json:"leg_breaker_index"`
+	EstimatedVam      pgtype.Numeric `json:"estimated_vam"`
+	DifficultyScore   int32          `json:"difficulty_score"`
+	DifficultyLabel   string         `json:"difficulty_label"`
+	RunnabilityPct    pgtype.Numeric `json:"runnability_pct"`
+	KingClimb         []byte         `json:"king_climb"`
+	TrackType         string         `json:"track_type"`
+	Direction         pgtype.Text    `json:"direction"`
 }
 
+// Issue #171, A8: d_plus_m / d_minus_m admiten NULL cuando la cobertura
+// de elevación es insuficiente (ver migración 00010). elevation_coverage
+// (0..1) se persiste junto al track para que la API pueda avisar al
+// frontend. NULL d+/d- con elevation_coverage conocido es el contrato.
 func (q *Queries) CreateGPXTrack(ctx context.Context, arg CreateGPXTrackParams) (GpxTrack, error) {
 	row := q.db.QueryRow(ctx, createGPXTrack,
 		arg.UserID,
@@ -67,6 +72,7 @@ func (q *Queries) CreateGPXTrack(ctx context.Context, arg CreateGPXTrackParams) 
 		arg.MovingTimeS,
 		arg.DPlusM,
 		arg.DMinusM,
+		arg.ElevationCoverage,
 		arg.MaxElevationM,
 		arg.MinElevationM,
 		arg.AvgSlopePct,
@@ -94,6 +100,7 @@ func (q *Queries) CreateGPXTrack(ctx context.Context, arg CreateGPXTrackParams) 
 		&i.MovingTimeS,
 		&i.DPlusM,
 		&i.DMinusM,
+		&i.ElevationCoverage,
 		&i.MaxElevationM,
 		&i.MinElevationM,
 		&i.AvgSlopePct,
@@ -131,7 +138,7 @@ func (q *Queries) DeleteGPXTrack(ctx context.Context, arg DeleteGPXTrackParams) 
 }
 
 const getGPXTrackByHash = `-- name: GetGPXTrackByHash :one
-SELECT id, user_id, name, file_hash, file_size_bytes, coordinates, distance_m, moving_time_s, d_plus_m, d_minus_m, max_elevation_m, min_elevation_m, avg_slope_pct, max_slope_pct, effort_index, itra_points, leg_breaker_index, estimated_vam, difficulty_score, difficulty_label, runnability_pct, king_climb, track_type, direction, created_at, analyzed_at, updated_at
+SELECT id, user_id, name, file_hash, file_size_bytes, coordinates, distance_m, moving_time_s, d_plus_m, d_minus_m, elevation_coverage, max_elevation_m, min_elevation_m, avg_slope_pct, max_slope_pct, effort_index, itra_points, leg_breaker_index, estimated_vam, difficulty_score, difficulty_label, runnability_pct, king_climb, track_type, direction, created_at, analyzed_at, updated_at
 FROM gpx_tracks
 WHERE user_id = $1 AND file_hash = $2
 LIMIT 1
@@ -156,6 +163,7 @@ func (q *Queries) GetGPXTrackByHash(ctx context.Context, arg GetGPXTrackByHashPa
 		&i.MovingTimeS,
 		&i.DPlusM,
 		&i.DMinusM,
+		&i.ElevationCoverage,
 		&i.MaxElevationM,
 		&i.MinElevationM,
 		&i.AvgSlopePct,
@@ -178,7 +186,7 @@ func (q *Queries) GetGPXTrackByHash(ctx context.Context, arg GetGPXTrackByHashPa
 }
 
 const getGPXTrackByID = `-- name: GetGPXTrackByID :one
-SELECT id, user_id, name, file_hash, file_size_bytes, coordinates, distance_m, moving_time_s, d_plus_m, d_minus_m, max_elevation_m, min_elevation_m, avg_slope_pct, max_slope_pct, effort_index, itra_points, leg_breaker_index, estimated_vam, difficulty_score, difficulty_label, runnability_pct, king_climb, track_type, direction, created_at, analyzed_at, updated_at
+SELECT id, user_id, name, file_hash, file_size_bytes, coordinates, distance_m, moving_time_s, d_plus_m, d_minus_m, elevation_coverage, max_elevation_m, min_elevation_m, avg_slope_pct, max_slope_pct, effort_index, itra_points, leg_breaker_index, estimated_vam, difficulty_score, difficulty_label, runnability_pct, king_climb, track_type, direction, created_at, analyzed_at, updated_at
 FROM gpx_tracks
 WHERE id = $1 AND user_id = $2
 LIMIT 1
@@ -203,6 +211,7 @@ func (q *Queries) GetGPXTrackByID(ctx context.Context, arg GetGPXTrackByIDParams
 		&i.MovingTimeS,
 		&i.DPlusM,
 		&i.DMinusM,
+		&i.ElevationCoverage,
 		&i.MaxElevationM,
 		&i.MinElevationM,
 		&i.AvgSlopePct,
@@ -225,7 +234,7 @@ func (q *Queries) GetGPXTrackByID(ctx context.Context, arg GetGPXTrackByIDParams
 }
 
 const listGPXTracksByUser = `-- name: ListGPXTracksByUser :many
-SELECT id, user_id, name, file_hash, file_size_bytes, coordinates, distance_m, moving_time_s, d_plus_m, d_minus_m, max_elevation_m, min_elevation_m, avg_slope_pct, max_slope_pct, effort_index, itra_points, leg_breaker_index, estimated_vam, difficulty_score, difficulty_label, runnability_pct, king_climb, track_type, direction, created_at, analyzed_at, updated_at, COUNT(*) OVER() AS total_count
+SELECT id, user_id, name, file_hash, file_size_bytes, coordinates, distance_m, moving_time_s, d_plus_m, d_minus_m, elevation_coverage, max_elevation_m, min_elevation_m, avg_slope_pct, max_slope_pct, effort_index, itra_points, leg_breaker_index, estimated_vam, difficulty_score, difficulty_label, runnability_pct, king_climb, track_type, direction, created_at, analyzed_at, updated_at, COUNT(*) OVER() AS total_count
 FROM gpx_tracks
 WHERE user_id = $1
 ORDER BY created_at DESC
@@ -239,34 +248,35 @@ type ListGPXTracksByUserParams struct {
 }
 
 type ListGPXTracksByUserRow struct {
-	ID              pgtype.UUID        `json:"id"`
-	UserID          pgtype.UUID        `json:"user_id"`
-	Name            string             `json:"name"`
-	FileHash        string             `json:"file_hash"`
-	FileSizeBytes   int64              `json:"file_size_bytes"`
-	Coordinates     []byte             `json:"coordinates"`
-	DistanceM       pgtype.Numeric     `json:"distance_m"`
-	MovingTimeS     int32              `json:"moving_time_s"`
-	DPlusM          pgtype.Numeric     `json:"d_plus_m"`
-	DMinusM         pgtype.Numeric     `json:"d_minus_m"`
-	MaxElevationM   pgtype.Numeric     `json:"max_elevation_m"`
-	MinElevationM   pgtype.Numeric     `json:"min_elevation_m"`
-	AvgSlopePct     pgtype.Numeric     `json:"avg_slope_pct"`
-	MaxSlopePct     pgtype.Numeric     `json:"max_slope_pct"`
-	EffortIndex     pgtype.Numeric     `json:"effort_index"`
-	ItraPoints      pgtype.Numeric     `json:"itra_points"`
-	LegBreakerIndex pgtype.Numeric     `json:"leg_breaker_index"`
-	EstimatedVam    pgtype.Numeric     `json:"estimated_vam"`
-	DifficultyScore int32              `json:"difficulty_score"`
-	DifficultyLabel string             `json:"difficulty_label"`
-	RunnabilityPct  pgtype.Numeric     `json:"runnability_pct"`
-	KingClimb       []byte             `json:"king_climb"`
-	TrackType       string             `json:"track_type"`
-	Direction       pgtype.Text        `json:"direction"`
-	CreatedAt       pgtype.Timestamptz `json:"created_at"`
-	AnalyzedAt      pgtype.Timestamptz `json:"analyzed_at"`
-	UpdatedAt       pgtype.Timestamptz `json:"updated_at"`
-	TotalCount      int64              `json:"total_count"`
+	ID                pgtype.UUID        `json:"id"`
+	UserID            pgtype.UUID        `json:"user_id"`
+	Name              string             `json:"name"`
+	FileHash          string             `json:"file_hash"`
+	FileSizeBytes     int64              `json:"file_size_bytes"`
+	Coordinates       []byte             `json:"coordinates"`
+	DistanceM         pgtype.Numeric     `json:"distance_m"`
+	MovingTimeS       int32              `json:"moving_time_s"`
+	DPlusM            pgtype.Numeric     `json:"d_plus_m"`
+	DMinusM           pgtype.Numeric     `json:"d_minus_m"`
+	ElevationCoverage pgtype.Numeric     `json:"elevation_coverage"`
+	MaxElevationM     pgtype.Numeric     `json:"max_elevation_m"`
+	MinElevationM     pgtype.Numeric     `json:"min_elevation_m"`
+	AvgSlopePct       pgtype.Numeric     `json:"avg_slope_pct"`
+	MaxSlopePct       pgtype.Numeric     `json:"max_slope_pct"`
+	EffortIndex       pgtype.Numeric     `json:"effort_index"`
+	ItraPoints        pgtype.Numeric     `json:"itra_points"`
+	LegBreakerIndex   pgtype.Numeric     `json:"leg_breaker_index"`
+	EstimatedVam      pgtype.Numeric     `json:"estimated_vam"`
+	DifficultyScore   int32              `json:"difficulty_score"`
+	DifficultyLabel   string             `json:"difficulty_label"`
+	RunnabilityPct    pgtype.Numeric     `json:"runnability_pct"`
+	KingClimb         []byte             `json:"king_climb"`
+	TrackType         string             `json:"track_type"`
+	Direction         pgtype.Text        `json:"direction"`
+	CreatedAt         pgtype.Timestamptz `json:"created_at"`
+	AnalyzedAt        pgtype.Timestamptz `json:"analyzed_at"`
+	UpdatedAt         pgtype.Timestamptz `json:"updated_at"`
+	TotalCount        int64              `json:"total_count"`
 }
 
 // Misma corrección que ListActivitiesByUser (issue #172, M6):
@@ -292,6 +302,7 @@ func (q *Queries) ListGPXTracksByUser(ctx context.Context, arg ListGPXTracksByUs
 			&i.MovingTimeS,
 			&i.DPlusM,
 			&i.DMinusM,
+			&i.ElevationCoverage,
 			&i.MaxElevationM,
 			&i.MinElevationM,
 			&i.AvgSlopePct,

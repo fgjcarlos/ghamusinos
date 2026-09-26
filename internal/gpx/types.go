@@ -36,21 +36,66 @@ const (
 )
 
 type Analysis struct {
-	DistanceM       float64         `json:"distance_m"`
-	MovingTimeS     int             `json:"moving_time_s"`
-	DPlusM          float64         `json:"d_plus_m"`
-	DMinusM         float64         `json:"d_minus_m"`
-	MaxElevationM   *float64        `json:"max_elevation_m,omitempty"`
-	MinElevationM   *float64        `json:"min_elevation_m,omitempty"`
-	AverageSlopePct float64         `json:"avg_slope_pct"`
-	MaxSlopePct     float64         `json:"max_slope_pct"`
-	EffortIndex     float64         `json:"effort_index"`
-	ITRAPoints      float64         `json:"itra_points"`
-	LegBreakerIndex float64         `json:"leg_breaker_index"`
-	EstimatedVAM    float64         `json:"estimated_vam"`
-	DifficultyScore int             `json:"difficulty_score"`
-	DifficultyLabel DifficultyLabel `json:"difficulty_label"`
-	RunnabilityPct  float64         `json:"runnability_pct"`
+	DistanceM   float64 `json:"distance_m"`
+	MovingTimeS int     `json:"moving_time_s"`
+	// DPlusM and DMinusM are nullable because a track with insufficient
+	// elevation coverage (< CoverageMinThreshold) does not publish a
+	// number — a zero would be a lie. Coverage captures the fraction
+	// of the track with usable elevation, so the frontend can decide
+	// whether to warn. Issue #171, A8.
+	DPlusM            *float64        `json:"d_plus_m"`
+	DMinusM           *float64        `json:"d_minus_m"`
+	ElevationCoverage *float64        `json:"elevation_coverage,omitempty"`
+	MaxElevationM     *float64        `json:"max_elevation_m,omitempty"`
+	MinElevationM     *float64        `json:"min_elevation_m,omitempty"`
+	AverageSlopePct   float64         `json:"avg_slope_pct"`
+	MaxSlopePct       float64         `json:"max_slope_pct"`
+	EffortIndex       float64         `json:"effort_index"`
+	ITRAPoints        float64         `json:"itra_points"`
+	LegBreakerIndex   float64         `json:"leg_breaker_index"`
+	EstimatedVAM      float64         `json:"estimated_vam"`
+	DifficultyScore   int             `json:"difficulty_score"`
+	DifficultyLabel   DifficultyLabel `json:"difficulty_label"`
+	RunnabilityPct    float64         `json:"runnability_pct"`
+}
+
+// CoverageStatus captures the policy for what the elevation analysis
+// considered usable. The thresholds live in this package as exported
+// constants so callers and tests reference a single source of truth.
+type CoverageStatus int
+
+const (
+	// CoverageFull: coverage ≥ CoverageFullThreshold. The D+/D- values
+	// are trusted as-is.
+	CoverageFull CoverageStatus = iota
+	// CoveragePartial: CoverageMinThreshold ≤ coverage < CoverageFullThreshold.
+	// The D+/D- values are usable but flagged for the UI to mark as
+	// partial estimates.
+	CoveragePartial
+	// CoverageInsufficient: coverage < CoverageMinThreshold. The D+/D-
+	// values are nil — we do not publish a number we cannot stand behind.
+	CoverageInsufficient
+)
+
+const (
+	// CoverageFullThreshold is the coverage above which the elevation
+	// analysis is considered authoritative.
+	CoverageFullThreshold = 0.95
+	// CoverageMinThreshold is the minimum coverage required to publish a
+	// D+/D- value at all. Below this we return nil and status
+	// Insufficient.
+	CoverageMinThreshold = 0.50
+)
+
+// ElevationResult is the output of CalculateElevation. DPlusM and
+// DMinusM are nil exactly when Status == CoverageInsufficient — i.e.,
+// when coverage is too low to trust the calculation. Coverage is always
+// populated (it can be zero if no point has elevation).
+type ElevationResult struct {
+	DPlusM   *float64
+	DMinusM  *float64
+	Coverage float64
+	Status   CoverageStatus
 }
 
 type Climb struct {
@@ -137,8 +182,15 @@ type GPXValidator interface {
 type GPXAnalyzer interface {
 	CalculateDistance(p1, p2 Point) float64
 	CalculatePathDistance(points []Point) float64
-	CalculateTotalDPlus(points []Point, threshold float64) float64
-	CalculateTotalDMinus(points []Point, threshold float64) float64
+	// CalculateElevation returns the cumulative positive and negative
+	// elevation change plus the fraction of the track's path distance
+	// that had usable elevation. When coverage falls below
+	// CoverageMinThreshold the returned D+/D- are nil and Status is
+	// CoverageInsufficient — a zero would be a lie about the data.
+	// Algorithm: accumulates per contiguous tramo of valid elevation,
+	// resetting at gaps, so a hueco never fabricates the jump across it.
+	// Issue #171, A8.
+	CalculateElevation(points []Point, threshold float64) ElevationResult
 	CalculateAverageSlope(distance, dPlus float64) float64
 	CalculateEffortIndex(distanceKm, dPlus float64) float64
 	CalculateITRAPoints(distanceKm, dPlus float64) float64
