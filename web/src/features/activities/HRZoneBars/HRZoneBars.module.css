@@ -1,0 +1,26 @@
+/* HRZoneBars. Issue 158. Colours from tokens.css. */
+
+.bars {
+  display: inline-flex;
+  align-items: flex-end;
+  gap: 2px;
+  width: 60px;
+  height: 24px;
+  padding: 2px;
+}
+
+.bar {
+  flex: 1 1 0;
+  background: var(--gh-accent);
+  border-radius: 2px;
+  min-height: 2px;
+}
+
+.empty {
+  display: inline-block;
+  font-family: var(--gh-font-body);
+  font-size: 11px;
+  font-style: italic;
+  color: var(--gh-text-3);
+  letter-spacing: 0.02em;
+}

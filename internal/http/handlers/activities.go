@@ -2,10 +2,11 @@ package handlers
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 	"strconv"
-	"strings"
 
+	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/google/uuid"
 
@@ -93,22 +94,8 @@ func GetActivity(q sqlc.Querier) http.Handler {
 			return
 		}
 
-		// Parse external ID from path parameter (chi style or direct URL parsing)
-		var externalIDStr string
-		// Try chi URLParam first (for chi router)
-		if val := r.Context().Value("id"); val != nil {
-			if v, ok := val.(string); ok {
-				externalIDStr = v
-			}
-		}
-		// Fallback: try extracting from URL path directly for tests
-		if externalIDStr == "" {
-			// Extract from /.../{id}
-			parts := strings.Split(strings.TrimSuffix(r.URL.Path, "/"), "/")
-			if len(parts) > 0 {
-				externalIDStr = parts[len(parts)-1]
-			}
-		}
+		// Parse external ID from chi route parameter.
+		externalIDStr := chi.URLParam(r, "id")
 
 		externalID, err := strconv.ParseInt(externalIDStr, 10, 64)
 		if err != nil {
@@ -126,7 +113,7 @@ func GetActivity(q sqlc.Querier) http.Handler {
 			ExternalID:     externalID,
 		})
 		if err != nil {
-			if err == pgx.ErrNoRows {
+			if errors.Is(err, pgx.ErrNoRows) {
 				requestID := middleware.GetReqID(r.Context())
 				problem := NewNotFound("activity not found", requestID)
 				WriteProblem(w, problem)
@@ -171,7 +158,7 @@ func SyncStatus(q sqlc.Querier) http.Handler {
 		// Query latest sync session
 		session, err := q.GetLatestSyncSession(r.Context(), parseUserID(user.ID))
 		if err != nil {
-			if err == pgx.ErrNoRows {
+			if errors.Is(err, pgx.ErrNoRows) {
 				requestID := middleware.GetReqID(r.Context())
 				problem := NewNotFound("no sync session found", requestID)
 				WriteProblem(w, problem)
