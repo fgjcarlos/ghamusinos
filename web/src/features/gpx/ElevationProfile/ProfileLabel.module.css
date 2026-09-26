@@ -1,0 +1,9 @@
+/* ProfileLabel. Issue 156. */
+
+.label {
+  font-family: var(--gh-font-body);
+  font-size: 10px;
+  font-weight: 500;
+  fill: var(--gh-text);
+  letter-spacing: 0.02em;
+}

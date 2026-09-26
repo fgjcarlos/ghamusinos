@@ -1,0 +1,36 @@
+/* ElevationProfile. Issue 156. Colours from tokens.css. */
+
+.profile {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-width: 100%;
+  background: var(--gh-bg-2);
+  border-radius: var(--gh-r-card);
+}
+
+.area {
+  fill: var(--gh-accent);
+  fill-opacity: 0.08;
+  stroke: none;
+}
+
+.line {
+  fill: none;
+  stroke: var(--gh-accent);
+  stroke-width: 1.6;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+
+.tickLabel {
+  font-family: var(--gh-font-body);
+  font-size: 10px;
+  fill: var(--gh-text-2);
+  font-variant-numeric: tabular-nums;
+}
+
+.baseline {
+  stroke: var(--gh-line);
+  stroke-width: 1;
+}
