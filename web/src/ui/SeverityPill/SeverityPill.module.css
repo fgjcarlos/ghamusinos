@@ -1,0 +1,27 @@
+/* SeverityPill. Issue 154. Colours come exclusively from tokens.css. */
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  padding: var(--gh-s-1) var(--gh-s-3);
+  border: 1px solid transparent;
+  border-radius: var(--gh-r-chip);
+  font-family: var(--gh-font-body);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  line-height: 1;
+}
+
+.medium {
+  background: var(--gh-warn-deep);
+  color: var(--gh-text);
+  border-color: var(--gh-warn);
+}
+
+.high {
+  background: var(--gh-risk);
+  color: var(--gh-accent-ink);
+  border-color: var(--gh-risk);
+}

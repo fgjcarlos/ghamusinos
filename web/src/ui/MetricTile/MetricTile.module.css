@@ -1,0 +1,41 @@
+/* MetricTile. Issue 154. Colours come exclusively from tokens.css. */
+
+.tile {
+  display: flex;
+  flex-direction: column;
+  gap: var(--gh-s-2);
+  padding: var(--gh-s-3) var(--gh-s-4);
+  background: var(--gh-surface);
+  border: 1px solid var(--gh-line);
+  border-radius: var(--gh-r-card);
+}
+
+.label {
+  font-family: var(--gh-font-body);
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--gh-text-2);
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.valueRow {
+  display: flex;
+  align-items: baseline;
+  gap: var(--gh-s-2);
+}
+
+.value {
+  font-family: var(--gh-font-display);
+  font-size: 28px;
+  font-weight: 700;
+  color: var(--gh-text);
+  line-height: 1;
+}
+
+.unit {
+  font-family: var(--gh-font-body);
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--gh-text-3);
+}

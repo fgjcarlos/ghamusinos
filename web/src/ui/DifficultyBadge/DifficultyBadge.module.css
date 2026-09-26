@@ -1,0 +1,44 @@
+/* DifficultyBadge. Issue 154. Colours come exclusively from tokens.css.
+ *
+ * Each level pair the color with the visible Spanish label
+ * (rendered by the component as text). Without the text the badge
+ * would fail WCAG 1.4.1 and degrade badly in PDF/print exports. */
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--gh-s-2);
+  min-height: 28px;
+  padding: var(--gh-s-1) var(--gh-s-3);
+  border: 1px solid transparent;
+  border-radius: var(--gh-r-chip);
+  font-family: var(--gh-font-body);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  line-height: 1;
+}
+
+.beginner {
+  background: var(--gh-bg-2);
+  color: var(--gh-text-2);
+  border-color: var(--gh-line-2);
+}
+
+.intermediate {
+  background: var(--gh-warn-deep);
+  color: var(--gh-text);
+  border-color: var(--gh-warn);
+}
+
+.advanced {
+  background: var(--gh-accent-deep);
+  color: var(--gh-text);
+  border-color: var(--gh-accent);
+}
+
+.pro {
+  background: var(--gh-accent);
+  color: var(--gh-accent-ink);
+  border-color: var(--gh-accent);
+}
