@@ -1,0 +1,103 @@
+/* TopBar. Issue 155. Colours from tokens.css. */
+
+.bar {
+  display: flex;
+  align-items: center;
+  gap: var(--gh-s-4);
+  height: 64px;
+  padding: 0 var(--gh-s-4);
+  background: var(--gh-bg);
+  border-bottom: 1px solid var(--gh-line);
+}
+
+.brand {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--gh-s-2);
+  min-height: 44px;
+  padding: 0 var(--gh-s-2);
+  border-radius: var(--gh-r-control);
+  color: var(--gh-text);
+  text-decoration: none;
+  font-family: var(--gh-font-display);
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+
+.brand:hover {
+  background: var(--gh-surface);
+}
+
+.brandIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  color: var(--gh-accent);
+}
+
+.brandIcon svg {
+  width: 100%;
+  height: 100%;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.brandName {
+  white-space: nowrap;
+}
+
+.nav {
+  display: flex;
+  align-items: center;
+  gap: var(--gh-s-1);
+  flex: 1 1 auto;
+  margin-left: var(--gh-s-4);
+}
+
+.placeholder {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--gh-s-2);
+  opacity: 0.55;
+}
+
+.placeholderHint {
+  font-family: var(--gh-font-body);
+  font-size: 10px;
+  font-weight: 500;
+  color: var(--gh-text-3);
+  background: var(--gh-bg-2);
+  padding: 2px 6px;
+  border-radius: var(--gh-r-chip);
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+
+.right {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--gh-s-3);
+  margin-left: auto;
+}
+
+.avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: var(--gh-accent-deep);
+  color: var(--gh-text);
+  font-family: var(--gh-font-body);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}

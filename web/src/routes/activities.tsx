@@ -4,7 +4,7 @@
  */
 
 import { useEffect, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { ActivityList } from '../features/strava/ActivityList';
 import { SyncProgressModal } from '../features/strava/SyncProgressModal';
 
@@ -125,13 +125,13 @@ export default function Activities() {
           textAlign: 'center',
         }}
       >
-        <a href="/" style={{ color: '#3b82f6', textDecoration: 'none' }}>
+        <Link to="/rutas" style={{ color: '#3b82f6', textDecoration: 'none' }}>
           Volver a inicio
-        </a>
+        </Link>
         {' | '}
-        <a href="/profile" style={{ color: '#3b82f6', textDecoration: 'none' }}>
+        <Link to="/perfil" style={{ color: '#3b82f6', textDecoration: 'none' }}>
           Perfil
-        </a>
+        </Link>
       </div>
     </div>
   );

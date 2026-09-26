@@ -2,6 +2,7 @@
  * Profile page provides account settings and Strava connection management.
  */
 
+import { Link } from 'react-router-dom';
 import { ConnectButton } from '../features/strava/ConnectButton';
 
 export default function Profile() {
@@ -104,13 +105,13 @@ export default function Profile() {
           textAlign: 'center',
         }}
       >
-        <a href="/" style={{ color: '#3b82f6', textDecoration: 'none' }}>
+        <Link to="/rutas" style={{ color: '#3b82f6', textDecoration: 'none' }}>
           Volver a inicio
-        </a>
+        </Link>
         {' | '}
-        <a href="/activities" style={{ color: '#3b82f6', textDecoration: 'none' }}>
+        <Link to="/actividades" style={{ color: '#3b82f6', textDecoration: 'none' }}>
           Mis actividades
-        </a>
+        </Link>
       </div>
     </div>
   );
