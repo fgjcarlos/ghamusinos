@@ -1,0 +1,36 @@
+/* EmptyState. Issue 154. Colours come exclusively from tokens.css. */
+
+.empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--gh-s-3);
+  padding: var(--gh-s-6) var(--gh-s-4);
+  background: var(--gh-surface);
+  border: 1px dashed var(--gh-line-2);
+  border-radius: var(--gh-r-card);
+  text-align: center;
+}
+
+.icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  color: var(--gh-text-3);
+}
+
+.message {
+  margin: 0;
+  font-family: var(--gh-font-body);
+  font-size: 14px;
+  color: var(--gh-text-2);
+  line-height: 1.5;
+}
+
+.action {
+  display: flex;
+  gap: var(--gh-s-2);
+}

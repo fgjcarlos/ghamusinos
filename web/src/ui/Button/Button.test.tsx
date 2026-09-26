@@ -1,4 +1,4 @@
-// TDD contract for Button (issue #154).
+// TDD contract for Button (issue 154).
 // Tests check the observable contract, not the CSS values.
 
 import { describe, it, expect, vi } from 'vitest';

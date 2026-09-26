@@ -1,4 +1,4 @@
-// Atomic button. Issue #154. Presentational only: no fetch, no router,
+// Atomic button. Issue 154. Presentational only: no fetch, no router,
 // no useEffect. Variants map to CSS-Module classes via a Record<Variant,
 // string> at module scope.
 

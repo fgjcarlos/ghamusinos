@@ -1,4 +1,4 @@
-/* Button. Issue #154. Colours come exclusively from tokens.css. */
+/* Button. Issue 154. Colours come exclusively from tokens.css. */
 
 .button {
   min-height: 44px; /* zona táctil mínima (accesibilidad + wcag 2.5.5) */
