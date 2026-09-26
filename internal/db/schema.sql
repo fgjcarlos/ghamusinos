@@ -147,7 +147,8 @@ CREATE TABLE hr_zones (
     computed_at     TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
--- Fase 1.3 — Laboratorio GPX. Mirrors migration 00006 for sqlc generation.
+-- Fase 1.3 — Laboratorio GPX. Mirrors migration 00006 (base) and
+-- migration 00010 (issue #171, A8) for sqlc generation.
 CREATE TABLE gpx_tracks (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -157,8 +158,12 @@ CREATE TABLE gpx_tracks (
     coordinates JSONB NOT NULL,
     distance_m NUMERIC NOT NULL,
     moving_time_s INTEGER NOT NULL,
-    d_plus_m NUMERIC NOT NULL,
-    d_minus_m NUMERIC NOT NULL,
+    -- d_plus_m / d_minus_m admiten NULL: cuando la cobertura de
+    -- elevación es insuficiente no publicamos un número (un cero
+    -- sería una mentira sobre los datos del usuario).
+    d_plus_m NUMERIC,
+    d_minus_m NUMERIC,
+    elevation_coverage NUMERIC,
     max_elevation_m NUMERIC,
     min_elevation_m NUMERIC,
     avg_slope_pct NUMERIC,
