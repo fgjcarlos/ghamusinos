@@ -1,0 +1,27 @@
+/* ActivityListContainer. Issue 158. Colours from tokens.css. */
+
+.loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 240px;
+  padding: var(--gh-s-6);
+  font-family: var(--gh-font-body);
+  font-size: 14px;
+  color: var(--gh-text-2);
+}
+
+.error {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 240px;
+  padding: var(--gh-s-6);
+  background: var(--gh-surface);
+  border: 1px solid var(--gh-risk);
+  border-radius: var(--gh-r-card);
+  margin: var(--gh-s-4);
+  font-family: var(--gh-font-body);
+  font-size: 14px;
+  color: var(--gh-risk);
+}
