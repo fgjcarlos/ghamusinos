@@ -1,0 +1,27 @@
+/* Chip. Issue 154. Colours come exclusively from tokens.css. */
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  padding: var(--gh-s-1) var(--gh-s-3);
+  border: 1px solid transparent;
+  border-radius: var(--gh-r-chip);
+  font-family: var(--gh-font-body);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1;
+  letter-spacing: 0.01em;
+}
+
+.neutral {
+  background: var(--gh-surface-2);
+  color: var(--gh-text-2);
+  border-color: var(--gh-line-2);
+}
+
+.accent {
+  background: var(--gh-accent-deep);
+  color: var(--gh-text);
+  border-color: var(--gh-accent-dim);
+}
