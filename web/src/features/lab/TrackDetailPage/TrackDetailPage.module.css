@@ -1,0 +1,37 @@
+/* TrackDetailPage. Issue 125. Colours from tokens.css. */
+
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--gh-s-6);
+  max-width: 960px;
+  margin: 0 auto;
+  padding: var(--gh-s-4);
+}
+
+.mapSection {
+  display: flex;
+  flex-direction: column;
+  gap: var(--gh-s-2);
+}
+
+.mapEmpty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 240px;
+  padding: var(--gh-s-6) var(--gh-s-4);
+  background: var(--gh-bg-2);
+  border: 1px dashed var(--gh-line-2);
+  border-radius: var(--gh-r-card);
+  font-family: var(--gh-font-body);
+  font-size: 14px;
+  color: var(--gh-text-2);
+  text-align: center;
+}
+
+@media (max-width: 767px) {
+  .page {
+    padding: var(--gh-s-3);
+  }
+}
