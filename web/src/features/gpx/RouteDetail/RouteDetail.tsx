@@ -4,6 +4,7 @@
 
 import { ElevationProfile } from '../ElevationProfile';
 import { projectTrack } from '../ElevationProfile/projectTrack';
+import { rawPointsToTrackPoints } from '../rawPointsToTrackPoints';
 import { RouteHeader } from '../RouteHeader/RouteHeader';
 import { RouteMetrics } from '../RouteMetrics/RouteMetrics';
 import { RouteClimbs } from '../RouteClimbs/RouteClimbs';
@@ -16,14 +17,8 @@ export interface RouteDetailProps {
 }
 
 export function RouteDetail({ data }: RouteDetailProps) {
-  // The backend doesn't yet return the raw points array in the detail
-  // response (TODO in the issue: separate /api/v1/gpx/{id}/points or
-  // include them in the existing response). Until then, projectTrack
-  // receives an empty points array — the elevation profile renders
-  // just axes and ticks. We still pass the climbs and risk_zones so
-  // their bands appear on the chart.
   const projected = projectTrack(
-    [],
+    rawPointsToTrackPoints(data.track.points as Parameters<typeof rawPointsToTrackPoints>[0]),
     data.climbs.map((c) => ({
       start_idx: c.start_idx,
       end_idx: c.end_idx,

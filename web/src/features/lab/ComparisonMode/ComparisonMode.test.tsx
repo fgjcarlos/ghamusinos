@@ -44,6 +44,7 @@ function makeFakeTrack(
         d_minus_m: 380,
         max_elevation_m: 1500,
         min_elevation_m: 300,
+        elevation_coverage: null,
         avg_slope_pct: 4.2,
         max_slope_pct: 18.7,
         effort_index: 87.3,

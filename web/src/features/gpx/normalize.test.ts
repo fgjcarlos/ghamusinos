@@ -22,6 +22,7 @@ const analysis: GpxAnalysis = {
   // (the pgtype wrappers live on the climb fields and the inner track).
   max_elevation_m: 1500,
   min_elevation_m: 300,
+  elevation_coverage: null,
   avg_slope_pct: 4.2,
   max_slope_pct: 18.7,
   effort_index: 87.3,
@@ -107,6 +108,19 @@ describe('normalizeTrackDetail', () => {
       risk_zones: risks,
     });
     expect(out.analysis.max_elevation_m).toBeNull();
+  });
+
+  it('preserves elevation coverage values and nulls', () => {
+    const withCoverage: GpxAnalysis = { ...analysis, elevation_coverage: 0.87 };
+    const out = normalizeTrackDetail({
+      track: { ...trackSummary, analysis: withCoverage },
+      climbs,
+      risk_zones: risks,
+    });
+    expect(out.analysis.elevation_coverage).toBe(0.87);
+
+    const noCoverage = normalizeTrackDetail(detail);
+    expect(noCoverage.analysis.elevation_coverage).toBeNull();
   });
 
   it('converts each climb in the array', () => {

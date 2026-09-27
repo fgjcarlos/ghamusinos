@@ -21,14 +21,32 @@ interface FlatPoint {
   ele: number | null;
 }
 
-function isFlatPoint(p: unknown): p is FlatPoint {
+interface RawFlatPoint {
+  lat: number;
+  lng?: number;
+  lon?: number;
+  ele?: number | null;
+}
+
+function isFlatPoint(p: unknown): p is RawFlatPoint {
   if (typeof p !== 'object' || p === null) return false;
-  const o = p as { lat?: unknown; lng?: unknown; ele?: unknown };
+  const o = p as { lat?: unknown; lng?: unknown; lon?: unknown; ele?: unknown };
+  const lng = Number.isFinite(o.lng) ? o.lng : o.lon;
   return (
     typeof o.lat === 'number' &&
-    typeof o.lng === 'number' &&
+    Number.isFinite(o.lat) &&
+    typeof lng === 'number' &&
+    Number.isFinite(lng) &&
     (o.ele === undefined || o.ele === null || typeof o.ele === 'number')
   );
+}
+
+function normalizeFlatPoint(point: RawFlatPoint): FlatPoint {
+  return {
+    lat: point.lat,
+    lng: (Number.isFinite(point.lng) ? point.lng : point.lon) as number,
+    ele: point.ele ?? null,
+  };
 }
 
 export function RouteComparator({ data }: RouteComparatorProps) {
@@ -38,7 +56,10 @@ export function RouteComparator({ data }: RouteComparatorProps) {
     () =>
       data.tracks.map((t) => {
         const list = Array.isArray(t.track.track.points) ? t.track.track.points : [];
-        return list.filter(isFlatPoint).map((p) => [p.lng, p.lat] as LngLat);
+        return list
+          .filter(isFlatPoint)
+          .map(normalizeFlatPoint)
+          .map((p) => [p.lng, p.lat] as LngLat);
       }),
     [data],
   );
@@ -52,9 +73,9 @@ export function RouteComparator({ data }: RouteComparatorProps) {
     () =>
       data.tracks.map((t) => ({
         name: t.track.track.name,
-        points: (Array.isArray(t.track.track.points) ? t.track.track.points : []).filter(
-          isFlatPoint,
-        ),
+        points: (Array.isArray(t.track.track.points) ? t.track.track.points : [])
+          .filter(isFlatPoint)
+          .map(normalizeFlatPoint),
       })),
     [data],
   );

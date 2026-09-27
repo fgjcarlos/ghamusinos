@@ -135,6 +135,7 @@ export interface GpxAnalysis {
   d_minus_m: number;
   max_elevation_m: number | null;
   min_elevation_m: number | null;
+  elevation_coverage: number | null;
   avg_slope_pct: number;
   max_slope_pct: number;
   effort_index: number;

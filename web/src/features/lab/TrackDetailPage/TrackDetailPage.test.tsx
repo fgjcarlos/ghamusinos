@@ -41,6 +41,7 @@ function makeData(overrides: Partial<NormalizedTrackDetail['track']> = {}): Norm
       d_minus_m: 480,
       max_elevation_m: 1500,
       min_elevation_m: 300,
+      elevation_coverage: null,
       avg_slope_pct: 4.2,
       max_slope_pct: 18.7,
       effort_index: 87.3,
@@ -75,6 +76,18 @@ describe('TrackDetailPage', () => {
     expect(map).toBeInTheDocument();
     // The map mock receives 3 coordinates (lng, lat) in GeoJSON order.
     expect(map.dataset.coordsLen).toBe('3');
+  });
+
+  it('renders the map when points use the lon key', () => {
+    const data = makeData({
+      points: [
+        { lat: 40.4, lon: -3.7 },
+        { lat: 40.5, lon: -3.6 },
+        { lat: 40.6, lon: -3.5 },
+      ],
+    });
+    renderInRouter(<TrackDetailPage data={data} />);
+    expect(screen.getByTestId('map-view').dataset.coordsLen).toBe('3');
   });
 
   it('renders the empty state when the backend has no points', () => {

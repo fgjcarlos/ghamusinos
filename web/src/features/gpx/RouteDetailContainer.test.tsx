@@ -11,6 +11,11 @@ import type { GpxTrackSummary, StoredTrackDetail } from '../../lib/api/types';
 vi.mock('../../lib/api/gpx', () => ({
   getGpxTrack: vi.fn(),
 }));
+vi.mock('../lab/MapView/MapView', () => ({
+  MapView: ({ coordinates }: { coordinates: [number, number][] }) => (
+    <div data-testid="map-view" data-coords-len={coordinates.length} />
+  ),
+}));
 
 // import after the mock so the mocked getGpxTrack is bound.
 import { getGpxTrack } from '../../lib/api/gpx';
@@ -39,6 +44,7 @@ function makeDetail(overrides: Partial<GpxTrackSummary['track']> = {}): StoredTr
         d_minus_m: 480,
         max_elevation_m: 1500,
         min_elevation_m: 300,
+        elevation_coverage: null,
         avg_slope_pct: 4.2,
         max_slope_pct: 18.7,
         effort_index: 87.3,
@@ -115,7 +121,15 @@ describe('RouteDetailContainer', () => {
 
   it('renders ready state with normalized data on success', async () => {
     vi.stubEnv('VITE_AUTH_TOKEN', 'tok');
-    mockedGetGpxTrack.mockResolvedValue(makeDetail({ name: 'Subida al Torrico' }));
+    mockedGetGpxTrack.mockResolvedValue(
+      makeDetail({
+        name: 'Subida al Torrico',
+        points: [
+          { lat: 40.4, lng: -3.7 },
+          { lat: 40.5, lng: -3.6 },
+        ],
+      }),
+    );
     render(
       <MemoryRouter>
         <RouteDetailContainer trackId="track-1" />
@@ -129,6 +143,20 @@ describe('RouteDetailContainer', () => {
     // sub-components are tested separately in their own test files;
     // here we just assert the container emitted the ready section
     // and the detail artifact (which carries data-testid='route-detail').
+    expect(screen.getByTestId('route-detail')).toBeInTheDocument();
+    expect(screen.getByTestId('track-detail-page')).toBeInTheDocument();
+    expect(screen.getByTestId('map-view')).toBeInTheDocument();
+  });
+
+  it('shows the empty-map region for a ready track with one point', async () => {
+    vi.stubEnv('VITE_AUTH_TOKEN', 'tok');
+    mockedGetGpxTrack.mockResolvedValue(makeDetail({ points: [{ lat: 40.4, lng: -3.7 }] }));
+    render(
+      <MemoryRouter>
+        <RouteDetailContainer trackId="track-1" />
+      </MemoryRouter>,
+    );
+    await waitFor(() => expect(screen.getByTestId('map-empty')).toBeInTheDocument());
     expect(screen.getByTestId('route-detail')).toBeInTheDocument();
   });
 });

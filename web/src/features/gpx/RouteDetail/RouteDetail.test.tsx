@@ -26,6 +26,7 @@ function makeData(overrides: Partial<NormalizedTrackDetail> = {}): NormalizedTra
       d_minus_m: 480,
       max_elevation_m: 1500,
       min_elevation_m: 300,
+      elevation_coverage: null,
       avg_slope_pct: 4.2,
       max_slope_pct: 18.7,
       effort_index: 87.3,
@@ -100,6 +101,31 @@ describe('RouteDetail', () => {
       </MemoryRouter>,
     );
     expect(screen.getAllByTestId('risk')).toHaveLength(1);
+  });
+
+  it('renders a non-degenerate elevation profile for real points', () => {
+    const data = makeData({
+      track: {
+        ...makeData().track,
+        points: [
+          { lat: 40.4, lng: -3.7, ele: 1000 },
+          { lat: 40.41, lng: -3.69, ele: 1010 },
+          { lat: 40.42, lng: -3.68, ele: 1020 },
+          { lat: 40.43, lng: -3.67, ele: 1030 },
+          { lat: 40.44, lng: -3.66, ele: 1040 },
+        ],
+      },
+    });
+    render(
+      <MemoryRouter>
+        <RouteDetail data={data} />
+      </MemoryRouter>,
+    );
+    const profile = screen.getByTestId('elevation-profile');
+    expect(
+      profile.querySelector('path')?.getAttribute('d')?.match(/L/g)?.length,
+    ).toBeGreaterThanOrEqual(4);
+    expect(profile.innerHTML).not.toContain('NaN');
   });
 
   it('renders the elevation profile svg', () => {

@@ -8,7 +8,7 @@ import { useEffect, useState } from 'react';
 import { ApiError, type StoredTrackDetail } from '../../lib/api/types';
 import { getGpxTrack } from '../../lib/api/gpx';
 import { normalizeTrackDetail, type NormalizedTrackDetail } from './normalize';
-import { RouteDetail } from './RouteDetail/RouteDetail';
+import { TrackDetailPage } from '../lab/TrackDetailPage/TrackDetailPage';
 import styles from './RouteDetailContainer.module.css';
 
 export type RouteDetailStatus =
@@ -95,7 +95,7 @@ export function RouteDetailContainer({ trackId }: RouteDetailContainerProps) {
     case 'ready':
       return (
         <section data-testid="route-detail-status-ready">
-          <RouteDetail data={status.data} />
+          <TrackDetailPage data={status.data} />
         </section>
       );
   }
