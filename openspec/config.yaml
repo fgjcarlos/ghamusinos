@@ -1,0 +1,98 @@
+schema: spec-driven
+
+# Project: ghamusinos
+# Persistence mode: openspec (artifact store)
+# Strict TDD: false — see testing.strict_tdd_rationale below.
+
+context: |
+  Go-first single-binary backend (chi router + pgx + goose + River jobs)
+  with an embedded React/Vite SPA under web/. PostgreSQL 16 + TimescaleDB.
+  Auth via Clerk (JWKS-cached JWT). Phase 1.x roadmap: 1.1 auth+invites
+  shipped, 1.2 Strava OAuth/ingest, 1.3 GPX lab. Internal packages:
+  app, auth, config, crypto, db, frontend, gpx, http, jobs, logging,
+  strava. Migrations via cmd/migrate (goose). sqlc generated under
+  internal/db/sqlc. CI: backend (gofmt + golangci-lint v2 + govulncheck
+  + go test -race -coverprofile + build + migration smoke) and frontend
+  (pnpm typecheck + vite build); release job smokes /, /healthz and CSP.
+
+strict_tdd: false
+testing:
+  strict_tdd: false
+  strict_tdd_rationale: |
+    No workspace-level test command covers every in-scope project.
+    `make test` runs only Go (`go test -race ./...`); `pnpm -C web test`
+    runs only the web SPA. There is no `pnpm-workspace.yaml`, turbo, or
+    other aggregator that fans out to both. Downstream SDD execution
+    therefore must invoke both commands explicitly per change and
+    cannot rely on a single composite `make`/`pnpm` target. Per-project
+    RED-GREEN-REFACTOR is still encouraged; only the workspace gate is
+    off.
+  projects:
+    - path: .
+      stack: "Go 1.25.13 + chi/v5 + pgx/v5 + goose/v3 + riverqueue + lestrrat-go/jwx/v2 + testify + sqlc"
+      module: github.com/fgjcarlos/ghamusinos
+      test_command: "make test"
+      test_command_raw: "GOTOOLCHAIN=local go test -race ./..."
+      coverage_command: "make coverage"
+      coverage_command_raw: "GOTOOLCHAIN=local go test -race -coverprofile=coverage.out -covermode=atomic ./... && go tool cover -func=coverage.out | tail -1"
+      test_layers:
+        - { layer: unit, available: true, tool: "stdlib testing + github.com/stretchr/testify + net/http/httptest" }
+        - { layer: integration, available: true, tool: "net/http/httptest with chi + sqlc mocks; *_integration_test.go files require live PostgreSQL via docker compose" }
+        - { layer: e2e, available: false }
+      quality:
+        - { tool: linter, available: true, command: "make lint", command_raw: "GOTOOLCHAIN=local golangci-lint run ./..." }
+        - { tool: type_checker, available: true, command: "make vet", command_raw: "GOTOOLCHAIN=local go vet ./..." }
+        - { tool: formatter, available: true, command: "make fmt", command_raw: "GOTOOLCHAIN=local go fmt ./..." }
+    - path: web
+      stack: "React 19 + TypeScript 6 + Vite 8 + Vitest 5 + @testing-library/react + jsdom + ESLint 10 + Prettier 3"
+      package_name: ghamusinos-web
+      test_command: "pnpm -C web test"
+      test_command_alt: "pnpm -C web test:run"
+      coverage_command: null
+      test_layers:
+        - { layer: unit, available: true, tool: "vitest + @testing-library/react + jsdom (src/test/setup.ts wires jest-dom matchers)" }
+        - { layer: integration, available: false }
+        - { layer: e2e, available: false }
+      quality:
+        - { tool: linter, available: true, command: "pnpm -C web lint", command_raw: "eslint ." }
+        - { tool: type_checker, available: true, command: "pnpm -C web typecheck", command_raw: "tsc --noEmit" }
+        - { tool: formatter, available: true, command: "pnpm -C web format:check", command_raw: "prettier --check ." }
+
+rules:
+  proposal:
+    - Include a rollback plan for any change that touches migrations, auth, or job workers
+    - State which project(s) are in scope (`.` and/or `web/`) and list the per-project test command the change will run
+    - If a slice is forecast to exceed the 400-line review budget, propose a chained-PR split up front
+  specs:
+    - Use Given/When/Then for every scenario
+    - Use RFC 2119 keywords (MUST, SHALL, SHOULD, MAY)
+    - Cross-reference the project root (Go) vs the `web/` SPA so reviewers know which tests cover each requirement
+  design:
+    - Document architecture decisions with rationale and alternatives considered
+    - Include sequence diagrams for non-trivial request/response flows (auth, OAuth, webhooks, jobs)
+    - When a change touches both projects, name the wiring contract between Go API and TS client explicitly
+  tasks:
+    - Group by phase, use hierarchical numbering (e.g. 1.1, 1.2, 2.1)
+    - Keep each task completable in one session; chain PRs when a slice exceeds the 400-line budget
+    - Pair tests with implementation in the same slice (RED before GREEN per task, when strict TDD is enabled on the slice)
+  apply:
+    guidelines:
+      - Follow existing code patterns in `internal/` (chi handlers, sqlc-backed repositories, slog logging, RFC 9457 errors)
+      - Match the existing Makefile + pnpm -C web convention; do not invent new aggregate commands
+      - For the web SPA, keep one design-token source of truth in `web/src/styles/tokens.css` and consume it via `var(--gh-*)`
+    tdd: false
+    tdd_note: "Workspace-level strict_tdd is false. Per-slice RED-GREEN-REFACTOR is still encouraged; document the slice-level test command in the change folder."
+    test_command: ""          # Empty: no workspace-wide command. Invoke `make test` AND `pnpm -C web test` (when web is in scope) explicitly.
+    web_test_command: "pnpm -C web test"
+    go_test_command: "make test"
+  verify:
+    test_command: ""          # Empty: per-project only. Run `make test` (Go) and `pnpm -C web test:run` (web) as applicable.
+    go_test_command: "make test"
+    web_test_command: "pnpm -C web test:run"
+    build_command: "make build"
+    coverage_threshold: 0
+    coverage_note: "No coverage threshold is enforced. `make coverage` reports totals via `go tool cover` for Go; web coverage is not configured."
+  archive:
+    - Warn before merging any REMOVED or destructive MODIFIED delta
+    - Preserve archive-report.md with per-PR LoC, branches, and outstanding warnings
+    - Cross-link archived spec deltas back to `openspec/specs/{domain}/spec.md` so the main spec stays the source of truth
