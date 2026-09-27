@@ -32,23 +32,14 @@
   color: var(--gh-text-2);
 }
 
-.body {
-  display: flex;
-  flex-direction: column;
+.columns {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
   gap: var(--gh-s-4);
 }
 
-.placeholder {
-  padding: var(--gh-s-6) var(--gh-s-4);
-  background: var(--gh-surface);
-  border: 1px dashed var(--gh-line-2);
-  border-radius: var(--gh-r-card);
-  font-family: var(--gh-font-body);
-  font-size: 14px;
-  color: var(--gh-text-2);
-  text-align: center;
-}
-
-.placeholder p {
-  margin: 0;
+@media (max-width: 767px) {
+  .columns {
+    grid-template-columns: 1fr;
+  }
 }

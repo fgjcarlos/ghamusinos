@@ -1,0 +1,76 @@
+/* MetricsDiffTable. Issue 126. Colours from tokens.css. */
+
+.table {
+  width: 100%;
+  overflow-x: auto;
+  background: var(--gh-surface);
+  border: 1px solid var(--gh-line);
+  border-radius: var(--gh-r-card);
+}
+
+.grid {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: var(--gh-font-mono);
+  font-size: 14px;
+  font-variant-numeric: tabular-nums;
+}
+
+.metricHeader,
+.metricCell {
+  text-align: left;
+  padding: var(--gh-s-3);
+  font-weight: 600;
+  color: var(--gh-text-2);
+  border-bottom: 1px solid var(--gh-line);
+  background: var(--gh-bg-2);
+}
+
+.metricCell {
+  font-weight: 400;
+  color: var(--gh-text);
+}
+
+.trackHeader {
+  text-align: left;
+  padding: var(--gh-s-3);
+  font-weight: 600;
+  font-family: var(--gh-font-body);
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--gh-text-2);
+  border-bottom: 1px solid var(--gh-line);
+  background: var(--gh-bg-2);
+  display: flex;
+  align-items: center;
+  gap: var(--gh-s-2);
+}
+
+.trackBadge {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.cell {
+  padding: var(--gh-s-3);
+  border-bottom: 1px solid var(--gh-line);
+  color: var(--gh-text);
+  text-align: right;
+}
+
+.cellBest {
+  /* Highlight the winner track cell with an accent border. */
+  border: 2px solid var(--gh-accent);
+  border-bottom-color: var(--gh-accent);
+  font-weight: 600;
+}
+
+.unit {
+  margin-left: var(--gh-s-1);
+  color: var(--gh-text-3);
+  font-size: 12px;
+}

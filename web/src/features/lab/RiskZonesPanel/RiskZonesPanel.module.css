@@ -1,0 +1,63 @@
+/* RiskZonesPanel. Issue 126. */
+
+.panel,
+.empty {
+  padding: var(--gh-s-4);
+  background: var(--gh-surface);
+  border: 1px solid var(--gh-line);
+  border-radius: var(--gh-r-card);
+}
+
+.empty {
+  font-family: var(--gh-font-body);
+  font-size: 14px;
+  color: var(--gh-text-3);
+  text-align: center;
+}
+
+.title {
+  margin: 0 0 var(--gh-s-3) 0;
+  font-family: var(--gh-font-display);
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--gh-text);
+}
+
+.list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--gh-s-2);
+}
+
+.item {
+  display: flex;
+  flex-direction: column;
+  gap: var(--gh-s-1);
+  padding: var(--gh-s-3);
+  background: var(--gh-bg-2);
+  border-radius: var(--gh-r-control);
+}
+
+.itemHeader {
+  display: flex;
+  align-items: center;
+  gap: var(--gh-s-2);
+}
+
+.category {
+  font-family: var(--gh-font-body);
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--gh-text);
+}
+
+.meta {
+  margin: 0;
+  font-family: var(--gh-font-mono);
+  font-size: 12px;
+  color: var(--gh-text-2);
+  font-variant-numeric: tabular-nums;
+}

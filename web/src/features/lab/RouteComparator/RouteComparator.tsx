@@ -1,21 +1,75 @@
 // RouteComparator: page-level composition for the route comparator.
-// Issue 126. Pure presentational — receives the normalized
-// CompareResponse from ComparisonMode (or any container) and
-// composes the multi-track map, the diff table, the risk zones
-// panel and the elevation profile overlay.
-//
-// This is a temporary stub: the full sub-components (ComparisonMap,
-// MetricsDiffTable, RiskZonesPanel, ComparisonElevationProfile) are
-// written in the next commits of this PR.
+// Issue 126. Pure presentational — composes ComparisonMap,
+// MetricsDiffTable, RiskZonesPanel and ComparisonElevationProfile
+// from the fetched CompareResponse.
 
-import type { CompareResponse } from '../../../lib/api/types';
+import { useMemo } from 'react';
+import type { CompareResponse, GpxRiskZone } from '../../../lib/api/types';
+import { ComparisonMap, type LngLat } from '../ComparisonMap/ComparisonMap';
+import { MetricsDiffTable } from '../MetricsDiffTable/MetricsDiffTable';
+import { RiskZonesPanel } from '../RiskZonesPanel/RiskZonesPanel';
+import { ComparisonElevationProfile } from '../ComparisonElevationProfile/ComparisonElevationProfile';
 import styles from './RouteComparator.module.css';
 
 export interface RouteComparatorProps {
   data: CompareResponse;
 }
 
+interface FlatPoint {
+  lat: number;
+  lng: number;
+  ele: number | null;
+}
+
+function isFlatPoint(p: unknown): p is FlatPoint {
+  if (typeof p !== 'object' || p === null) return false;
+  const o = p as { lat?: unknown; lng?: unknown; ele?: unknown };
+  return (
+    typeof o.lat === 'number' &&
+    typeof o.lng === 'number' &&
+    (o.ele === undefined || o.ele === null || typeof o.ele === 'number')
+  );
+}
+
 export function RouteComparator({ data }: RouteComparatorProps) {
+  const trackNames = useMemo(() => data.tracks.map((t) => t.track.track.name), [data]);
+
+  const coordsByTrack = useMemo<LngLat[][]>(
+    () =>
+      data.tracks.map((t) => {
+        const list = Array.isArray(t.track.track.points) ? t.track.track.points : [];
+        return list.filter(isFlatPoint).map((p) => [p.lng, p.lat] as LngLat);
+      }),
+    [data],
+  );
+
+  const tracksForMap = useMemo(
+    () => trackNames.map((name, i) => ({ name, coordinates: coordsByTrack[i] })),
+    [trackNames, coordsByTrack],
+  );
+
+  const tracksForProfile = useMemo(
+    () =>
+      data.tracks.map((t) => ({
+        name: t.track.track.name,
+        points: (Array.isArray(t.track.track.points) ? t.track.track.points : []).filter(
+          isFlatPoint,
+        ),
+      })),
+    [data],
+  );
+
+  const flatZones = useMemo<{ trackName: string; zone: GpxRiskZone }[]>(
+    () =>
+      data.tracks.flatMap((t) =>
+        t.risk_zones.map((zone) => ({
+          trackName: t.track.track.name,
+          zone,
+        })),
+      ),
+    [data],
+  );
+
   return (
     <article
       className={styles.comparator}
@@ -24,19 +78,17 @@ export function RouteComparator({ data }: RouteComparatorProps) {
     >
       <header className={styles.header}>
         <h1 className={styles.title}>Comparador de rutas</h1>
-        <p className={styles.meta}>{data.tracks.length} tracks comparados</p>
+        <p className={styles.meta}>{trackNames.length} tracks comparados</p>
       </header>
-      <section className={styles.body} data-testid="route-comparator-body">
-        {/* Placeholder for sub-components (ComparisonMap, MetricsDiffTable,
-            RiskZonesPanel, ComparisonElevationProfile) — full
-            implementations land in the next commits of this PR. */}
-        <div className={styles.placeholder} data-testid="route-comparator-placeholder">
-          <p>
-            Comparación cargada con {data.tracks.length} tracks. Las sub-vistas (mapa, tabla,
-            perfil, riesgos) se montan en commits separados de este mismo PR.
-          </p>
-        </div>
-      </section>
+
+      <ComparisonMap tracks={tracksForMap} />
+
+      <MetricsDiffTable metrics={data.diff} trackNames={trackNames} />
+
+      <div className={styles.columns}>
+        <RiskZonesPanel zones={flatZones} />
+        <ComparisonElevationProfile tracks={tracksForProfile} />
+      </div>
     </article>
   );
 }
