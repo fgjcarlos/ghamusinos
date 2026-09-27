@@ -323,3 +323,12 @@ func (m *mockQuerier) ListGPXRiskZonesByTrack(ctx context.Context, trackID pgtyp
 func (m *mockQuerier) ListGPXTracksByUser(ctx context.Context, arg sqlc.ListGPXTracksByUserParams) ([]sqlc.ListGPXTracksByUserRow, error) {
 	return nil, nil
 }
+
+// GetUserPreferencesByID stub añadido tras el regen de SQLC que añadió
+// el query a la interfaz Querier (handlers/me_preferences.go). El mock
+// devuelve cero porque los tests de auth no ejercitan el endpoint de
+// preferencias del usuario; el método solo existe para satisfacer la
+// interfaz y que el compilador no proteste.
+func (m *mockQuerier) GetUserPreferencesByID(ctx context.Context, id pgtype.UUID) (sqlc.GetUserPreferencesByIDRow, error) {
+	return sqlc.GetUserPreferencesByIDRow{}, nil
+}
