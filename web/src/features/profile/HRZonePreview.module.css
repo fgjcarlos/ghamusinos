@@ -1,0 +1,75 @@
+/* HRZonePreview. Issue 159. Colours from tokens.css. */
+
+.preview,
+.empty {
+  padding: var(--gh-s-4);
+  background: var(--gh-surface);
+  border: 1px solid var(--gh-line);
+  border-radius: var(--gh-r-card);
+}
+
+.empty {
+  font-family: var(--gh-font-body);
+  font-size: 14px;
+  color: var(--gh-text-3);
+  text-align: center;
+}
+
+.header {
+  display: flex;
+  flex-direction: column;
+  gap: var(--gh-s-1);
+  margin-bottom: var(--gh-s-3);
+}
+
+.title {
+  margin: 0;
+  font-family: var(--gh-font-display);
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--gh-text);
+}
+
+.subtitle {
+  margin: 0;
+  font-family: var(--gh-font-body);
+  font-size: 13px;
+  color: var(--gh-text-2);
+}
+
+.zones {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--gh-s-2);
+}
+
+.zone {
+  display: grid;
+  grid-template-columns: 60px 1fr auto;
+  align-items: center;
+  gap: var(--gh-s-3);
+  padding: var(--gh-s-2) var(--gh-s-3);
+  background: var(--gh-bg-2);
+  border-radius: var(--gh-r-control);
+  font-family: var(--gh-font-mono);
+  font-size: 13px;
+  color: var(--gh-text);
+}
+
+.zoneLabel {
+  font-weight: 600;
+  color: var(--gh-accent);
+}
+
+.zoneRange {
+  color: var(--gh-text-2);
+  font-variant-numeric: tabular-nums;
+}
+
+.zoneBpm {
+  color: var(--gh-text-3);
+  font-variant-numeric: tabular-nums;
+}
