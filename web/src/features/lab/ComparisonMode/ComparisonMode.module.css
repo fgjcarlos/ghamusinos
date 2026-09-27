@@ -1,0 +1,52 @@
+/* ComparisonMode. Issue 126. Colours from tokens.css. */
+
+.skeleton,
+.error {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 240px;
+  padding: var(--gh-s-6) var(--gh-s-4);
+  font-family: var(--gh-font-body);
+  font-size: 14px;
+  color: var(--gh-text-2);
+}
+
+.error {
+  background: var(--gh-surface);
+  border: 1px solid var(--gh-risk);
+  border-radius: var(--gh-r-card);
+  color: var(--gh-risk);
+}
+
+.error code {
+  font-family: var(--gh-font-mono);
+  background: var(--gh-bg-2);
+  padding: 1px 4px;
+  border-radius: 3px;
+  color: var(--gh-text-2);
+}
+
+.exportBtn {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: var(--gh-s-2) var(--gh-s-4);
+  margin-bottom: var(--gh-s-4);
+  border: 1px solid var(--gh-line-2);
+  border-radius: var(--gh-r-control);
+  background: var(--gh-surface);
+  color: var(--gh-text);
+  font-family: var(--gh-font-body);
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition:
+    background-color 0.15s ease,
+    border-color 0.15s ease;
+}
+
+.exportBtn:hover {
+  background: var(--gh-bg-2);
+  border-color: var(--gh-accent);
+}
