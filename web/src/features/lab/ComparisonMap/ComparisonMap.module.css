@@ -1,0 +1,9 @@
+/* ComparisonMap. Issue 126. */
+
+.map {
+  width: 100%;
+  border-radius: var(--gh-r-card);
+  overflow: hidden;
+  background: var(--gh-bg-2);
+  border: 1px solid var(--gh-line);
+}

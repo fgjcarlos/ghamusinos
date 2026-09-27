@@ -1,33 +1,30 @@
-/**
- * Comparison placeholder. La página completa (multi-track overlay,
- * diff table, RiskZonesPanel) llega en PR-D (issue #126).
- *
- * Por ahora parsea los IDs del query string y muestra el listado
- * crudo para confirmar que la ruta existe y los IDs llegan bien.
- */
+// Compare tracks page. Issue 126. Delegates to <ComparisonMode> for
+// the actual comparison UI (fetch, state, JSON export, map overlay,
+// diff table, risk zones, elevation overlay). This route file is a
+// thin shell that pulls the track ids from the query string and hands
+// them off.
 
 import { Link, useSearchParams } from 'react-router-dom';
+import { ComparisonMode } from '../features/lab/ComparisonMode/ComparisonMode';
 
 export default function LabCompare() {
   const [searchParams] = useSearchParams();
-  const ids = (searchParams.get('ids') ?? '').split(',').filter(Boolean);
+  const ids = (searchParams.get('ids') ?? '')
+    .split(',')
+    .map((id) => id.trim())
+    .filter(Boolean);
+
   return (
-    <div style={{ padding: '20px', maxWidth: '600px', margin: '0 auto' }}>
+    <main style={{ maxWidth: '960px', margin: '0 auto', padding: '16px' }}>
       <p>
         <Link to="/lab">← Back to lab</Link>
       </p>
       <h1>Compare tracks</h1>
-      <p>{ids.length} tracks selected.</p>
-      <ul>
-        {ids.map((id) => (
-          <li key={id}>
-            <code>{id}</code>
-          </li>
-        ))}
-      </ul>
-      <p>
-        <em>Comparator + RiskZonesPanel llega en issue #126.</em>
-      </p>
-    </div>
+      {ids.length >= 2 ? (
+        <ComparisonMode trackIds={ids} />
+      ) : (
+        <p>Selecciona entre 2 y 3 tracks en el laboratorio para compararlos aquí.</p>
+      )}
+    </main>
   );
 }
