@@ -1,0 +1,30 @@
+/* RouteDetail. Issue 157. */
+
+.detail {
+  display: flex;
+  flex-direction: column;
+  gap: var(--gh-s-6);
+  max-width: 960px;
+  margin: 0 auto;
+  padding: var(--gh-s-4);
+}
+
+.profileSection {
+  background: var(--gh-surface);
+  border: 1px solid var(--gh-line);
+  border-radius: var(--gh-r-card);
+  padding: var(--gh-s-3);
+  overflow: hidden;
+}
+
+.columns {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--gh-s-4);
+}
+
+@media (max-width: 767px) {
+  .columns {
+    grid-template-columns: 1fr;
+  }
+}

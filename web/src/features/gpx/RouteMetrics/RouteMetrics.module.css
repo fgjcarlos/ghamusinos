@@ -1,0 +1,21 @@
+/* RouteMetrics. Issue 157. Colours from tokens.css. */
+
+.metrics {
+  display: flex;
+  flex-direction: column;
+  gap: var(--gh-s-3);
+}
+
+.title {
+  margin: 0;
+  font-family: var(--gh-font-display);
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--gh-text);
+}
+
+.tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: var(--gh-s-3);
+}

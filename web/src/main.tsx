@@ -1,12 +1,12 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
-import { BrowserRouter, Routes, Route, Navigate, Link } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, Link, useParams } from 'react-router-dom';
 import Activities from './routes/activities';
 import Profile from './routes/profile';
 import Lab from './routes/lab';
-import LabTrackDetail from './routes/lab-detail';
 import LabCompare from './routes/lab-compare';
 import { AppShell } from './ui/AppShell';
+import { RouteDetailContainer } from './features/gpx/RouteDetailContainer';
 import './styles/fonts.css';
 import './index.css';
 
@@ -25,6 +25,14 @@ function RendimientoPlaceholder() {
   );
 }
 
+// Reads the :id URL param and forwards it to the container. Both
+// /rutas/:id and /lab/:id mount this same wrapper so the legacy alias
+// keeps working without a separate handler.
+function RouteDetailWithId() {
+  const { id } = useParams<{ id: string }>();
+  return <RouteDetailContainer trackId={id ?? ''} />;
+}
+
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <BrowserRouter>
@@ -32,8 +40,9 @@ createRoot(document.getElementById('root')!).render(
         <Route element={<AppShell lastSync={null} />}>
           <Route path="/" element={<Navigate to="/rutas" replace />} />
           <Route path="/rutas" element={<Lab />} />
+          <Route path="/rutas/:id" element={<RouteDetailWithId />} />
           <Route path="/lab" element={<Lab />} />
-          <Route path="/lab/:id" element={<LabTrackDetail />} />
+          <Route path="/lab/:id" element={<RouteDetailWithId />} />
           <Route path="/lab/compare" element={<LabCompare />} />
           <Route path="/actividades" element={<Activities />} />
           <Route path="/perfil" element={<Profile />} />
