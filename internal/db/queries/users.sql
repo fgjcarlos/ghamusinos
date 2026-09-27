@@ -29,6 +29,14 @@ RETURNING *;
 -- Obtiene el hr_max del usuario para cálculos de zonas HR.
 SELECT hr_max FROM users WHERE id = $1 LIMIT 1;
 
+-- name: GetUserPreferencesByID :one
+-- Devuelve las preferencias de entrenamiento e IA del usuario
+-- (issue #159). Sólo lectura — la mutación usa UpdateUserPreferences.
+SELECT hr_max, lthr, ftp, level, timezone, ai_enabled
+FROM users
+WHERE id = $1
+LIMIT 1;
+
 -- name: UpdateUserPreferences :one
 -- Actualiza las preferencias de entrenamiento e IA del usuario (fase 1.1).
 -- Las métricas pueden ir a NULL si el usuario no las conoce; timezone y
