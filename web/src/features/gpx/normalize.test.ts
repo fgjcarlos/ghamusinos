@@ -61,9 +61,7 @@ const climbs: GpxClimb[] = [
   },
 ];
 
-const risks: GpxRiskZone[] = [
-  { start_idx: 30, end_idx: 35, category: 'steep', severity: 0.9 },
-];
+const risks: GpxRiskZone[] = [{ start_idx: 30, end_idx: 35, category: 'steep', severity: 0.9 }];
 
 const detail: StoredTrackDetail = { track: trackSummary, climbs, risk_zones: risks };
 

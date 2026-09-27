@@ -100,9 +100,7 @@ function normalizeAnalysis(a: GpxAnalysis): NormalizedAnalysis {
   };
 }
 
-function normalizeInnerTrack(
-  inner: GpxTrackSummary['track'],
-): NormalizedInnerTrack {
+function normalizeInnerTrack(inner: GpxTrackSummary['track']): NormalizedInnerTrack {
   // uploaded_at is already an ISO 8601 string from the backend.
   const uploaded = inner.uploaded_at ? new Date(inner.uploaded_at) : new Date(0);
   return {
@@ -147,9 +145,7 @@ function normalizeRiskZone(r: GpxRiskZone): NormalizedRiskZone {
  * Backend nests the inner track metadata under `detail.track.track`
  * and the analysis under `detail.track.analysis`. After normalization
  * the consumer sees a flat `track` + `analysis` pair. */
-export function normalizeTrackDetail(
-  detail: StoredTrackDetail,
-): NormalizedTrackDetail {
+export function normalizeTrackDetail(detail: StoredTrackDetail): NormalizedTrackDetail {
   return {
     track: normalizeInnerTrack(detail.track.track),
     analysis: normalizeAnalysis(detail.track.analysis),
