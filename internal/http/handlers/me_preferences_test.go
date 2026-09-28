@@ -31,8 +31,15 @@ func newPatchReq(body string) *http.Request {
 // returns. The methods our handlers actually touch —
 // GetUserPreferencesByID and UpdateUserPreferences — are no-ops;
 // every other method is included only to satisfy the interface.
+//
+// The struct also exposes a configurable hook for
+// DeleteStravaTokensByUserID so the strava disconnect tests in
+// strava_connection_test.go can drive the same mock without
+// copying the entire interface. Defaults to zero-value behaviour
+// when nil.
 type preferencesMockQuerier struct {
-	t *testing.T
+	t                    *testing.T
+	deleteStravaTokens   func(userID pgtype.UUID) error
 }
 
 func (m *preferencesMockQuerier) CreateInvite(ctx context.Context, arg sqlc.CreateInviteParams) (sqlc.Invite, error) {
@@ -45,6 +52,9 @@ func (m *preferencesMockQuerier) CreateUser(ctx context.Context, arg sqlc.Create
 	return sqlc.User{}, nil
 }
 func (m *preferencesMockQuerier) DeleteStravaTokensByUserID(ctx context.Context, userID pgtype.UUID) error {
+	if m.deleteStravaTokens != nil {
+		return m.deleteStravaTokens(userID)
+	}
 	return nil
 }
 func (m *preferencesMockQuerier) EnqueueActivityEvent(ctx context.Context, arg sqlc.EnqueueActivityEventParams) (sqlc.ActivityEvent, error) {
