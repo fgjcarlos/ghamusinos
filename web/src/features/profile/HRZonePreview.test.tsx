@@ -10,9 +10,7 @@ describe('HRZonePreview', () => {
   it('renders the empty state when hr_max is null', () => {
     render(<HRZonePreview hr_max={null} />);
     expect(screen.getByTestId('hr-zones-empty')).toBeInTheDocument();
-    expect(
-      screen.getByText(/Introduce tu FC máxima para ver tus zonas/i),
-    ).toBeInTheDocument();
+    expect(screen.getByText(/Introduce tu FC máxima para ver tus zonas/i)).toBeInTheDocument();
   });
 
   it('renders the empty state when hr_max is 0 or negative', () => {

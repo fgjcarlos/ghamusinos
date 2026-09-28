@@ -41,9 +41,7 @@ describe('PreferencesForm', () => {
         onSubmit={() => {}}
       />,
     );
-    expect(
-      screen.getByText(/hr_max must be between 1 and 260/i),
-    ).toBeInTheDocument();
+    expect(screen.getByText(/hr_max must be between 1 and 260/i)).toBeInTheDocument();
   });
 
   it('renders the cross-field warning when present', () => {
@@ -118,8 +116,6 @@ describe('PreferencesForm', () => {
         onSubmit={() => {}}
       />,
     );
-    expect(
-      screen.getByRole('button', { name: /guardando/i }),
-    ).toBeDisabled();
+    expect(screen.getByRole('button', { name: /guardando/i })).toBeDisabled();
   });
 });

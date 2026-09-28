@@ -29,10 +29,7 @@ const EMPTY: PreferencesFormValues = {
 
 type SaveStatus = 'idle' | 'saving' | 'saved' | 'error';
 
-export function PreferencesContainer({
-  strava,
-  stravaBusy,
-}: PreferencesContainerProps) {
+export function PreferencesContainer({ strava, stravaBusy }: PreferencesContainerProps) {
   const [values, setValues] = useState<PreferencesFormValues>(EMPTY);
   const [errors, setErrors] = useState<Record<string, string | undefined>>({});
   const [warning, setWarning] = useState<string | undefined>(undefined);

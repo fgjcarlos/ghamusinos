@@ -67,8 +67,8 @@ export function ConnectionCard({ state, busy }: ConnectionCardProps) {
         <h2 className={styles.title}>Strava no conectado</h2>
       </header>
       <p className={styles.empty}>
-        Conecta tu cuenta de Strava para importar actividades, calcular
-        zonas de FC y mantener tu biblioteca al día.
+        Conecta tu cuenta de Strava para importar actividades, calcular zonas de FC y mantener tu
+        biblioteca al día.
       </p>
       <Link
         to="/api/v1/strava/connect"

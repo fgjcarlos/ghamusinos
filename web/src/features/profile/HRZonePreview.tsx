@@ -48,9 +48,8 @@ export function HRZonePreview({ hr_max }: HRZonePreviewProps) {
         aria-label="Vista previa de zonas de frecuencia cardíaca"
       >
         <p>
-          Introduce tu FC máxima para ver tus zonas. Las zonas se calculan
-          con los mismos umbrales que usa el backend al importar
-          actividades (60 / 70 / 80 / 90 %).
+          Introduce tu FC máxima para ver tus zonas. Las zonas se calculan con los mismos umbrales
+          que usa el backend al importar actividades (60 / 70 / 80 / 90 %).
         </p>
       </section>
     );

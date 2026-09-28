@@ -178,12 +178,7 @@ function Field({ id, label, type, value, error, hint, onChange }: FieldProps) {
   return (
     <div className={styles.field}>
       <label htmlFor={id}>{label}</label>
-      <input
-        id={id}
-        type={type}
-        value={displayValue}
-        onChange={(e) => onChange(e.target.value)}
-      />
+      <input id={id} type={type} value={displayValue} onChange={(e) => onChange(e.target.value)} />
       {hint && !error && <p className={styles.hint}>{hint}</p>}
       {error && (
         <p className={styles.error} role="alert">

@@ -13,9 +13,7 @@ describe('ConnectionCard', () => {
       </MemoryRouter>,
     );
     expect(screen.getByTestId('strava-connection-disconnected')).toBeInTheDocument();
-    expect(
-      screen.getByText(/Conecta tu cuenta de Strava para importar/i),
-    ).toBeInTheDocument();
+    expect(screen.getByText(/Conecta tu cuenta de Strava para importar/i)).toBeInTheDocument();
   });
 
   it('renders a connect link pointing at the strava connect endpoint', () => {
@@ -69,10 +67,7 @@ describe('ConnectionCard', () => {
   it('shows a busy indicator when busy is true', () => {
     render(
       <MemoryRouter>
-        <ConnectionCard
-          state={{ connected: true, athlete_id: 7 }}
-          busy
-        />
+        <ConnectionCard state={{ connected: true, athlete_id: 7 }} busy />
       </MemoryRouter>,
     );
     expect(screen.getByText(/Sincronizando/i)).toBeInTheDocument();
