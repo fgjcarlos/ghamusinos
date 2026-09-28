@@ -91,10 +91,16 @@ export function PreferencesContainer({ strava, stravaBusy }: PreferencesContaine
       })
       .catch((err: unknown) => {
         if (err instanceof ApiError && err.status === 422) {
-          // Surface field-level errors from the problem detail.
-          const detail = err.message;
-          setErrors({ timezone: detail });
-          setStatus('error');
+          // closes-159-strava-disconnect (PR1): per-field 422 errors
+          // arrive on err.fields as {field: message}. Paint them next
+          // to their input via PreferencesForm. The global banner
+          // stays for non-field server failures (5xx, network).
+          const fields = err.fields ?? {};
+          setErrors(fields);
+          // Only flip to error status if there is at least one field
+          // message; otherwise leave the user with the per-field
+          // paint and no global red banner.
+          setStatus(Object.keys(fields).length > 0 ? 'idle' : 'error');
         } else {
           setStatus('error');
           setErrors({});
