@@ -87,17 +87,45 @@ export interface SyncSession {
 
 /**
  * ApiError is thrown when an API call fails.
- * It carries the HTTP status code and a descriptive message.
+ * It carries the HTTP status code, a descriptive message, and an
+ * optional field-level error map populated from RFC 9457 problem
+ * details with the `errors` extension member
+ * (closes-159-strava-disconnect). When `fields` is set the
+ * container component maps each entry to the input that caused it.
  */
 export class ApiError extends Error {
+  public fields?: Record<string, string>;
+
   constructor(
     public status: number,
     message: string,
+    fields?: Record<string, string>,
   ) {
     super(message);
     this.name = 'ApiError';
+    // exactOptionalPropertyTypes is enabled; assign via
+    // conditional spread so `undefined` does not materialise a
+    // property that the consumer treats as "explicitly absent".
+    if (fields) {
+      this.fields = fields;
+    }
     Object.setPrototypeOf(this, ApiError.prototype);
   }
+}
+
+/**
+ * ProblemDetail mirrors the backend's `internal/http/handlers/errors.go`
+ * `ProblemDetail` struct. We only model the fields the SPA needs to
+ * surface per-field validation feedback. Status is kept as a number
+ * to stay aligned with `http.StatusUnprocessableEntity` (422).
+ */
+export interface ProblemDetailShape {
+  type?: string;
+  title?: string;
+  status?: number;
+  detail?: string;
+  instance?: string;
+  errors?: Record<string, string>;
 }
 
 // ─────────────────────────────────────────────────────────────────
