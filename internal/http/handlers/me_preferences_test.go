@@ -38,8 +38,8 @@ func newPatchReq(body string) *http.Request {
 // copying the entire interface. Defaults to zero-value behaviour
 // when nil.
 type preferencesMockQuerier struct {
-	t                    *testing.T
-	deleteStravaTokens   func(userID pgtype.UUID) error
+	t                  *testing.T
+	deleteStravaTokens func(userID pgtype.UUID) error
 }
 
 func (m *preferencesMockQuerier) CreateInvite(ctx context.Context, arg sqlc.CreateInviteParams) (sqlc.Invite, error) {
