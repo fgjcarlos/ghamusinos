@@ -193,17 +193,18 @@ func TestPatchPreferences_InvalidJSON(t *testing.T) {
 
 func TestPatchPreferences_RejectsOutOfRange(t *testing.T) {
 	cases := []struct {
-		name string
-		body string
-		want string
+		name  string
+		body  string
+		field string
+		want  string
 	}{
-		{"hr_max too low", `{"hr_max":0}`, "hr_max must be between 1 and 260 (or null)"},
-		{"hr_max too high", `{"hr_max":261}`, "hr_max must be between 1 and 260 (or null)"},
-		{"lthr too low", `{"lthr":0}`, "lthr must be between 1 and 260 (or null)"},
-		{"ftp too low", `{"ftp":0}`, "ftp must be between 1 and 2000 (or null)"},
-		{"ftp too high", `{"ftp":2001}`, "ftp must be between 1 and 2000 (or null)"},
-		{"invalid level", `{"level":"pro"}`, "level must be one of beginner | intermediate | advanced (or null)"},
-		{"empty timezone", `{"timezone":""}`, "timezone is required and must be a non-empty IANA name"},
+		{"hr_max too low", `{"hr_max":0}`, "hr_max", "hr_max must be between 1 and 260 (or null)"},
+		{"hr_max too high", `{"hr_max":261}`, "hr_max", "hr_max must be between 1 and 260 (or null)"},
+		{"lthr too low", `{"lthr":0}`, "lthr", "lthr must be between 1 and 260 (or null)"},
+		{"ftp too low", `{"ftp":0}`, "ftp", "ftp must be between 1 and 2000 (or null)"},
+		{"ftp too high", `{"ftp":2001}`, "ftp", "ftp must be between 1 and 2000 (or null)"},
+		{"invalid level", `{"level":"pro"}`, "level", "level must be one of beginner | intermediate | advanced (or null)"},
+		{"empty timezone", `{"timezone":""}`, "timezone", "timezone is required and must be a non-empty IANA name"},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
@@ -214,10 +215,57 @@ func TestPatchPreferences_RejectsOutOfRange(t *testing.T) {
 			if w.Code != http.StatusUnprocessableEntity {
 				t.Errorf("expected 422 for %s, got %d", c.name, w.Code)
 			}
-			if !strings.Contains(w.Body.String(), c.want) {
-				t.Errorf("expected message %q in body, got %q", c.want, w.Body.String())
+			var problem ProblemDetail
+			if err := json.Unmarshal(w.Body.Bytes(), &problem); err != nil {
+				t.Fatalf("expected ProblemDetail JSON, got %q (err=%v)", w.Body.String(), err)
+			}
+			if problem.Status != http.StatusUnprocessableEntity {
+				t.Errorf("expected problem.Status=422, got %d", problem.Status)
+			}
+			got, ok := problem.Errors[c.field]
+			if !ok {
+				t.Errorf("expected errors[%q] in problem body, got %q", c.field, w.Body.String())
+			}
+			if got != c.want {
+				t.Errorf("expected errors[%q]=%q, got %q", c.field, c.want, got)
 			}
 		})
+	}
+}
+
+// TestPatchPreferences_ReportsMultipleFieldErrors verifies that a
+// single PATCH body with two invalid fields produces both entries
+// in the `errors` extension member. This is the contract the
+// /perfil SPA depends on to render per-field 422 messages.
+//
+// The fixture omits `timezone`, which is required; we therefore
+// assert that the response contains at least the two named errors,
+// not that the map is exactly two entries long.
+func TestPatchPreferences_ReportsMultipleFieldErrors(t *testing.T) {
+	h := PatchPreferences(&preferencesMockQuerier{t: t})
+	body := `{"hr_max":999,"level":"pro"}`
+	req := newPatchReq(body)
+	w := httptest.NewRecorder()
+	h.ServeHTTP(w, req)
+	if w.Code != http.StatusUnprocessableEntity {
+		t.Fatalf("expected 422, got %d (body=%s)", w.Code, w.Body.String())
+	}
+	var problem ProblemDetail
+	if err := json.Unmarshal(w.Body.Bytes(), &problem); err != nil {
+		t.Fatalf("expected ProblemDetail JSON: %v", err)
+	}
+	if len(problem.Errors) < 2 {
+		t.Errorf("expected at least 2 entries in errors, got %d (%v)", len(problem.Errors), problem.Errors)
+	}
+	if _, ok := problem.Errors["hr_max"]; !ok {
+		t.Errorf("expected errors[hr_max], got %v", problem.Errors)
+	}
+	if _, ok := problem.Errors["level"]; !ok {
+		t.Errorf("expected errors[level], got %v", problem.Errors)
+	}
+	// The flat Detail still carries the stable summary.
+	if problem.Detail == "" {
+		t.Errorf("expected non-empty Detail for legacy consumers, got %q", problem.Detail)
 	}
 }
 
@@ -248,8 +296,13 @@ func TestPatchPreferences_InvalidTimezone(t *testing.T) {
 	if w.Code != http.StatusUnprocessableEntity {
 		t.Errorf("expected 422 for invalid timezone, got %d", w.Code)
 	}
-	if !strings.Contains(w.Body.String(), "Not/A/Real/Zone") {
-		t.Errorf("expected invalid timezone name in error body, got %q", w.Body.String())
+	var problem ProblemDetail
+	if err := json.Unmarshal(w.Body.Bytes(), &problem); err != nil {
+		t.Fatalf("expected ProblemDetail JSON: %v", err)
+	}
+	got, ok := problem.Errors["timezone"]
+	if !ok || !strings.Contains(got, "Not/A/Real/Zone") {
+		t.Errorf("expected errors[timezone] to contain %q, got %q", "Not/A/Real/Zone", got)
 	}
 }
 

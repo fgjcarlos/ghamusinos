@@ -93,9 +93,13 @@ func PatchPreferences(q sqlc.Querier) http.Handler {
 			return
 		}
 
-		if msg := body.validate(); msg != "" {
+		if errs := body.validate(); len(errs) > 0 {
 			requestID := middleware.GetReqID(r.Context())
-			problem := NewUnprocessableEntity(msg, requestID)
+			problem := NewUnprocessableEntityFields(
+				"request validation failed",
+				requestID,
+				errs,
+			)
 			WriteProblem(w, problem)
 			return
 		}
@@ -155,22 +159,26 @@ type preferencesPatch struct {
 	AiEnabled bool         `json:"ai_enabled"`
 }
 
-// validate enforces la tabla de reglas de #159. Devuelve el primer
-// mensaje de error o cadena vacía si todo es válido.
-func (b *preferencesPatch) validate() string {
+// validate enforces la tabla de reglas de #159. Devuelve un mapa
+// campo→mensaje con todas las reglas violadas; un mapa vacío
+// significa válido. El handler traduce el mapa al extension member
+// `errors` del ProblemDetail (RFC 9457 §3.1) para que el frontend
+// pueda pintar cada error junto al input correspondiente.
+func (b *preferencesPatch) validate() map[string]string {
+	errs := map[string]string{}
 	if !isNilInt2(b.HrMax) {
 		if v := int(b.HrMax.Int16); v < 1 || v > 260 {
-			return "hr_max must be between 1 and 260 (or null)"
+			errs["hr_max"] = "hr_max must be between 1 and 260 (or null)"
 		}
 	}
 	if !isNilInt2(b.Lthr) {
 		if v := int(b.Lthr.Int16); v < 1 || v > 260 {
-			return "lthr must be between 1 and 260 (or null)"
+			errs["lthr"] = "lthr must be between 1 and 260 (or null)"
 		}
 	}
 	if !isNilInt2(b.Ftp) {
 		if v := int(b.Ftp.Int16); v < 1 || v > 2000 {
-			return "ftp must be between 1 and 2000 (or null)"
+			errs["ftp"] = "ftp must be between 1 and 2000 (or null)"
 		}
 	}
 	if b.Level.Valid {
@@ -178,16 +186,15 @@ func (b *preferencesPatch) validate() string {
 		case "beginner", "intermediate", "advanced":
 			// ok
 		default:
-			return "level must be one of beginner | intermediate | advanced (or null)"
+			errs["level"] = "level must be one of beginner | intermediate | advanced (or null)"
 		}
 	}
 	if b.Timezone == "" {
-		return "timezone is required and must be a non-empty IANA name"
+		errs["timezone"] = "timezone is required and must be a non-empty IANA name"
+	} else if _, err := time.LoadLocation(b.Timezone); err != nil {
+		errs["timezone"] = "timezone is not a valid IANA name: " + b.Timezone
 	}
-	if _, err := time.LoadLocation(b.Timezone); err != nil {
-		return "timezone is not a valid IANA name: " + b.Timezone
-	}
-	return ""
+	return errs
 }
 
 func isNilInt2(v *pgtype.Int2) bool {
