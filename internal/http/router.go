@@ -224,6 +224,14 @@ func (s *Server) Router() http.Handler {
 				r.Get("/strava/connect", strava.ConnectHandler(s.stravaClient, s.stravaCipherKey))
 			}
 
+			// Strava connection management (closes-159-strava-disconnect, PR2):
+			// DELETE /api/v1/strava/connection — drops the encrypted tokens row.
+			// Only requires the Querier (no Strava client/cipher needed). PR3
+			// will add GET on the same path so the SPA can show the real state.
+			if s.queries != nil {
+				r.Delete("/strava/connection", handlers.DeleteStravaConnection(s.queries).ServeHTTP)
+			}
+
 			// Custom NotFound and MethodNotAllowed for v1 API (RFC 9457 ProblemDetail)
 			r.NotFound(func(w http.ResponseWriter, r *http.Request) {
 				requestID := middleware.GetReqID(r.Context())
