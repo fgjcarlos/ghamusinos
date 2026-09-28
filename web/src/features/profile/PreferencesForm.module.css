@@ -1,0 +1,122 @@
+/* PreferencesForm. Issue 159. Colours from tokens.css. */
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--gh-s-4);
+}
+
+.fieldset {
+  display: flex;
+  flex-direction: column;
+  gap: var(--gh-s-3);
+  padding: var(--gh-s-4);
+  background: var(--gh-surface);
+  border: 1px solid var(--gh-line);
+  border-radius: var(--gh-r-card);
+}
+
+.legend {
+  font-family: var(--gh-font-display);
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--gh-text);
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--gh-s-1);
+}
+
+.field label {
+  font-family: var(--gh-font-body);
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--gh-text-2);
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.field input,
+.field select {
+  font-family: var(--gh-font-mono);
+  font-size: 14px;
+  color: var(--gh-text);
+  background: var(--gh-bg);
+  border: 1px solid var(--gh-line);
+  border-radius: var(--gh-r-control);
+  padding: var(--gh-s-2) var(--gh-s-3);
+}
+
+.field input:focus,
+.field select:focus {
+  outline: 2px solid var(--gh-accent);
+  outline-offset: -1px;
+}
+
+.checkboxLabel {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--gh-s-2);
+  font-family: var(--gh-font-body);
+  font-size: 14px;
+  color: var(--gh-text);
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.hint {
+  margin: 0;
+  font-family: var(--gh-font-body);
+  font-size: 12px;
+  color: var(--gh-text-3);
+}
+
+.error {
+  margin: 0;
+  font-family: var(--gh-font-body);
+  font-size: 12px;
+  color: var(--gh-risk);
+}
+
+.warning {
+  margin: 0;
+  font-family: var(--gh-font-body);
+  font-size: 13px;
+  color: var(--gh-text-2);
+  background: var(--gh-bg-2);
+  border: 1px solid var(--gh-line-2);
+  border-radius: var(--gh-r-control);
+  padding: var(--gh-s-3);
+  font-style: italic;
+}
+
+.actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.submit {
+  min-height: 44px;
+  padding: var(--gh-s-2) var(--gh-s-4);
+  background: var(--gh-accent);
+  color: var(--gh-accent-ink);
+  border: none;
+  border-radius: var(--gh-r-control);
+  font-family: var(--gh-font-body);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.submit:hover:not(:disabled) {
+  background: var(--gh-accent-dim);
+}
+
+.submit:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}

@@ -70,6 +70,19 @@ func NewInternalError(detail, instance string) ProblemDetail {
 	}
 }
 
+// NewUnprocessableEntity creates a ProblemDetail for 422 Unprocessable
+// Entity. Returned by validation paths when the request body parses but
+// the values don't satisfy the schema's CHECK constraints (issue #159).
+func NewUnprocessableEntity(detail, instance string) ProblemDetail {
+	return ProblemDetail{
+		Type:     "about:blank",
+		Title:    "Unprocessable Entity",
+		Status:   http.StatusUnprocessableEntity,
+		Detail:   detail,
+		Instance: instance,
+	}
+}
+
 // NewPayloadTooLarge creates a ProblemDetail for 413 Payload Too Large.
 // Used by the body-size middleware (issue #26).
 func NewPayloadTooLarge(detail, instance string) ProblemDetail {

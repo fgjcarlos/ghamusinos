@@ -14,9 +14,8 @@ export interface TrackDetailPageProps {
 }
 
 export function TrackDetailPage({ data, mapHeight = 360 }: TrackDetailPageProps) {
-  // The backend's NormalizedTrackSummary.points is `unknown[]` for now
-  // (the issue #158 / future-points endpoint isn't wired). We coerce
-  // defensively: anything with `lat`/`lng` numeric keys is kept.
+  // The backend points are unknown at this boundary; accept its `lon` wire key
+  // or the TS `lng` alias and normalize coordinates for GeoJSON.
   const coordinates = useMemo<LngLat[]>(() => {
     return data.track.points
       .map((p) => {
@@ -24,13 +23,14 @@ export function TrackDetailPage({ data, mapHeight = 360 }: TrackDetailPageProps)
           typeof p === 'object' &&
           p !== null &&
           'lat' in p &&
-          'lng' in p &&
-          typeof (p as { lat: unknown }).lat === 'number' &&
-          typeof (p as { lng: unknown }).lng === 'number'
+          typeof (p as { lat?: unknown }).lat === 'number' &&
+          Number.isFinite((p as { lat: number }).lat)
         ) {
-          const point = p as { lat: number; lng: number };
+          const point = p as { lat: number; lng?: unknown; lon?: unknown };
+          const lng = Number.isFinite(point.lng) ? point.lng : point.lon;
+          if (typeof lng !== 'number' || !Number.isFinite(lng)) return null;
           // GeoJSON convention is [lng, lat].
-          return [point.lng, point.lat];
+          return [lng, point.lat];
         }
         return null;
       })

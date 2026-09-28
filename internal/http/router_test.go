@@ -143,6 +143,15 @@ func (m *mockQuerier) ListGPXTracksByUser(ctx context.Context, arg sqlc.ListGPXT
 	return nil, nil
 }
 
+// GetUserPreferencesByID stub añadido tras el regen de SQLC que añadió
+// el query a la interfaz Querier (handlers/me_preferences.go). El mock
+// devuelve cero porque los tests de router no ejercitan el endpoint de
+// preferencias; el método solo existe para satisfacer la interfaz y que
+// el compilador no proteste.
+func (m *mockQuerier) GetUserPreferencesByID(ctx context.Context, id pgtype.UUID) (sqlc.GetUserPreferencesByIDRow, error) {
+	return sqlc.GetUserPreferencesByIDRow{}, nil
+}
+
 // nuevoServidor es un helper de test que crea un Server con pool nil
 // (entorno sin base de datos) y lo envuelve en httptest.
 func nuevoServidor(t *testing.T) *httptest.Server {

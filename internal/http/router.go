@@ -201,6 +201,8 @@ func (s *Server) Router() http.Handler {
 				r.Get("/activities", handlers.ListActivities(s.queries).ServeHTTP)
 				r.Get("/activities/{id}", handlers.GetActivity(s.queries).ServeHTTP)
 				r.Get("/sync/status", handlers.SyncStatus(s.queries).ServeHTTP)
+				r.Get("/me/preferences", handlers.GetPreferences(s.queries).ServeHTTP)
+				r.Patch("/me/preferences", handlers.PatchPreferences(s.queries).ServeHTTP)
 			}
 
 			if s.gpxStore != nil {

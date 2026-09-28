@@ -1,0 +1,105 @@
+/* ConnectionCard. Issue 159. Colours from tokens.css. */
+
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--gh-s-3);
+  padding: var(--gh-s-4);
+  background: var(--gh-surface);
+  border: 1px solid var(--gh-line);
+  border-radius: var(--gh-r-card);
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  gap: var(--gh-s-2);
+}
+
+.dotOk,
+.dotOff {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.dotOk {
+  background: var(--gh-accent);
+}
+
+.dotOff {
+  background: var(--gh-text-3);
+}
+
+.title {
+  margin: 0;
+  font-family: var(--gh-font-display);
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--gh-text);
+}
+
+.details {
+  display: flex;
+  flex-direction: column;
+  gap: var(--gh-s-2);
+  margin: 0;
+}
+
+.row {
+  display: grid;
+  grid-template-columns: 120px 1fr;
+  gap: var(--gh-s-2);
+  font-family: var(--gh-font-body);
+  font-size: 14px;
+}
+
+.row dt {
+  color: var(--gh-text-3);
+  margin: 0;
+}
+
+.row dd {
+  color: var(--gh-text);
+  margin: 0;
+  font-family: var(--gh-font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+.empty {
+  margin: 0;
+  font-family: var(--gh-font-body);
+  font-size: 14px;
+  color: var(--gh-text-2);
+  line-height: 1.5;
+}
+
+.connect {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  padding: var(--gh-s-2) var(--gh-s-4);
+  background: var(--gh-accent);
+  color: var(--gh-accent-ink);
+  border-radius: var(--gh-r-control);
+  font-family: var(--gh-font-body);
+  font-size: 14px;
+  font-weight: 600;
+  text-decoration: none;
+  align-self: flex-start;
+}
+
+.connect:hover {
+  background: var(--gh-accent-dim);
+}
+
+.busy {
+  margin: 0;
+  font-family: var(--gh-font-body);
+  font-size: 13px;
+  color: var(--gh-text-3);
+  font-style: italic;
+}

@@ -1,0 +1,50 @@
+/* PreferencesContainer. Issue 159. Colours from tokens.css. */
+
+.container {
+  display: flex;
+  flex-direction: column;
+  gap: var(--gh-s-6);
+  max-width: 960px;
+  margin: 0 auto;
+  padding: var(--gh-s-4);
+}
+
+.header {
+  display: flex;
+  flex-direction: column;
+  gap: var(--gh-s-2);
+}
+
+.heading {
+  margin: 0;
+  font-family: var(--gh-font-display);
+  font-size: 28px;
+  font-weight: 700;
+  color: var(--gh-text);
+}
+
+.statusOk {
+  margin: 0;
+  font-family: var(--gh-font-body);
+  font-size: 13px;
+  color: var(--gh-accent);
+}
+
+.statusErr {
+  margin: 0;
+  font-family: var(--gh-font-body);
+  font-size: 13px;
+  color: var(--gh-risk);
+}
+
+.row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--gh-s-4);
+}
+
+@media (max-width: 767px) {
+  .row {
+    grid-template-columns: 1fr;
+  }
+}

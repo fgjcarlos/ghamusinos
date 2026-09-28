@@ -10,20 +10,18 @@ import {
   type Climb,
   type RiskZone,
 } from '../../gpx/ElevationProfile/projectTrack';
+import { rawPointsToTrackPoints } from '../../gpx/rawPointsToTrackPoints';
 import styles from './ComparisonElevationProfile.module.css';
 
 // Mirrors the values in ComparisonMap.tsx / MetricsDiffTable.tsx so
 // the same colour follows the track across views.
 const TRACK_COLORS = ['#7fc689', '#9e7a1f', '#8c3324'] as const;
 
-// The backend returns raw points as `{ lat, lng, ele }` (not the
-// GpxTrackSummary.points-shaped `TrackPoint` with distance_m +
-// elevation_m). The projection helper accepts a permissive shape so
-// we can feed these raw points directly without re-shaping.
-type RawPoint = { lat: number; lng: number; ele?: number | null };
+// Raw API points may use Go's `lon` wire key or the normalized `lng` alias.
+type RawPoint = { lat: number; lng?: number; lon?: number; ele?: number | null };
 
 export interface ComparisonElevationProfileProps {
-  /** Per-track raw elevation points ({ lat, lng, ele? }). */
+  /** Per-track raw elevation points ({ lat, lng | lon, ele? }). */
   tracks: { name: string; points: RawPoint[] }[];
   height?: number;
 }
@@ -39,16 +37,10 @@ export function ComparisonElevationProfile({
   const projections = useMemo<ProjectedTrack[]>(
     () =>
       tracks.map((t) =>
-        projectTrack(
-          // TODO: the backend currently doesn't return `points` in
-          // the compare response; when #gpx-2 lands (a /points endpoint)
-          // the shape will be `TrackPoint[]`. Until then we cast
-          // the raw shape so the call type-checks.
-          t.points as unknown as Parameters<typeof projectTrack>[0],
-          [] as Climb[],
-          [] as RiskZone[],
-          { width: 800, height },
-        ),
+        projectTrack(rawPointsToTrackPoints(t.points), [] as Climb[], [] as RiskZone[], {
+          width: 800,
+          height,
+        }),
       ),
     [tracks, height],
   );

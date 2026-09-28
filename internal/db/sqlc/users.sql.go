@@ -91,6 +91,38 @@ func (q *Queries) GetUserHRMaxByID(ctx context.Context, id pgtype.UUID) (pgtype.
 	return hr_max, err
 }
 
+const getUserPreferencesByID = `-- name: GetUserPreferencesByID :one
+SELECT hr_max, lthr, ftp, level, timezone, ai_enabled
+FROM users
+WHERE id = $1
+LIMIT 1
+`
+
+type GetUserPreferencesByIDRow struct {
+	HrMax     pgtype.Int2 `json:"hr_max"`
+	Lthr      pgtype.Int2 `json:"lthr"`
+	Ftp       pgtype.Int2 `json:"ftp"`
+	Level     pgtype.Text `json:"level"`
+	Timezone  string      `json:"timezone"`
+	AiEnabled bool        `json:"ai_enabled"`
+}
+
+// Devuelve las preferencias de entrenamiento e IA del usuario
+// (issue #159). Sólo lectura — la mutación usa UpdateUserPreferences.
+func (q *Queries) GetUserPreferencesByID(ctx context.Context, id pgtype.UUID) (GetUserPreferencesByIDRow, error) {
+	row := q.db.QueryRow(ctx, getUserPreferencesByID, id)
+	var i GetUserPreferencesByIDRow
+	err := row.Scan(
+		&i.HrMax,
+		&i.Lthr,
+		&i.Ftp,
+		&i.Level,
+		&i.Timezone,
+		&i.AiEnabled,
+	)
+	return i, err
+}
+
 const updateUserInviteStatus = `-- name: UpdateUserInviteStatus :one
 UPDATE users
 SET

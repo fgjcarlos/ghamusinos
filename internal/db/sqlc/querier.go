@@ -54,6 +54,9 @@ type Querier interface {
 	// The scalar subquery always returns one row. An unknown athlete therefore
 	// scans as pgtype.UUID{Valid:false} rather than pgx.ErrNoRows.
 	GetUserIDByAthleteID(ctx context.Context, athleteID int64) (pgtype.UUID, error)
+	// Devuelve las preferencias de entrenamiento e IA del usuario
+	// (issue #159). Sólo lectura — la mutación usa UpdateUserPreferences.
+	GetUserPreferencesByID(ctx context.Context, id pgtype.UUID) (GetUserPreferencesByIDRow, error)
 	// Lista paginada de actividades del usuario, ordenadas de más reciente a
 	// más antigua. El LIMIT es por la query (no cursor) porque el uso esperado
 	// es UI paginada con offset; cuando se necesite cursor, se añadirá en su

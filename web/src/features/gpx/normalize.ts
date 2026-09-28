@@ -25,6 +25,7 @@ export interface NormalizedAnalysis {
   d_minus_m: number;
   max_elevation_m: number | null;
   min_elevation_m: number | null;
+  elevation_coverage: number | null;
   avg_slope_pct: number;
   max_slope_pct: number;
   effort_index: number;
@@ -88,6 +89,7 @@ function normalizeAnalysis(a: GpxAnalysis): NormalizedAnalysis {
     // (only the climb fields and the inner-track id/UUIDs are pgtype).
     max_elevation_m: a.max_elevation_m,
     min_elevation_m: a.min_elevation_m,
+    elevation_coverage: a.elevation_coverage ?? null,
     avg_slope_pct: a.avg_slope_pct,
     max_slope_pct: a.max_slope_pct,
     effort_index: a.effort_index,

@@ -467,6 +467,10 @@ func (m *activitiesMockQuerier) GetLatestSyncSession(ctx context.Context, userID
 	return sqlc.SyncSession{}, nil
 }
 
+func (m *activitiesMockQuerier) GetUserPreferencesByID(ctx context.Context, id pgtype.UUID) (sqlc.GetUserPreferencesByIDRow, error) {
+	return sqlc.GetUserPreferencesByIDRow{}, nil
+}
+
 // Stub all other querier methods
 func (m *activitiesMockQuerier) CreateInvite(ctx context.Context, arg sqlc.CreateInviteParams) (sqlc.Invite, error) {
 	return sqlc.Invite{}, nil

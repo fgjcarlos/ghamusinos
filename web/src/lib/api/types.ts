@@ -101,6 +101,25 @@ export class ApiError extends Error {
 }
 
 // ─────────────────────────────────────────────────────────────────
+// Preferencias de usuario (issue #159)
+// ─────────────────────────────────────────────────────────────────
+
+/**
+ * Forma normalizada de las preferencias de usuario. Coincide con la
+ * salida JSON del backend en /api/v1/me/preferences (GET y PATCH). Los
+ * campos numéricos son nullables porque el schema admite NULL cuando el
+ * usuario no conoce la métrica.
+ */
+export interface PreferencesApiResponse {
+  hr_max: number | null;
+  lthr: number | null;
+  ftp: number | null;
+  level: 'beginner' | 'intermediate' | 'advanced' | null;
+  timezone: string;
+  ai_enabled: boolean;
+}
+
+// ─────────────────────────────────────────────────────────────────
 // GPX / Laboratorio
 // ─────────────────────────────────────────────────────────────────
 
@@ -116,6 +135,7 @@ export interface GpxAnalysis {
   d_minus_m: number;
   max_elevation_m: number | null;
   min_elevation_m: number | null;
+  elevation_coverage: number | null;
   avg_slope_pct: number;
   max_slope_pct: number;
   effort_index: number;

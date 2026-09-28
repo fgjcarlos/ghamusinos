@@ -101,6 +101,25 @@ func TestSQLCStoreGetByIDScopesByUser(t *testing.T) {
 	require.Equal(t, trackID, got.Track.ID)
 }
 
+func TestSQLCStorePropagatesElevationCoverage(t *testing.T) {
+	userID := pgtype.UUID{Valid: true, Bytes: [16]byte{1}}
+	trackID := pgtype.UUID{Valid: true, Bytes: [16]byte{2}}
+	coverage, err := numeric(0.87)
+	require.NoError(t, err)
+
+	query := &mockGPXQuerier{track: databaseTrack(trackID, userID)}
+	query.track.ElevationCoverage = coverage
+	stored, err := NewSQLCStore(query).GetByID(context.Background(), userID, trackID, 0)
+	require.NoError(t, err)
+	require.NotNil(t, stored.Analysis.ElevationCoverage)
+	require.InDelta(t, 0.87, *stored.Analysis.ElevationCoverage, 1e-9)
+
+	query.track.ElevationCoverage = pgtype.Numeric{}
+	stored, err = NewSQLCStore(query).GetByID(context.Background(), userID, trackID, 0)
+	require.NoError(t, err)
+	require.Nil(t, stored.Analysis.ElevationCoverage)
+}
+
 func TestSQLCStoreListPaginates(t *testing.T) {
 	userID := pgtype.UUID{Valid: true, Bytes: [16]byte{1}}
 	query := &mockGPXQuerier{tracks: []sqlc.ListGPXTracksByUserRow{
