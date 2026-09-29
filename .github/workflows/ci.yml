@@ -12,7 +12,9 @@ permissions:
 
 # El runner de GitHub Actions usa el toolchain que las dependencias pidan
 # (go.mod declara go 1.26.0). Para entornos offline, fijar
-# GOTOOLCHAIN: local a nivel de job.
+# GOTOOLCHAIN: local a nivel de job. El toolchain se pinea al último 1.26.x
+# estable (1.26.8) para que govulncheck no reporte CVEs de stdlib corregidas
+# en releases posteriores.
 
 jobs:
   backend:
@@ -41,7 +43,7 @@ jobs:
 
       - uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6.4.0
         with:
-          go-version: "1.26.0"
+          go-version: "1.26.8"
           cache: true
 
       - name: gofmt
@@ -66,14 +68,14 @@ jobs:
 
       - name: golangci-lint
         env:
-          # Forzar el toolchain que setup-go instalo (v1.26.x) para que el
+          # Forzar el toolchain que setup-go instalo (v1.26.8) para que el
           # linter pueda parsear el go.mod que declara go 1.26.0.
-          GOTOOLCHAIN: go1.26.0
+          GOTOOLCHAIN: go1.26.8
         run: golangci-lint run --timeout 5m
 
       - name: govulncheck
         env:
-          GOTOOLCHAIN: go1.26.0
+          GOTOOLCHAIN: go1.26.8
         run: |
           # golang/vuln NO publica binarios en sus releases (los assets
           # están vacíos; bajar el zip siempre devuelve 404). El método
@@ -194,7 +196,7 @@ jobs:
 
       - uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6.4.0
         with:
-          go-version: "1.26.0"
+          go-version: "1.26.8"
           cache: true
 
       - name: build frontend
