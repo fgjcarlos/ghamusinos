@@ -58,7 +58,7 @@ Modified:
 
 ## LoC and PR boundary
 
-PR1 stays within the 400-line limit: 386 authored added lines (generated SQLC files and mechanical Querier stubs in unrelated tests excluded; 47 deleted lines are not counted as authored additions). No size exception is required. The The PR1 implementation tip before this progress-file commit is `4b30e0ff2b84165c9b476b920fbe01754b4c3675`. No deviation from the backend specs/design was made. Migration test omission and missing remote migration/CI smoke are the only verification caveats.
+PR1 stays within the 400-line limit: 386 authored added lines (generated SQLC files and mechanical Querier stubs in unrelated tests excluded; 47 deleted lines are not counted as authored additions). No size exception is required. The PR1 implementation tip before this progress-file commit is `4b30e0ff2b84165c9b476b920fbe01754b4c3675`. No deviation from the backend specs/design was made. Migration test omission and missing remote migration/CI smoke are the only verification caveats.
 
 ## Commits
 
