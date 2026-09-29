@@ -298,6 +298,38 @@ func TestSQLCStoreGetDetailReturnsEmptyClimbDerivedListsAndNilKmVertical(t *test
 	require.Nil(t, detail.KmVertical)
 }
 
+// TestDatabaseTrackFixtureKeepsClimbDerivedFields is a regression pin against
+// silent field loss when the `databaseTrack` fixture is converted into a
+// StoredTrackDetail. If a future refactor moves a field name, drops a
+// rehydration call, or breaks the empty/nil semantics for Muros,
+// RecoveryZones, or KmVertical, this test catches it at the fixture level
+// rather than letting the bug surface in downstream rendering code.
+func TestDatabaseTrackFixtureKeepsClimbDerivedFields(t *testing.T) {
+	trackID := pgtype.UUID{Bytes: [16]byte{3}, Valid: true}
+	userID := pgtype.UUID{Bytes: [16]byte{4}, Valid: true}
+	query := &mockGPXQuerier{
+		track:         databaseTrack(trackID, userID),
+		muros:         []sqlc.GpxMuro{},
+		recoveryZones: []sqlc.GpxRecoveryZone{},
+		kmVerticalErr: pgx.ErrNoRows,
+	}
+	detail, err := NewSQLCStore(query).GetDetail(context.Background(), userID, trackID, 0)
+	require.NoError(t, err)
+	// The fixture + store MUST keep all three climb-derived fields present
+	// even when the underlying SQLC rows are empty or absent. JSON
+	// serialization must NOT panic, must produce empty arrays for the list
+	// fields, and must produce null for the optional singleton.
+	require.NotNil(t, detail.Muros, "Muros slice must be initialised (not nil) so JSON serialises as []")
+	require.NotNil(t, detail.RecoveryZones, "RecoveryZones slice must be initialised (not nil) so JSON serialises as []")
+	require.Nil(t, detail.KmVertical, "KmVertical must remain nil when the row is absent so JSON serialises as null")
+	data, err := json.Marshal(detail)
+	require.NoError(t, err)
+	encoded := string(data)
+	require.Contains(t, encoded, `"muros":[]`)
+	require.Contains(t, encoded, `"recovery_zones":[]`)
+	require.Contains(t, encoded, `"km_vertical":null`)
+}
+
 func TestSQLCStoreCreateDetailPersistsMurosAndRecoveryZonesAndKmVertical(t *testing.T) {
 	trackID := pgtype.UUID{Bytes: [16]byte{9}, Valid: true}
 	query := &mockGPXQuerier{track: databaseTrack(trackID, pgtype.UUID{Valid: true})}
