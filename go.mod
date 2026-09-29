@@ -1,6 +1,6 @@
 module github.com/fgjcarlos/ghamusinos
 
-go 1.25.13
+go 1.26.0
 
 require (
 	github.com/go-chi/chi/v5 v5.3.2
@@ -11,7 +11,7 @@ require (
 	github.com/pressly/goose/v3 v3.27.3
 	github.com/riverqueue/river v0.43.0
 	github.com/riverqueue/river/riverdriver/riverpgxv5 v0.43.0
-	github.com/riverqueue/river/rivertype v0.43.0
+	github.com/riverqueue/river/rivertype v0.47.0
 	github.com/sethvargo/go-retry v0.4.0
 	github.com/stretchr/testify v1.12.1
 	github.com/twpayne/go-gpx v1.5.0
