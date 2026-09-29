@@ -10,7 +10,7 @@
 - **El slice cierra la única grieta funcional de #15**: `FindKmVertical`, `FindMuros`, `FindRecoveryZones` se calculan al upload pero **nunca se persisten** (`internal/http/handlers/gpx_upload.go:142-146` los devuelve en claves top-level huérfanas y `CreateDetail` no los recibe). Tras refrescar la página, los valores desaparecen aunque los detectores siguen emitiendo lo correcto.
 - **3 tablas nuevas** (`gpx_muros`, `gpx_recovery_zones`, `gpx_km_vertical`) en `00011_gpx_muros_recovery_kmvertical.sql`, NO columnas JSONB. Razón: consistencia con `gpx_climbs` y `gpx_risk_zones`; muros es lista (no singleton), recovery zones son semánticamente distintas de risk zones.
 - **`StoredTrackDetail` crece 3 campos top-level**: `Muros`, `RecoveryZones`, `KmVertical`. Alineado con patrón actual (`Climbs`, `RiskZones`).
-- **Breaking change en el wire shape del upload**: el cuerpo de respuesta del POST deja de llevar `muros`/`recovery_zones`/`km_vertical` como top-level huérfanas. Pasa a ser la misma forma que `GET /api/v1/gpx/{id}`. El frontend SPA actual solo parsea `{ id: string }` desde el upload, así que el cambio es seguro para los consumidores actuales.
+- **Wire shape del upload se refactoriza, NO es breaking**: el cuerpo de respuesta del POST deja de emitir un wrapper anónimo bespoke que duplicaba los campos top-level. Ahora serializa `StoredTrackDetail` directamente. Como `StoredTrackDetail` gana los mismos 3 campos (`Muros`, `RecoveryZones`, `KmVertical`) que el wrapper exponía, las claves top-level `muros` / `recovery_zones` / `km_vertical` siguen presentes en el body con los mismos valores — solo cambia la fuente de los datos (campos del struct vs wrapper anónimo). El frontend SPA actual solo parsea `{ id: string }` desde el upload, así que el cambio es seguro para los consumidores actuales. **No es un breaking change.**
 - **Comparator (`computeDiff`) NO se extiende en este slice**: mantiene su superficie de 6 métricas. Extender a muros/km/recovery es un follow-up que consume los campos ya estables.
 - **No backfill** de tracks existentes: los detectores son deterministas, pero los tracks pre-existentes mantienen su estado vacío de muros/km/recovery. Backfill es un change aparte si se necesita.
 - **PR2 web** solo renderiza: tres presentacionales `RouteKmVertical` / `RouteMuros` / `RouteRecovery` siguiendo el patrón `RouteClimbs.tsx` / `RouteRisks.tsx`.
@@ -73,7 +73,7 @@
 
 - **PR1 cambia la firma de `CreateDetail`**: afecta a todos los call-sites (handlers, tests, fixtures). Mitigación: actualizar todo en el mismo PR; CI lo cazaría si se olvida algo.
 - **El mock `databaseTrack`** en `internal/gpx/store_test.go` puede tener un guard que asume la forma anterior; verificar.
-- **El upload body breaking**: aunque el frontend actual no parsea los 3 keys huérfanos, cualquier integración externa sí. Documentar en el release notes si aplica (decisión fuera del scope técnico).
+- **El upload body no es breaking**: el refactor de wrapper anónimo → campos del struct preserva los nombres de los 3 keys top-level. No hace falta release note para clientes del upload (siguen recibiendo `muros` / `recovery_zones` / `km_vertical` igual que antes).
 
 ## Rollback
 
