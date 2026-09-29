@@ -3,6 +3,7 @@ package handlers
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"io"
 	"mime/multipart"
@@ -19,21 +20,25 @@ import (
 )
 
 type uploadGPXStore struct {
-	existing      *gpx.StoredTrack
-	detail        *gpx.StoredTrackDetail
-	findErr       error
-	createErr     error
-	createdTrack  *gpx.Track
-	createdClimbs []gpx.Climb
-	createdRisks  []gpx.RiskZone
+	existing             *gpx.StoredTrack
+	detail               *gpx.StoredTrackDetail
+	findErr              error
+	createErr            error
+	createdTrack         *gpx.Track
+	createdClimbs        []gpx.Climb
+	createdRisks         []gpx.RiskZone
+	createdMuros         []gpx.Muro
+	createdRecoveryZones []gpx.RecoveryZone
+	createdKmVertical    *gpx.KmVerticalResult
 }
 
 func (s *uploadGPXStore) FindByHash(_ context.Context, _ pgtype.UUID, _ string) (*gpx.StoredTrack, error) {
 	return s.existing, s.findErr
 }
 
-func (s *uploadGPXStore) CreateDetail(_ context.Context, track *gpx.Track, _ *gpx.Analysis, climbs []gpx.Climb, risks []gpx.RiskZone, _ *gpx.Climb) (*gpx.StoredTrackDetail, error) {
+func (s *uploadGPXStore) CreateDetail(_ context.Context, track *gpx.Track, _ *gpx.Analysis, climbs []gpx.Climb, risks []gpx.RiskZone, _ *gpx.Climb, muros []gpx.Muro, recoveryZones []gpx.RecoveryZone, kmVertical *gpx.KmVerticalResult) (*gpx.StoredTrackDetail, error) {
 	s.createdTrack, s.createdClimbs, s.createdRisks = track, climbs, risks
+	s.createdMuros, s.createdRecoveryZones, s.createdKmVertical = muros, recoveryZones, kmVertical
 	return s.detail, s.createErr
 }
 
@@ -120,7 +125,7 @@ func TestUploadGPXReturnsConflictForDuplicate(t *testing.T) {
 
 func TestUploadGPXReturnsCreatedFullAnalysis(t *testing.T) {
 	id := pgtype.UUID{Bytes: [16]byte{7}, Valid: true}
-	detail := &gpx.StoredTrackDetail{Track: gpx.StoredTrack{Track: gpx.Track{ID: id, Name: "Upload trail"}}, Climbs: []gpx.Climb{}, RiskZones: []gpx.RiskZone{}}
+	detail := &gpx.StoredTrackDetail{Track: gpx.StoredTrack{Track: gpx.Track{ID: id, Name: "Upload trail"}}, Climbs: []gpx.Climb{}, RiskZones: []gpx.RiskZone{}, Muros: []gpx.Muro{}, RecoveryZones: []gpx.RecoveryZone{}}
 	store := &uploadGPXStore{detail: detail, findErr: pgx.ErrNoRows}
 	recorder := httptest.NewRecorder()
 	uploadHandler(store).ServeHTTP(recorder, multipartGPXRequest(t, validUploadGPX(true), true))
@@ -129,9 +134,14 @@ func TestUploadGPXReturnsCreatedFullAnalysis(t *testing.T) {
 	require.Equal(t, "application/json", recorder.Header().Get("Content-Type"))
 	require.Contains(t, recorder.Body.String(), id.String())
 	require.Contains(t, recorder.Body.String(), `"risk_zones":[]`)
-	require.Contains(t, recorder.Body.String(), `"muros":[]`)
-	require.Contains(t, recorder.Body.String(), `"recovery_zones":[]`)
-	require.Contains(t, recorder.Body.String(), `"km_vertical":null`)
+	var response map[string]json.RawMessage
+	require.NoError(t, json.Unmarshal(recorder.Body.Bytes(), &response))
+	require.Contains(t, response, "muros")
+	require.Contains(t, response, "recovery_zones")
+	require.Contains(t, response, "km_vertical")
+	require.Empty(t, store.createdMuros)
+	require.Empty(t, store.createdRecoveryZones)
+	require.Nil(t, store.createdKmVertical)
 	require.NotNil(t, store.createdTrack)
 	require.Equal(t, "Upload trail", store.createdTrack.Name)
 	require.Equal(t, int64(len(validUploadGPX(true))), store.createdTrack.FileSizeBytes)

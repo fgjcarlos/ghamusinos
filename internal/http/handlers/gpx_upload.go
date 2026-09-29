@@ -18,7 +18,7 @@ import (
 
 type UploadGPXStore interface {
 	FindByHash(context.Context, pgtype.UUID, string) (*gpx.StoredTrack, error)
-	CreateDetail(context.Context, *gpx.Track, *gpx.Analysis, []gpx.Climb, []gpx.RiskZone, *gpx.Climb) (*gpx.StoredTrackDetail, error)
+	CreateDetail(context.Context, *gpx.Track, *gpx.Analysis, []gpx.Climb, []gpx.RiskZone, *gpx.Climb, []gpx.Muro, []gpx.RecoveryZone, *gpx.KmVerticalResult) (*gpx.StoredTrackDetail, error)
 }
 
 func UploadGPX(
@@ -118,7 +118,7 @@ func UploadGPX(
 		}
 		track.TrackType, track.Direction = trackType.Type, trackType.Direction
 
-		detail, err := store.CreateDetail(r.Context(), track, analysis, climbs, riskZones, kingClimb)
+		detail, err := store.CreateDetail(r.Context(), track, analysis, climbs, riskZones, kingClimb, muros, recoveryZones, kmVertical)
 		if err != nil {
 			// +Inf/-Inf/NaN propagado desde el análisis: el cliente envió
 			// un GPX cuyo análisis cae fuera del rango representable.
@@ -138,12 +138,7 @@ func UploadGPX(
 		}
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusCreated)
-		escribirJSON(w, struct {
-			*gpx.StoredTrackDetail
-			Muros         []gpx.Muro            `json:"muros"`
-			RecoveryZones []gpx.RecoveryZone    `json:"recovery_zones"`
-			KmVertical    *gpx.KmVerticalResult `json:"km_vertical"`
-		}{StoredTrackDetail: detail, Muros: muros, RecoveryZones: recoveryZones, KmVertical: kmVertical})
+		escribirJSON(w, detail)
 	})
 }
 
