@@ -2,30 +2,39 @@ package gpx
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
 	"testing"
 
 	"github.com/fgjcarlos/ghamusinos/internal/db/sqlc"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/stretchr/testify/require"
 )
 
 type mockGPXQuerier struct {
 	sqlc.Querier
-	created      sqlc.CreateGPXTrackParams
-	createdClimb sqlc.CreateGPXClimbParams
-	createdRisk  sqlc.CreateGPXRiskZoneParams
-	getParams    sqlc.GetGPXTrackByIDParams
-	hashParams   sqlc.GetGPXTrackByHashParams
-	listParams   sqlc.ListGPXTracksByUserParams
-	deleteParams sqlc.DeleteGPXTrackParams
-	track        sqlc.GpxTrack
-	tracks       []sqlc.ListGPXTracksByUserRow
-	err          error
-	climbs       []sqlc.GpxClimb
-	risks        []sqlc.GpxRiskZone
+	created              sqlc.CreateGPXTrackParams
+	createdClimb         sqlc.CreateGPXClimbParams
+	createdRisk          sqlc.CreateGPXRiskZoneParams
+	createdMuros         []sqlc.CreateGPXMuroParams
+	createdRecoveryZones []sqlc.CreateGPXRecoveryZoneParams
+	createdKmVertical    []sqlc.UpsertGPXKmVerticalParams
+	getParams            sqlc.GetGPXTrackByIDParams
+	hashParams           sqlc.GetGPXTrackByHashParams
+	listParams           sqlc.ListGPXTracksByUserParams
+	deleteParams         sqlc.DeleteGPXTrackParams
+	track                sqlc.GpxTrack
+	tracks               []sqlc.ListGPXTracksByUserRow
+	err                  error
+	climbs               []sqlc.GpxClimb
+	risks                []sqlc.GpxRiskZone
+	muros                []sqlc.GpxMuro
+	recoveryZones        []sqlc.GpxRecoveryZone
+	kmVertical           sqlc.GpxKmVertical
+	kmVerticalErr        error
 }
 
 type mockGPXTransactionRunner struct {
@@ -46,6 +55,33 @@ func (m *mockGPXQuerier) CreateGPXClimb(_ context.Context, params sqlc.CreateGPX
 func (m *mockGPXQuerier) CreateGPXRiskZone(_ context.Context, params sqlc.CreateGPXRiskZoneParams) (sqlc.GpxRiskZone, error) {
 	m.createdRisk = params
 	return sqlc.GpxRiskZone{}, m.err
+}
+
+func (m *mockGPXQuerier) CreateGPXMuro(_ context.Context, params sqlc.CreateGPXMuroParams) (sqlc.GpxMuro, error) {
+	m.createdMuros = append(m.createdMuros, params)
+	return sqlc.GpxMuro{}, m.err
+}
+
+func (m *mockGPXQuerier) ListGPXMurosByTrack(_ context.Context, _ pgtype.UUID) ([]sqlc.GpxMuro, error) {
+	return m.muros, m.err
+}
+
+func (m *mockGPXQuerier) CreateGPXRecoveryZone(_ context.Context, params sqlc.CreateGPXRecoveryZoneParams) (sqlc.GpxRecoveryZone, error) {
+	m.createdRecoveryZones = append(m.createdRecoveryZones, params)
+	return sqlc.GpxRecoveryZone{}, m.err
+}
+
+func (m *mockGPXQuerier) ListGPXRecoveryZonesByTrack(_ context.Context, _ pgtype.UUID) ([]sqlc.GpxRecoveryZone, error) {
+	return m.recoveryZones, m.err
+}
+
+func (m *mockGPXQuerier) UpsertGPXKmVertical(_ context.Context, params sqlc.UpsertGPXKmVerticalParams) (sqlc.GpxKmVertical, error) {
+	m.createdKmVertical = append(m.createdKmVertical, params)
+	return sqlc.GpxKmVertical{}, m.err
+}
+
+func (m *mockGPXQuerier) GetGPXKmVerticalByTrack(_ context.Context, _ pgtype.UUID) (sqlc.GpxKmVertical, error) {
+	return m.kmVertical, m.kmVerticalErr
 }
 
 func (m *mockGPXQuerier) GetGPXTrackByHash(_ context.Context, params sqlc.GetGPXTrackByHashParams) (sqlc.GpxTrack, error) {
@@ -180,7 +216,7 @@ func TestSQLCStoreCreateDetailPersistsClimbsAndRiskZones(t *testing.T) {
 	climbs := []Climb{{StartIdx: 1, EndIdx: 4, GainM: 120, DistanceM: 600, AvgSlopePct: 20, IsKingClimb: true}}
 	risks := []RiskZone{{StartIdx: 2, EndIdx: 3, RiskType: "steep", Severity: "high"}}
 
-	detail, err := NewSQLCStore(query).CreateDetail(context.Background(), track, &Analysis{DistanceM: 1000}, climbs, risks, &climbs[0])
+	detail, err := NewSQLCStore(query).CreateDetail(context.Background(), track, &Analysis{DistanceM: 1000}, climbs, risks, &climbs[0], nil, nil, nil)
 	require.NoError(t, err)
 	require.Equal(t, trackID, detail.Track.Track.ID)
 	require.Equal(t, trackID, query.createdClimb.TrackID)
@@ -196,7 +232,7 @@ func TestSQLCStoreCreateDetailUsesTransactionRunner(t *testing.T) {
 	runner := &mockGPXTransactionRunner{query: query}
 	store := newTransactionalSQLCStore(query, runner)
 
-	_, err := store.CreateDetail(context.Background(), &Track{TrackType: "point-to-point", Points: []Point{{}, {}}}, &Analysis{}, nil, nil, nil)
+	_, err := store.CreateDetail(context.Background(), &Track{TrackType: "point-to-point", Points: []Point{{}, {}}}, &Analysis{}, nil, nil, nil, nil, nil, nil)
 	require.NoError(t, err)
 	require.Equal(t, 1, runner.runs)
 }
@@ -220,9 +256,12 @@ func TestSQLCStoreGetDetailHydratesChildren(t *testing.T) {
 		t.Fatalf("test setup numeric(100): %v", err)
 	}
 	query := &mockGPXQuerier{
-		track:  databaseTrack(trackID, userID),
-		climbs: []sqlc.GpxClimb{{StartIdx: 1, EndIdx: 3, GainM: gain100, IsKingClimb: true}},
-		risks:  []sqlc.GpxRiskZone{{StartIdx: 2, EndIdx: 4, RiskType: "technical", Severity: "medium"}},
+		track:         databaseTrack(trackID, userID),
+		climbs:        []sqlc.GpxClimb{{StartIdx: 1, EndIdx: 3, GainM: gain100, IsKingClimb: true}},
+		risks:         []sqlc.GpxRiskZone{{StartIdx: 2, EndIdx: 4, RiskType: "technical", Severity: "medium"}},
+		muros:         []sqlc.GpxMuro{{StartIdx: 10, EndIdx: 20, GainM: gain100, DistanceM: gain100, AvgSlopePct: gain100}},
+		recoveryZones: []sqlc.GpxRecoveryZone{{StartIdx: 20, EndIdx: 30, DistanceM: gain100}},
+		kmVertical:    sqlc.GpxKmVertical{StartIdx: 1, EndIdx: 80, GainM: gain100, DistanceM: gain100},
 	}
 
 	detail, err := NewSQLCStore(query).GetDetail(context.Background(), userID, trackID, 0)
@@ -233,6 +272,87 @@ func TestSQLCStoreGetDetailHydratesChildren(t *testing.T) {
 	require.InDelta(t, 100, detail.Climbs[0].GainM, 0.01)
 	require.Len(t, detail.RiskZones, 1)
 	require.Equal(t, "technical", detail.RiskZones[0].RiskType)
+	require.Len(t, detail.Muros, 1)
+	require.Equal(t, 10, detail.Muros[0].StartIdx)
+	require.Len(t, detail.RecoveryZones, 1)
+	require.Equal(t, 20, detail.RecoveryZones[0].StartIdx)
+	require.NotNil(t, detail.KmVertical)
+	require.InDelta(t, 100, detail.KmVertical.GainM, 0.01)
+}
+
+func TestSQLCStoreGetDetailReturnsEmptyClimbDerivedListsAndNilKmVertical(t *testing.T) {
+	trackID := pgtype.UUID{Bytes: [16]byte{2}, Valid: true}
+	query := &mockGPXQuerier{
+		track:         databaseTrack(trackID, pgtype.UUID{Valid: true}),
+		muros:         []sqlc.GpxMuro{},
+		recoveryZones: []sqlc.GpxRecoveryZone{},
+		kmVerticalErr: pgx.ErrNoRows,
+	}
+
+	detail, err := NewSQLCStore(query).GetDetail(context.Background(), pgtype.UUID{Valid: true}, trackID, 0)
+	require.NoError(t, err)
+	require.NotNil(t, detail.Muros)
+	require.Empty(t, detail.Muros)
+	require.NotNil(t, detail.RecoveryZones)
+	require.Empty(t, detail.RecoveryZones)
+	require.Nil(t, detail.KmVertical)
+}
+
+func TestSQLCStoreCreateDetailPersistsMurosAndRecoveryZonesAndKmVertical(t *testing.T) {
+	trackID := pgtype.UUID{Bytes: [16]byte{9}, Valid: true}
+	query := &mockGPXQuerier{track: databaseTrack(trackID, pgtype.UUID{Valid: true})}
+	track := &Track{Name: "Trail", FileHash: "hash", FileSizeBytes: 2048, TrackType: "circular", Points: []Point{{Lat: 40, Lon: -3}}}
+	muros := []Muro{{StartIdx: 10, EndIdx: 20, GainM: 50, DistanceM: 200, AvgSlopePct: 25}, {StartIdx: 30, EndIdx: 40, GainM: 60, DistanceM: 300, AvgSlopePct: 20}}
+	recovery := []RecoveryZone{{StartIdx: 20, EndIdx: 30, DistanceM: 100}, {StartIdx: 40, EndIdx: 50, DistanceM: 150}}
+	kmVertical := &KmVerticalResult{StartIdx: 1, EndIdx: 90, GainM: 850, DistanceM: 10000}
+	_, err := NewSQLCStore(query).CreateDetail(context.Background(), track, &Analysis{}, nil, nil, nil, muros, recovery, kmVertical)
+	require.NoError(t, err)
+	require.Len(t, query.createdMuros, 2)
+	require.Equal(t, int32(10), query.createdMuros[0].StartIdx)
+	require.Equal(t, int32(40), query.createdMuros[1].EndIdx)
+	require.Len(t, query.createdRecoveryZones, 2)
+	require.Equal(t, int32(20), query.createdRecoveryZones[0].StartIdx)
+	require.Equal(t, int32(90), query.createdKmVertical[0].EndIdx)
+
+	query.createdMuros, query.createdRecoveryZones, query.createdKmVertical = nil, nil, nil
+	_, err = NewSQLCStore(query).CreateDetail(context.Background(), track, &Analysis{}, nil, nil, nil, []Muro{}, []RecoveryZone{}, nil)
+	require.NoError(t, err)
+	require.Empty(t, query.createdMuros)
+	require.Empty(t, query.createdRecoveryZones)
+	require.Empty(t, query.createdKmVertical)
+}
+
+func TestSQLCStoreListMurosAndRecoveryZonesPreservesQueryOrder(t *testing.T) {
+	query := &mockGPXQuerier{
+		muros:         []sqlc.GpxMuro{{StartIdx: 10}, {StartIdx: 50}},
+		recoveryZones: []sqlc.GpxRecoveryZone{{StartIdx: 20}, {StartIdx: 100}},
+	}
+	store := NewSQLCStore(query)
+
+	muros, err := store.ListMuros(context.Background(), pgtype.UUID{Valid: true})
+	require.NoError(t, err)
+	require.Equal(t, []int{10, 50}, []int{muros[0].StartIdx, muros[1].StartIdx})
+
+	zones, err := store.ListRecoveryZones(context.Background(), pgtype.UUID{Valid: true})
+	require.NoError(t, err)
+	require.Equal(t, []int{20, 100}, []int{zones[0].StartIdx, zones[1].StartIdx})
+}
+
+func TestSQLCStoreGetKmVerticalReturnsNilWhenMissing(t *testing.T) {
+	store := NewSQLCStore(&mockGPXQuerier{kmVerticalErr: pgx.ErrNoRows})
+
+	got, err := store.GetKmVertical(context.Background(), pgtype.UUID{Valid: true})
+	require.NoError(t, err)
+	require.Nil(t, got)
+}
+
+func TestStoredTrackDetailSerializesClimbDerivedFields(t *testing.T) {
+	detail := StoredTrackDetail{Muros: []Muro{}, RecoveryZones: []RecoveryZone{}}
+	data, err := json.Marshal(detail)
+	require.NoError(t, err)
+	require.Contains(t, string(data), `"muros":[]`)
+	require.Contains(t, string(data), `"recovery_zones":[]`)
+	require.Contains(t, string(data), `"km_vertical":null`)
 }
 
 func databaseTrack(id, userID pgtype.UUID) sqlc.GpxTrack {
