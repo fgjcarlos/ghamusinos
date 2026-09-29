@@ -101,6 +101,12 @@ type gpxQuerier interface {
 	CreateGPXTrack(context.Context, sqlc.CreateGPXTrackParams) (sqlc.GpxTrack, error)
 	CreateGPXClimb(context.Context, sqlc.CreateGPXClimbParams) (sqlc.GpxClimb, error)
 	CreateGPXRiskZone(context.Context, sqlc.CreateGPXRiskZoneParams) (sqlc.GpxRiskZone, error)
+	CreateGPXMuro(context.Context, sqlc.CreateGPXMuroParams) (sqlc.GpxMuro, error)
+	ListGPXMurosByTrack(context.Context, pgtype.UUID) ([]sqlc.GpxMuro, error)
+	CreateGPXRecoveryZone(context.Context, sqlc.CreateGPXRecoveryZoneParams) (sqlc.GpxRecoveryZone, error)
+	ListGPXRecoveryZonesByTrack(context.Context, pgtype.UUID) ([]sqlc.GpxRecoveryZone, error)
+	UpsertGPXKmVertical(context.Context, sqlc.UpsertGPXKmVerticalParams) (sqlc.GpxKmVertical, error)
+	GetGPXKmVerticalByTrack(context.Context, pgtype.UUID) (sqlc.GpxKmVertical, error)
 	GetGPXTrackByID(context.Context, sqlc.GetGPXTrackByIDParams) (sqlc.GpxTrack, error)
 	GetGPXTrackByHash(context.Context, sqlc.GetGPXTrackByHashParams) (sqlc.GpxTrack, error)
 	ListGPXClimbsByTrack(context.Context, pgtype.UUID) ([]sqlc.GpxClimb, error)
@@ -202,7 +208,7 @@ func (s *SQLCStore) createTrack(ctx context.Context, track *Track, analysis *Ana
 	return row, nil
 }
 
-func (s *SQLCStore) CreateDetail(ctx context.Context, track *Track, analysis *Analysis, climbs []Climb, riskZones []RiskZone, kingClimb *Climb) (*StoredTrackDetail, error) {
+func (s *SQLCStore) CreateDetail(ctx context.Context, track *Track, analysis *Analysis, climbs []Climb, riskZones []RiskZone, kingClimb *Climb, muros []Muro, recoveryZones []RecoveryZone, kmVertical *KmVerticalResult) (*StoredTrackDetail, error) {
 	if s == nil || s.q == nil {
 		return nil, fmt.Errorf("gpx: store is not initialized")
 	}
@@ -213,15 +219,15 @@ func (s *SQLCStore) CreateDetail(ctx context.Context, track *Track, analysis *An
 		var detail *StoredTrackDetail
 		err := s.transactions.WithinTransaction(ctx, func(q gpxQuerier) error {
 			var createErr error
-			detail, createErr = NewSQLCStore(q).createDetail(ctx, track, analysis, climbs, riskZones, kingClimb)
+			detail, createErr = NewSQLCStore(q).createDetail(ctx, track, analysis, climbs, riskZones, kingClimb, muros, recoveryZones, kmVertical)
 			return createErr
 		})
 		return detail, err
 	}
-	return s.createDetail(ctx, track, analysis, climbs, riskZones, kingClimb)
+	return s.createDetail(ctx, track, analysis, climbs, riskZones, kingClimb, muros, recoveryZones, kmVertical)
 }
 
-func (s *SQLCStore) createDetail(ctx context.Context, track *Track, analysis *Analysis, climbs []Climb, riskZones []RiskZone, kingClimb *Climb) (*StoredTrackDetail, error) {
+func (s *SQLCStore) createDetail(ctx context.Context, track *Track, analysis *Analysis, climbs []Climb, riskZones []RiskZone, kingClimb *Climb, muros []Muro, recoveryZones []RecoveryZone, kmVertical *KmVerticalResult) (*StoredTrackDetail, error) {
 	row, err := s.createTrack(ctx, track, analysis, kingClimb)
 	if err != nil {
 		return nil, err
@@ -255,11 +261,50 @@ func (s *SQLCStore) createDetail(ctx context.Context, track *Track, analysis *An
 			return nil, fmt.Errorf("gpx: create risk zone: %w", err)
 		}
 	}
+	for _, muro := range muros {
+		gainM, err := numeric(muro.GainM)
+		if err != nil {
+			return nil, fmt.Errorf("%w: muro.gain_m", ErrNumericConversion)
+		}
+		distanceM, err := numeric(muro.DistanceM)
+		if err != nil {
+			return nil, fmt.Errorf("%w: muro.distance_m", ErrNumericConversion)
+		}
+		slope, err := numeric(muro.AvgSlopePct)
+		if err != nil {
+			return nil, fmt.Errorf("%w: muro.avg_slope_pct", ErrNumericConversion)
+		}
+		if _, err := s.q.CreateGPXMuro(ctx, sqlc.CreateGPXMuroParams{TrackID: row.ID, StartIdx: int32(muro.StartIdx), EndIdx: int32(muro.EndIdx), GainM: gainM, DistanceM: distanceM, AvgSlopePct: slope}); err != nil {
+			return nil, fmt.Errorf("gpx: create muro: %w", err)
+		}
+	}
+	for _, zone := range recoveryZones {
+		distanceM, err := numeric(zone.DistanceM)
+		if err != nil {
+			return nil, fmt.Errorf("%w: recovery_zone.distance_m", ErrNumericConversion)
+		}
+		if _, err := s.q.CreateGPXRecoveryZone(ctx, sqlc.CreateGPXRecoveryZoneParams{TrackID: row.ID, StartIdx: int32(zone.StartIdx), EndIdx: int32(zone.EndIdx), DistanceM: distanceM}); err != nil {
+			return nil, fmt.Errorf("gpx: create recovery zone: %w", err)
+		}
+	}
+	if kmVertical != nil {
+		gainM, err := numeric(kmVertical.GainM)
+		if err != nil {
+			return nil, fmt.Errorf("%w: km_vertical.gain_m", ErrNumericConversion)
+		}
+		distanceM, err := numeric(kmVertical.DistanceM)
+		if err != nil {
+			return nil, fmt.Errorf("%w: km_vertical.distance_m", ErrNumericConversion)
+		}
+		if _, err := s.q.UpsertGPXKmVertical(ctx, sqlc.UpsertGPXKmVerticalParams{TrackID: row.ID, StartIdx: int32(kmVertical.StartIdx), EndIdx: int32(kmVertical.EndIdx), GainM: gainM, DistanceM: distanceM}); err != nil {
+			return nil, fmt.Errorf("gpx: upsert km vertical: %w", err)
+		}
+	}
 	stored, err := storedTrack(row, 0)
 	if err != nil {
 		return nil, err
 	}
-	return &StoredTrackDetail{Track: *stored, Climbs: climbs, RiskZones: riskZones}, nil
+	return &StoredTrackDetail{Track: *stored, Climbs: climbs, RiskZones: riskZones, Muros: muros, RecoveryZones: recoveryZones, KmVertical: kmVertical}, nil
 }
 
 func (s *SQLCStore) FindByHash(ctx context.Context, userID pgtype.UUID, fileHash string) (*StoredTrack, error) {
@@ -286,7 +331,19 @@ func (s *SQLCStore) GetDetail(ctx context.Context, userID, trackID pgtype.UUID, 
 	if err != nil {
 		return nil, err
 	}
-	return &StoredTrackDetail{Track: *track, Climbs: climbs, RiskZones: risks}, nil
+	muros, err := s.ListMuros(ctx, trackID)
+	if err != nil {
+		return nil, err
+	}
+	recoveryZones, err := s.ListRecoveryZones(ctx, trackID)
+	if err != nil {
+		return nil, err
+	}
+	kmVertical, err := s.GetKmVertical(ctx, trackID)
+	if err != nil {
+		return nil, err
+	}
+	return &StoredTrackDetail{Track: *track, Climbs: climbs, RiskZones: risks, Muros: muros, RecoveryZones: recoveryZones, KmVertical: kmVertical}, nil
 }
 
 func (s *SQLCStore) ListClimbs(ctx context.Context, trackID pgtype.UUID) ([]Climb, error) {
@@ -317,6 +374,50 @@ func (s *SQLCStore) ListRiskZones(ctx context.Context, trackID pgtype.UUID) ([]R
 		zones = append(zones, RiskZone{ID: row.ID, StartIdx: int(row.StartIdx), EndIdx: int(row.EndIdx), RiskType: row.RiskType, Severity: row.Severity})
 	}
 	return zones, nil
+}
+
+func (s *SQLCStore) ListMuros(ctx context.Context, trackID pgtype.UUID) ([]Muro, error) {
+	if s == nil || s.q == nil {
+		return nil, fmt.Errorf("gpx: store is not initialized")
+	}
+	rows, err := s.q.ListGPXMurosByTrack(ctx, trackID)
+	if err != nil {
+		return nil, fmt.Errorf("gpx: list muros: %w", err)
+	}
+	muros := make([]Muro, 0, len(rows))
+	for _, row := range rows {
+		muros = append(muros, Muro{StartIdx: int(row.StartIdx), EndIdx: int(row.EndIdx), GainM: numericValue(row.GainM), DistanceM: numericValue(row.DistanceM), AvgSlopePct: numericValue(row.AvgSlopePct)})
+	}
+	return muros, nil
+}
+
+func (s *SQLCStore) ListRecoveryZones(ctx context.Context, trackID pgtype.UUID) ([]RecoveryZone, error) {
+	if s == nil || s.q == nil {
+		return nil, fmt.Errorf("gpx: store is not initialized")
+	}
+	rows, err := s.q.ListGPXRecoveryZonesByTrack(ctx, trackID)
+	if err != nil {
+		return nil, fmt.Errorf("gpx: list recovery zones: %w", err)
+	}
+	zones := make([]RecoveryZone, 0, len(rows))
+	for _, row := range rows {
+		zones = append(zones, RecoveryZone{StartIdx: int(row.StartIdx), EndIdx: int(row.EndIdx), DistanceM: numericValue(row.DistanceM)})
+	}
+	return zones, nil
+}
+
+func (s *SQLCStore) GetKmVertical(ctx context.Context, trackID pgtype.UUID) (*KmVerticalResult, error) {
+	if s == nil || s.q == nil {
+		return nil, fmt.Errorf("gpx: store is not initialized")
+	}
+	row, err := s.q.GetGPXKmVerticalByTrack(ctx, trackID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("gpx: get km vertical: %w", err)
+	}
+	return &KmVerticalResult{StartIdx: int(row.StartIdx), EndIdx: int(row.EndIdx), GainM: numericValue(row.GainM), DistanceM: numericValue(row.DistanceM)}, nil
 }
 
 func (s *SQLCStore) GetByID(ctx context.Context, userID, trackID pgtype.UUID, resolution int) (*StoredTrack, error) {

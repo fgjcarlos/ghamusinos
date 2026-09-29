@@ -149,9 +149,12 @@ type StoredTrack struct {
 }
 
 type StoredTrackDetail struct {
-	Track     StoredTrack `json:"track"`
-	Climbs    []Climb     `json:"climbs"`
-	RiskZones []RiskZone  `json:"risk_zones"`
+	Track         StoredTrack       `json:"track"`
+	Climbs        []Climb           `json:"climbs"`
+	RiskZones     []RiskZone        `json:"risk_zones"`
+	Muros         []Muro            `json:"muros"`
+	RecoveryZones []RecoveryZone    `json:"recovery_zones"`
+	KmVertical    *KmVerticalResult `json:"km_vertical"`
 }
 
 type ListParams struct {
@@ -220,7 +223,7 @@ type TrackTypeDetector interface {
 
 type GPXStore interface {
 	Create(ctx context.Context, track *Track, analysis *Analysis) error
-	CreateDetail(ctx context.Context, track *Track, analysis *Analysis, climbs []Climb, riskZones []RiskZone, kingClimb *Climb) (*StoredTrackDetail, error)
+	CreateDetail(ctx context.Context, track *Track, analysis *Analysis, climbs []Climb, riskZones []RiskZone, kingClimb *Climb, muros []Muro, recoveryZones []RecoveryZone, kmVertical *KmVerticalResult) (*StoredTrackDetail, error)
 	// GetByID and GetDetail accept resolution in points-per-detail; 0 or
 	// negative falls back to gpx.DefaultResolution (2000). Resolutions
 	// smaller than the track length trigger min/max-per-bucket
@@ -230,6 +233,9 @@ type GPXStore interface {
 	FindByHash(ctx context.Context, userID pgtype.UUID, fileHash string) (*StoredTrack, error)
 	ListClimbs(ctx context.Context, trackID pgtype.UUID) ([]Climb, error)
 	ListRiskZones(ctx context.Context, trackID pgtype.UUID) ([]RiskZone, error)
+	ListMuros(ctx context.Context, trackID pgtype.UUID) ([]Muro, error)
+	ListRecoveryZones(ctx context.Context, trackID pgtype.UUID) ([]RecoveryZone, error)
+	GetKmVertical(ctx context.Context, trackID pgtype.UUID) (*KmVerticalResult, error)
 	List(ctx context.Context, userID pgtype.UUID, params ListParams) (*PaginatedTracks, error)
 	Delete(ctx context.Context, userID pgtype.UUID, trackID pgtype.UUID) error
 }
