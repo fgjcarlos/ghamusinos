@@ -185,6 +185,24 @@ func (m *mockMeQuerier) CreateGPXClimb(ctx context.Context, arg sqlc.CreateGPXCl
 func (m *mockMeQuerier) CreateGPXRiskZone(ctx context.Context, arg sqlc.CreateGPXRiskZoneParams) (sqlc.GpxRiskZone, error) {
 	return sqlc.GpxRiskZone{}, nil
 }
+func (m *mockMeQuerier) CreateGPXMuro(ctx context.Context, arg sqlc.CreateGPXMuroParams) (sqlc.GpxMuro, error) {
+	return sqlc.GpxMuro{}, nil
+}
+func (m *mockMeQuerier) CreateGPXRecoveryZone(ctx context.Context, arg sqlc.CreateGPXRecoveryZoneParams) (sqlc.GpxRecoveryZone, error) {
+	return sqlc.GpxRecoveryZone{}, nil
+}
+func (m *mockMeQuerier) UpsertGPXKmVertical(ctx context.Context, arg sqlc.UpsertGPXKmVerticalParams) (sqlc.GpxKmVertical, error) {
+	return sqlc.GpxKmVertical{}, nil
+}
+func (m *mockMeQuerier) GetGPXKmVerticalByTrack(ctx context.Context, trackID pgtype.UUID) (sqlc.GpxKmVertical, error) {
+	return sqlc.GpxKmVertical{}, nil
+}
+func (m *mockMeQuerier) ListGPXMurosByTrack(ctx context.Context, trackID pgtype.UUID) ([]sqlc.GpxMuro, error) {
+	return nil, nil
+}
+func (m *mockMeQuerier) ListGPXRecoveryZonesByTrack(ctx context.Context, trackID pgtype.UUID) ([]sqlc.GpxRecoveryZone, error) {
+	return nil, nil
+}
 func (m *mockMeQuerier) CreateGPXTrack(ctx context.Context, arg sqlc.CreateGPXTrackParams) (sqlc.GpxTrack, error) {
 	return sqlc.GpxTrack{}, nil
 }

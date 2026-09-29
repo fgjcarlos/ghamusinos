@@ -12,6 +12,8 @@ import (
 
 type Querier interface {
 	CreateGPXClimb(ctx context.Context, arg CreateGPXClimbParams) (GpxClimb, error)
+	CreateGPXMuro(ctx context.Context, arg CreateGPXMuroParams) (GpxMuro, error)
+	CreateGPXRecoveryZone(ctx context.Context, arg CreateGPXRecoveryZoneParams) (GpxRecoveryZone, error)
 	CreateGPXRiskZone(ctx context.Context, arg CreateGPXRiskZoneParams) (GpxRiskZone, error)
 	// Issue #171, A8: d_plus_m / d_minus_m admiten NULL cuando la cobertura
 	// de elevación es insuficiente (ver migración 00010). elevation_coverage
@@ -40,6 +42,7 @@ type Querier interface {
 	GetActivityByExternalID(ctx context.Context, arg GetActivityByExternalIDParams) (Activity, error)
 	// Load an event by the internal UUID passed to IngestActivityEventWorker.
 	GetActivityEventByID(ctx context.Context, id pgtype.UUID) (ActivityEvent, error)
+	GetGPXKmVerticalByTrack(ctx context.Context, trackID pgtype.UUID) (GpxKmVertical, error)
 	GetGPXTrackByHash(ctx context.Context, arg GetGPXTrackByHashParams) (GpxTrack, error)
 	GetGPXTrackByID(ctx context.Context, arg GetGPXTrackByIDParams) (GpxTrack, error)
 	GetHRZonesByActivity(ctx context.Context, activityID pgtype.UUID) (HrZone, error)
@@ -68,6 +71,8 @@ type Querier interface {
 	// devolvía `offset + len(rows) (+ 1 si has_next)`, que no es un total.
 	ListActivitiesByUser(ctx context.Context, arg ListActivitiesByUserParams) ([]ListActivitiesByUserRow, error)
 	ListGPXClimbsByTrack(ctx context.Context, trackID pgtype.UUID) ([]GpxClimb, error)
+	ListGPXMurosByTrack(ctx context.Context, trackID pgtype.UUID) ([]GpxMuro, error)
+	ListGPXRecoveryZonesByTrack(ctx context.Context, trackID pgtype.UUID) ([]GpxRecoveryZone, error)
 	ListGPXRiskZonesByTrack(ctx context.Context, trackID pgtype.UUID) ([]GpxRiskZone, error)
 	// Misma corrección que ListActivitiesByUser (issue #172, M6):
 	// COUNT(*) OVER() añade el total real a cada fila para que el handler
@@ -98,6 +103,7 @@ type Querier interface {
 	// Guarda/actualiza un stream concreto de una actividad (HR, watts, ...).
 	// PRIMARY KEY (activity_id, stream_type) hace el upsert natural.
 	UpsertActivityStream(ctx context.Context, arg UpsertActivityStreamParams) (ActivityStream, error)
+	UpsertGPXKmVertical(ctx context.Context, arg UpsertGPXKmVerticalParams) (GpxKmVertical, error)
 	// Idempotente por PK activity_id. Upsert de zonas HR calculadas.
 	UpsertHRZones(ctx context.Context, arg UpsertHRZonesParams) (HrZone, error)
 	// Inserta o reemplaza los tokens OAuth cifrados de un usuario.

@@ -85,6 +85,23 @@ func TestGetGPXReturnsOwnedTrackDetail(t *testing.T) {
 // TestGetGPXForwardsResolutionQueryParam: ?resolution=N se reenvía al
 // store (issue #170, M9). Sin query param o con valor inválido, el
 // handler pasa 0 y el store cae a gpx.DefaultResolution.
+func TestGetGPXRehydratesMurosAndKmVerticalAndRecoveryZones(t *testing.T) {
+	id := pgtype.UUID{Bytes: [16]byte{15: 2}, Valid: true}
+	detail := &gpx.StoredTrackDetail{
+		Track:         gpx.StoredTrack{Track: gpx.Track{ID: id, Name: "Owned"}},
+		Muros:         []gpx.Muro{{StartIdx: 10, EndIdx: 20, GainM: 45, DistanceM: 180, AvgSlopePct: 25}},
+		RecoveryZones: []gpx.RecoveryZone{{StartIdx: 20, EndIdx: 30, DistanceM: 200}},
+		KmVertical:    &gpx.KmVerticalResult{StartIdx: 1, EndIdx: 80, GainM: 850, DistanceM: 10000},
+	}
+	recorder := httptest.NewRecorder()
+	GetGPX(&detailGPXStore{detail: detail}).ServeHTTP(recorder, getGPXRequest(true))
+
+	require.Equal(t, http.StatusOK, recorder.Code)
+	require.Contains(t, recorder.Body.String(), `"muros":[{"start_idx":10,"end_idx":20,"gain_m":45,"distance_m":180,"avg_slope_pct":25}]`)
+	require.Contains(t, recorder.Body.String(), `"recovery_zones":[{"start_idx":20,"end_idx":30,"distance_m":200}]`)
+	require.Contains(t, recorder.Body.String(), `"km_vertical":{"start_idx":1,"end_idx":80,"gain_m":850,"distance_m":10000}`)
+}
+
 func TestGetGPXForwardsResolutionQueryParam(t *testing.T) {
 	cases := []struct {
 		name        string

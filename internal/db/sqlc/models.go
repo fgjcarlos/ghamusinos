@@ -60,6 +60,30 @@ type GpxClimb struct {
 	AvgSlopePct pgtype.Numeric `json:"avg_slope_pct"`
 }
 
+type GpxKmVertical struct {
+	TrackID   pgtype.UUID    `json:"track_id"`
+	StartIdx  int32          `json:"start_idx"`
+	EndIdx    int32          `json:"end_idx"`
+	GainM     pgtype.Numeric `json:"gain_m"`
+	DistanceM pgtype.Numeric `json:"distance_m"`
+}
+
+type GpxMuro struct {
+	TrackID     pgtype.UUID    `json:"track_id"`
+	StartIdx    int32          `json:"start_idx"`
+	EndIdx      int32          `json:"end_idx"`
+	GainM       pgtype.Numeric `json:"gain_m"`
+	DistanceM   pgtype.Numeric `json:"distance_m"`
+	AvgSlopePct pgtype.Numeric `json:"avg_slope_pct"`
+}
+
+type GpxRecoveryZone struct {
+	TrackID   pgtype.UUID    `json:"track_id"`
+	StartIdx  int32          `json:"start_idx"`
+	EndIdx    int32          `json:"end_idx"`
+	DistanceM pgtype.Numeric `json:"distance_m"`
+}
+
 type GpxRiskZone struct {
 	ID       pgtype.UUID `json:"id"`
 	TrackID  pgtype.UUID `json:"track_id"`
