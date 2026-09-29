@@ -304,30 +304,73 @@ func TestSQLCStoreGetDetailReturnsEmptyClimbDerivedListsAndNilKmVertical(t *test
 // rehydration call, or breaks the empty/nil semantics for Muros,
 // RecoveryZones, or KmVertical, this test catches it at the fixture level
 // rather than letting the bug surface in downstream rendering code.
+//
+// Two halves pin two distinct failure modes:
+//  1. Empty/absent rows MUST produce non-nil empty slices and a nil
+//     singleton so JSON serialises as [] / [] / null without panicking.
+//  2. Populated rows MUST round-trip through GetDetail into the
+//     StoredTrackDetail fields — a silently dropped assignment would
+//     leave the zero value in place, which the empty-half assertion
+//     above could not catch.
 func TestDatabaseTrackFixtureKeepsClimbDerivedFields(t *testing.T) {
 	trackID := pgtype.UUID{Bytes: [16]byte{3}, Valid: true}
 	userID := pgtype.UUID{Bytes: [16]byte{4}, Valid: true}
-	query := &mockGPXQuerier{
-		track:         databaseTrack(trackID, userID),
-		muros:         []sqlc.GpxMuro{},
-		recoveryZones: []sqlc.GpxRecoveryZone{},
-		kmVerticalErr: pgx.ErrNoRows,
-	}
-	detail, err := NewSQLCStore(query).GetDetail(context.Background(), userID, trackID, 0)
-	require.NoError(t, err)
-	// The fixture + store MUST keep all three climb-derived fields present
-	// even when the underlying SQLC rows are empty or absent. JSON
-	// serialization must NOT panic, must produce empty arrays for the list
-	// fields, and must produce null for the optional singleton.
-	require.NotNil(t, detail.Muros, "Muros slice must be initialised (not nil) so JSON serialises as []")
-	require.NotNil(t, detail.RecoveryZones, "RecoveryZones slice must be initialised (not nil) so JSON serialises as []")
-	require.Nil(t, detail.KmVertical, "KmVertical must remain nil when the row is absent so JSON serialises as null")
-	data, err := json.Marshal(detail)
-	require.NoError(t, err)
-	encoded := string(data)
-	require.Contains(t, encoded, `"muros":[]`)
-	require.Contains(t, encoded, `"recovery_zones":[]`)
-	require.Contains(t, encoded, `"km_vertical":null`)
+
+	t.Run("empty and absent rows serialise as expected", func(t *testing.T) {
+		query := &mockGPXQuerier{
+			track:         databaseTrack(trackID, userID),
+			muros:         []sqlc.GpxMuro{},
+			recoveryZones: []sqlc.GpxRecoveryZone{},
+			kmVerticalErr: pgx.ErrNoRows,
+		}
+		detail, err := NewSQLCStore(query).GetDetail(context.Background(), userID, trackID, 0)
+		require.NoError(t, err)
+		require.NotNil(t, detail.Muros, "Muros slice must be initialised (not nil) so JSON serialises as []")
+		require.NotNil(t, detail.RecoveryZones, "RecoveryZones slice must be initialised (not nil) so JSON serialises as []")
+		require.Nil(t, detail.KmVertical, "KmVertical must remain nil when the row is absent so JSON serialises as null")
+		data, err := json.Marshal(detail)
+		require.NoError(t, err)
+		encoded := string(data)
+		require.Contains(t, encoded, `"muros":[]`)
+		require.Contains(t, encoded, `"recovery_zones":[]`)
+		require.Contains(t, encoded, `"km_vertical":null`)
+	})
+
+	t.Run("populated rows round-trip through rehydration", func(t *testing.T) {
+		gain800, err := numeric(800)
+		if err != nil {
+			t.Fatalf("test setup numeric(800): %v", err)
+		}
+		distance10000, err := numeric(10000)
+		if err != nil {
+			t.Fatalf("test setup numeric(10000): %v", err)
+		}
+		gain50, err := numeric(50)
+		if err != nil {
+			t.Fatalf("test setup numeric(50): %v", err)
+		}
+		query := &mockGPXQuerier{
+			track: databaseTrack(trackID, userID),
+			muros: []sqlc.GpxMuro{
+				{TrackID: trackID, StartIdx: 10, EndIdx: 20, GainM: gain50, DistanceM: distance10000, AvgSlopePct: gain50},
+			},
+			recoveryZones: []sqlc.GpxRecoveryZone{
+				{TrackID: trackID, StartIdx: 20, EndIdx: 30, DistanceM: distance10000},
+			},
+			kmVertical: sqlc.GpxKmVertical{
+				TrackID: trackID, StartIdx: 1, EndIdx: 90,
+				GainM: gain800, DistanceM: distance10000,
+			},
+		}
+		detail, err := NewSQLCStore(query).GetDetail(context.Background(), userID, trackID, 0)
+		require.NoError(t, err)
+		require.Len(t, detail.Muros, 1, "GetDetail must populate Muros from SQLC rows; a silently dropped assignment leaves this at zero")
+		require.Equal(t, 10, detail.Muros[0].StartIdx)
+		require.Len(t, detail.RecoveryZones, 1, "GetDetail must populate RecoveryZones from SQLC rows")
+		require.Equal(t, 20, detail.RecoveryZones[0].StartIdx)
+		require.NotNil(t, detail.KmVertical, "GetDetail must populate KmVertical from SQLC row; a silently dropped assignment leaves this nil")
+		require.InDelta(t, 800, detail.KmVertical.GainM, 0.01)
+	})
 }
 
 func TestSQLCStoreCreateDetailPersistsMurosAndRecoveryZonesAndKmVertical(t *testing.T) {
