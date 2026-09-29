@@ -141,7 +141,7 @@ tasks carry an explicit "Mechanical, no separate RED phase" line.
 
 #### 1.1. Migration `00011_gpx_muros_recovery_kmvertical.sql` (Up + Down)
 
-- [ ]
+- [x]
 
 - **TDD**: RED. Write a goose migration test in
   `internal/db/migrations/00011_gpx_muros_recovery_kmvertical_test.go`
@@ -170,7 +170,7 @@ tasks carry an explicit "Mechanical, no separate RED phase" line.
 
 #### 1.2. SQLC queries — `gpx_muros.sql`
 
-- [ ]
+- [x]
 
 - **TDD**: RED. Write a store test in `internal/gpx/store_test.go`
   (`TestSQLCStoreListGPXMurosByTrackReturnsRowsInStartIdxOrder`) that
@@ -192,7 +192,7 @@ tasks carry an explicit "Mechanical, no separate RED phase" line.
 
 #### 1.3. SQLC queries — `gpx_recovery_zones.sql`
 
-- [ ]
+- [x]
 
 - **TDD**: RED. Same posture as 1.2: write
   `TestSQLCStoreListGPXRecoveryZonesByTrackReturnsRowsInStartIdxOrder`
@@ -209,7 +209,7 @@ tasks carry an explicit "Mechanical, no separate RED phase" line.
 
 #### 1.4. SQLC queries — `gpx_km_vertical.sql` (Upsert + Get)
 
-- [ ]
+- [x]
 
 - **TDD**: RED. Write `TestSQLCStoreUpsertGPXKmVerticalReplacesSingleton`
   asserting that two `UpsertGPXKmVertical` calls with the same `track_id`
@@ -232,7 +232,7 @@ tasks carry an explicit "Mechanical, no separate RED phase" line.
 
 #### 1.5. Review `make generate` diff
 
-- [ ]
+- [x]
 
 - **Mechanical, no separate RED phase.** After 1.2–1.4 land, run
   `make generate` and inspect the diff in `internal/db/sqlc/`:
@@ -250,7 +250,7 @@ tasks carry an explicit "Mechanical, no separate RED phase" line.
 
 #### 1.6. Extend `gpxQuerier` interface in `internal/gpx/store.go`
 
-- [ ]
+- [x]
 
 - **TDD**: RED. The mock `mockGPXQuerier` (lines 1–80 of
   `internal/gpx/store_test.go`) embeds `sqlc.Querier`; once the
@@ -270,7 +270,7 @@ tasks carry an explicit "Mechanical, no separate RED phase" line.
 
 #### 1.7. Extend `StoredTrackDetail` Go struct
 
-- [ ]
+- [x]
 
 - **TDD**: RED. Write a serialisation test in
   `internal/gpx/types_test.go` (new file if absent) that marshals a
@@ -298,7 +298,7 @@ tasks carry an explicit "Mechanical, no separate RED phase" line.
 
 #### 1.8. Extend `CreateDetail` signature + body in `internal/gpx/store.go`
 
-- [ ]
+- [x]
 
 - **TDD**: RED. Write
   `TestSQLCStoreCreateDetailPersistsMurosAndRecoveryZonesAndKmVertical`
@@ -329,7 +329,7 @@ tasks carry an explicit "Mechanical, no separate RED phase" line.
 
 #### 1.9. Extend `GPXStore.CreateDetail` and `UploadGPXStore.CreateDetail`
 
-- [ ]
+- [x]
 
 - **TDD**: RED. Compile failure IS the RED phase: the
   `GPXStore.CreateDetail` interface in `internal/gpx/types.go:223` and
@@ -353,7 +353,7 @@ tasks carry an explicit "Mechanical, no separate RED phase" line.
 
 #### 1.10. Extend `GetDetail` rehydration in `internal/gpx/store.go`
 
-- [ ]
+- [x]
 
 - **TDD**: RED. Extend `TestSQLCStoreGetDetailHydratesChildren` (the
   existing test that pins read-side rehydration for climbs / risk
@@ -377,7 +377,7 @@ tasks carry an explicit "Mechanical, no separate RED phase" line.
 
 #### 1.11. Add `ListMuros`, `ListRecoveryZones`, `GetKmVertical` accessors
 
-- [ ]
+- [x]
 
 - **TDD**: RED. Three short tests pinning each accessor:
   `TestSQLCStoreListMurosReturnsRowsInOrder`,
@@ -398,7 +398,7 @@ tasks carry an explicit "Mechanical, no separate RED phase" line.
 
 #### 1.12. Drop orphaned-keys wrapper in `gpx_upload.go`
 
-- [ ]
+- [x]
 
 - **TDD**: RED. Replace the lossy pins at `gpx_upload_test.go:132-134`
   (`require.Contains(t, recorder.Body.String(), "muros":[])` etc.)
@@ -431,7 +431,7 @@ tasks carry an explicit "Mechanical, no separate RED phase" line.
 
 #### 1.13. New `TestGetGPXRehydratesMurosAndKmVerticalAndRecoveryZones`
 
-- [ ]
+- [x]
 
 - **TDD**: RED → GREEN in one task (test-first, then a read-only
   assertion trip that the existing GET handler already produces the
@@ -456,7 +456,7 @@ tasks carry an explicit "Mechanical, no separate RED phase" line.
 
 #### 1.14. Extend `databaseTrack` regression guard in `store_test.go`
 
-- [ ]
+- [x]
 
 - **TDD**: RED. Extend the existing `databaseTrack` fixture (referenced
   by the `wire-elevation-and-map-to-track-detail` regression pin) so
@@ -476,7 +476,7 @@ tasks carry an explicit "Mechanical, no separate RED phase" line.
 
 #### 1.15. Run `make fmt vet lint test` final gate (PR1)
 
-- [ ]
+- [x]
 
 - **Mechanical, no separate RED phase.** Final quality gate.
   - `make fmt` (may auto-format; idempotent on a clean checkout).
