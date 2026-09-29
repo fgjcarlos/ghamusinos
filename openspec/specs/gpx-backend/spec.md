@@ -9,7 +9,7 @@
 
 | Project root | `.` |
 | --- | --- |
-| Stack | Go 1.25.13 + chi/v5 + pgx/v5 + goose/v3 + sqlc + testify |
+| Stack | Go 1.26.0 + chi/v5 + pgx/v5 + goose/v3 + sqlc + testify |
 | Gating test command | `make test` (raw: `GOTOOLCHAIN=local go test -race ./...`) |
 | Quality gates | `make lint` (`golangci-lint run ./...`), `make vet`, `make fmt` |
 
