@@ -208,3 +208,31 @@ CREATE INDEX idx_gpx_tracks_user_created ON gpx_tracks (user_id, created_at DESC
 CREATE INDEX idx_gpx_tracks_difficulty ON gpx_tracks (user_id, difficulty_score DESC);
 CREATE INDEX idx_gpx_climbs_track ON gpx_climbs (track_id);
 CREATE INDEX idx_gpx_risk_zones_track ON gpx_risk_zones (track_id);
+
+CREATE TABLE gpx_muros (
+    track_id UUID NOT NULL REFERENCES gpx_tracks(id) ON DELETE CASCADE,
+    start_idx INTEGER NOT NULL,
+    end_idx INTEGER NOT NULL,
+    gain_m NUMERIC NOT NULL,
+    distance_m NUMERIC NOT NULL,
+    avg_slope_pct NUMERIC NOT NULL
+);
+
+CREATE TABLE gpx_recovery_zones (
+    track_id UUID NOT NULL REFERENCES gpx_tracks(id) ON DELETE CASCADE,
+    start_idx INTEGER NOT NULL,
+    end_idx INTEGER NOT NULL,
+    distance_m NUMERIC NOT NULL
+);
+
+CREATE TABLE gpx_km_vertical (
+    track_id UUID NOT NULL UNIQUE REFERENCES gpx_tracks(id) ON DELETE CASCADE,
+    start_idx INTEGER NOT NULL,
+    end_idx INTEGER NOT NULL,
+    gain_m NUMERIC NOT NULL,
+    distance_m NUMERIC NOT NULL
+);
+
+CREATE INDEX idx_gpx_muros_track ON gpx_muros (track_id);
+CREATE INDEX idx_gpx_recovery_zones_track ON gpx_recovery_zones (track_id);
+CREATE INDEX idx_gpx_km_vertical_track ON gpx_km_vertical (track_id);
