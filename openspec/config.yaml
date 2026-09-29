@@ -29,7 +29,7 @@ testing:
     off.
   projects:
     - path: .
-      stack: "Go 1.25.13 + chi/v5 + pgx/v5 + goose/v3 + riverqueue + lestrrat-go/jwx/v2 + testify + sqlc"
+      stack: "Go 1.26.0 + chi/v5 + pgx/v5 + goose/v3 + riverqueue + lestrrat-go/jwx/v2 + testify + sqlc"
       module: github.com/fgjcarlos/ghamusinos
       test_command: "make test"
       test_command_raw: "GOTOOLCHAIN=local go test -race ./..."
