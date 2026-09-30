@@ -1,0 +1,57 @@
+/* RouteKmVertical. Issue 15, Fase 1.3. Colours from tokens.css. */
+
+.card,
+.empty {
+  display: flex;
+  flex-direction: column;
+  gap: var(--gh-s-3);
+  padding: var(--gh-s-3);
+  background: var(--gh-surface);
+  border: 1px solid var(--gh-line);
+  border-radius: var(--gh-r-card);
+}
+
+.title {
+  margin: 0;
+  font-family: var(--gh-font-display);
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--gh-text);
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--gh-s-2);
+}
+
+.stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: var(--gh-s-2);
+  margin: 0;
+}
+
+.stats > div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.stats dt {
+  font-family: var(--gh-font-body);
+  font-size: 10px;
+  color: var(--gh-text-3);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin: 0;
+}
+
+.stats dd {
+  font-family: var(--gh-font-mono);
+  font-size: 14px;
+  color: var(--gh-text);
+  font-variant-numeric: tabular-nums;
+  margin: 0;
+}
