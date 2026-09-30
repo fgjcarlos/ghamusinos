@@ -97,8 +97,9 @@
 - [x] sdd-archive PR1: pendiente (no se ejecuta hasta cerrar el change completo; el archive cubre ambos PRs). *(redundant — consolidated below)*
 - [x] sdd-tasks PR2: pendiente (rebalance de tasks ya hecho en rebase). *(rebalance confirmed in rebase)*
 - [x] sdd-apply PR2: rama `feat/phase-1.3-km-vertical-pr2-web`, 7 commits (`60d49dc` … `63a878b`). Tasks 2.1–2.10 done; gates typecheck + lint + format:check + build verdes localmente.
-- [ ] sdd-verify PR2: pendiente.
-- [ ] sdd-archive final: pendiente (cierra el change tras merge de PR2; incluye sync de deltas a `openspec/specs/{gpx-backend,gpx-lab}/spec.md`).
+- [x] sdd-verify PR2 round 1: **APPROVE-WITH-FOLLOWUPS**. 3 follow-ups resolubles cerrados en commit `03e10ec`: panel ordering, GET-not-upload pin (mockea uploadGpx también), tasks.md checkboxes.
+- [x] PR2 pusheado, PR #238 abierto, CI verde (Backend / Frontend / Release / GitGuardian), mergeado a main con `--squash --delete-branch`. Merge commit `366f485`. Rama local eliminada.
+- [ ] sdd-archive final: pendiente (cierra el change tras merge de PR2; incluye sync de deltas a `openspec/specs/{gpx-backend,gpx-lab}/spec.md` y move de `openspec/changes/phase-1-3-km-vertical-and-king-climb/` a `openspec/changes/archive/YYYY-MM-DD-phase-1-3-km-vertical-and-king-climb/`).
 
 ## Referencias
 
