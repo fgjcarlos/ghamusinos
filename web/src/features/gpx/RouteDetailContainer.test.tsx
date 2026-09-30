@@ -162,4 +162,39 @@ describe('RouteDetailContainer', () => {
     await waitFor(() => expect(screen.getByTestId('map-empty')).toBeInTheDocument());
     expect(screen.getByTestId('route-detail')).toBeInTheDocument();
   });
+
+  it('surfaces climb-derived fields from the GET response, not the upload body (PR2 #15)', async () => {
+    vi.stubEnv('VITE_AUTH_TOKEN', 'tok');
+    // uploadGpx is intentionally stubbed to return only an id — the SPA
+    // contract is Promise<{ id: string }>; the new climb-derived fields
+    // are persisted by PR1 and rehydrated from GET /api/v1/gpx/{id}.
+    const detail = makeDetail();
+    detail.muros = [
+      { start_idx: 5, end_idx: 15, gain_m: 120, distance_m: 900, avg_slope_pct: 13.3 },
+    ];
+    detail.recovery_zones = [{ start_idx: 20, end_idx: 30, distance_m: 600 }];
+    detail.km_vertical = {
+      start_idx: 40,
+      end_idx: 200,
+      gain_m: 850,
+      distance_m: 10000,
+    };
+    mockedGetGpxTrack.mockResolvedValue(detail);
+    render(
+      <MemoryRouter>
+        <RouteDetailContainer trackId="track-1" />
+      </MemoryRouter>,
+    );
+    await waitFor(() =>
+      expect(screen.getByTestId('route-detail-status-ready')).toBeInTheDocument(),
+    );
+    // The three climb-derived panels reflect the GET fixture, not the
+    // upload body. Their root testids must be present.
+    expect(screen.getByTestId('route-km-vertical')).toBeInTheDocument();
+    expect(screen.getByTestId('route-muros')).toBeInTheDocument();
+    expect(screen.getByTestId('route-recovery')).toBeInTheDocument();
+    // The muro from the GET fixture is rendered.
+    expect(screen.getAllByTestId('muro-card')).toHaveLength(1);
+    expect(screen.getAllByTestId('recovery-card')).toHaveLength(1);
+  });
 });
