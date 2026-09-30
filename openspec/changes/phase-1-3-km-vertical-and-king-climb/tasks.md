@@ -757,7 +757,7 @@ posture applies to every behaviour task below; mechanical tasks carry
 
 #### 2.10. CI green on pushed branch (verification only, do not actually push)
 
-- [ ]
+- [x]
 
 - **Mechanical, no separate RED phase.** Document in the PR2 body
   which CI jobs to expect green: `frontend` (`pnpm typecheck` +
