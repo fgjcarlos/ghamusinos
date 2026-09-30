@@ -10,6 +10,7 @@ import type { GpxTrackSummary, StoredTrackDetail } from '../../lib/api/types';
 
 vi.mock('../../lib/api/gpx', () => ({
   getGpxTrack: vi.fn(),
+  uploadGpx: vi.fn(),
 }));
 vi.mock('../lab/MapView/MapView', () => ({
   MapView: ({ coordinates }: { coordinates: [number, number][] }) => (
@@ -18,10 +19,11 @@ vi.mock('../lab/MapView/MapView', () => ({
 }));
 
 // import after the mock so the mocked getGpxTrack is bound.
-import { getGpxTrack } from '../../lib/api/gpx';
+import { getGpxTrack, uploadGpx } from '../../lib/api/gpx';
 import { RouteDetailContainer } from './RouteDetailContainer';
 
 const mockedGetGpxTrack = vi.mocked(getGpxTrack);
+const mockedUploadGpx = vi.mocked(uploadGpx);
 
 function makeDetail(overrides: Partial<GpxTrackSummary['track']> = {}): StoredTrackDetail {
   return {
@@ -168,6 +170,12 @@ describe('RouteDetailContainer', () => {
     // uploadGpx is intentionally stubbed to return only an id — the SPA
     // contract is Promise<{ id: string }>; the new climb-derived fields
     // are persisted by PR1 and rehydrated from GET /api/v1/gpx/{id}.
+    // Even if a future uploadGpx return shape accidentally widens, this
+    // test asserts the container ignores any non-{id} keys in upload
+    // responses and only reads climb-derived data from getGpxTrack.
+    mockedUploadGpx.mockResolvedValue({
+      id: 'c'.repeat(32),
+    } as Awaited<ReturnType<typeof uploadGpx>>);
     const detail = makeDetail();
     detail.muros = [
       { start_idx: 5, end_idx: 15, gain_m: 120, distance_m: 900, avg_slope_pct: 13.3 },
@@ -196,5 +204,11 @@ describe('RouteDetailContainer', () => {
     // The muro from the GET fixture is rendered.
     expect(screen.getAllByTestId('muro-card')).toHaveLength(1);
     expect(screen.getAllByTestId('recovery-card')).toHaveLength(1);
+    // Contract pin: the read flow never invokes uploadGpx. Even if
+    // some bug caused it to be called, the test would catch it
+    // because uploadGpx is mocked and never wired to a real fetch.
+    expect(mockedUploadGpx).not.toHaveBeenCalled();
+    // And getGpxTrack IS called with the URL trackId.
+    expect(mockedGetGpxTrack).toHaveBeenCalledWith('tok', 'track-1', expect.anything());
   });
 });

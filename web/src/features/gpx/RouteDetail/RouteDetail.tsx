@@ -38,9 +38,9 @@ export function RouteDetail({ data }: RouteDetailProps) {
         <ElevationProfile projected={projected} width={960} height={200} />
       </section>
       <RouteMetrics analysis={data.analysis} />
-      <RouteKmVertical data={data.km_vertical} />
       <div className={styles.columns}>
         <RouteClimbs climbs={data.climbs} />
+        <RouteKmVertical data={data.km_vertical} />
         <RouteMuros data={data.muros} />
         <RouteRisks risks={data.risk_zones} />
         <RouteRecovery data={data.recovery_zones} />
