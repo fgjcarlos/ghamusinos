@@ -489,7 +489,7 @@ tasks carry an explicit "Mechanical, no separate RED phase" line.
 
 #### 1.16. CI green on pushed branch (verification only, do not actually push)
 
-- [ ]
+- [x]
 
 - **Mechanical, no separate RED phase.** Document in the PR1 body
   which CI jobs to expect green: `backend` (gofmt + golangci-lint v2 +
