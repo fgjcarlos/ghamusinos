@@ -88,15 +88,18 @@
 - [x] sdd-spec ejecutado. Outputs:
   - `openspec/changes/phase-1-3-km-vertical-and-king-climb/specs/gpx-backend/spec.md` (743 líneas, 8 ADDED requirements, 34 scenarios)
   - `openspec/changes/phase-1-3-km-vertical-and-king-climb/specs/gpx-lab/spec.md` (431 líneas, 7 ADDED requirements, 17 scenarios)
-- [ ] sdd-design: NO NECESARIO (spec cubre WHAT, proposal cubre HOW, no hay `## Capabilities` ni `rules.design`).
-- [ ] sdd-tasks: pendiente.
-- [ ] sdd-apply PR1: pendiente.
-- [ ] sdd-verify PR1: pendiente.
-- [ ] sdd-archive PR1: pendiente.
-- [ ] sdd-tasks PR2: pendiente (independiente, sobre main con PR1 mergeado).
+- [x] sdd-design ejecutado (`design.md`, 140 inserciones). D1–D5 decisions + data flow + file-by-file + test strategy + rollback.
+- [x] sdd-tasks ejecutado (`tasks.md`, 26 tasks, 1.1–1.16 PR1, 2.1–2.10 PR2, TDD posture on every behaviour task).
+- [x] sdd-apply PR1 ejecutado. Branch `feat/phase-1.3-km-vertical-pr1-backend`, 8 commits (`9073ae8` … `1dc325c`).
+- [x] sdd-verify PR1 round 3 ejecutado: **approve-with-followups**. Blocadores resueltos con regression pin (commits `c617939`, `b7b04fb`, `7379d80`).
+- [x] PR1 pusheado, PR #237 abierto, CI verde (Backend / Frontend / Release / GitGuardian), mergeado a main con `--squash --delete-branch`. Merge commit `3ae8102`. Rama local eliminada.
+- [x] Branch `feat/phase-1.3-km-vertical` rebaseado sobre main (commits `9531fd5` → `40f0813`). `tasks.md` con 15/26 checks (PR1 done) + 11 pending (PR2).
+- [ ] sdd-archive PR1: pendiente (no se ejecuta hasta cerrar el change completo; el archive cubre ambos PRs).
+- [ ] sdd-tasks PR2: pendiente (rebalance de tasks ya hecho en rebase).
 - [ ] sdd-apply PR2: pendiente.
 - [ ] sdd-verify PR2: pendiente.
-- [ ] sdd-archive PR2: pendiente.
+- [ ] sdd-archive PR2: pendiente (cierre del change).
+- [ ] sdd-archive final: pendiente (incluye sync de deltas a `openspec/specs/{gpx-backend,gpx-lab}/spec.md`).
 
 ## Referencias
 
