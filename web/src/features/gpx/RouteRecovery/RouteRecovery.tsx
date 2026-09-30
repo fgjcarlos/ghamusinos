@@ -25,7 +25,11 @@ export function RouteRecovery({ data }: RouteRecoveryProps) {
     );
   }
   return (
-    <section className={styles.recovery} aria-label="Zonas de recuperación del track">
+    <section
+      className={styles.recovery}
+      aria-label="Zonas de recuperación del track"
+      data-testid="route-recovery"
+    >
       <h2 className={styles.title}>Recovery zones ({data.length})</h2>
       <ul className={styles.list}>
         {data.map((r, i) => (

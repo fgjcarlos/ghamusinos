@@ -25,7 +25,7 @@ export function RouteMuros({ data }: RouteMurosProps) {
     );
   }
   return (
-    <section className={styles.muros} aria-label="Muros del track">
+    <section className={styles.muros} aria-label="Muros del track" data-testid="route-muros">
       <h2 className={styles.title}>Muros ({data.length})</h2>
       <ul className={styles.list}>
         {data.map((m, i) => (
