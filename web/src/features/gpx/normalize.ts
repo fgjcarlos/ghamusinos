@@ -10,6 +10,9 @@
 import type {
   GpxAnalysis,
   GpxClimb,
+  GpxKmVertical,
+  GpxMuro,
+  GpxRecoveryZone,
   GpxRiskZone,
   GpxTrackSummary,
   PgTypeUUID,
@@ -67,11 +70,35 @@ export interface NormalizedRiskZone {
   severity: number;
 }
 
+export interface NormalizedMuro {
+  start_idx: number;
+  end_idx: number;
+  gain_m: number;
+  distance_m: number;
+  avg_slope_pct: number;
+}
+
+export interface NormalizedRecoveryZone {
+  start_idx: number;
+  end_idx: number;
+  distance_m: number;
+}
+
+export interface NormalizedKmVertical {
+  start_idx: number;
+  end_idx: number;
+  gain_m: number;
+  distance_m: number;
+}
+
 export interface NormalizedTrackDetail {
   track: NormalizedInnerTrack;
   analysis: NormalizedAnalysis;
   climbs: NormalizedClimb[];
   risk_zones: NormalizedRiskZone[];
+  muros: NormalizedMuro[];
+  recovery_zones: NormalizedRecoveryZone[];
+  km_vertical: NormalizedKmVertical | null;
 }
 
 function pgUuidToString(u: PgTypeUUID | null | undefined): string {
@@ -142,6 +169,34 @@ function normalizeRiskZone(r: GpxRiskZone): NormalizedRiskZone {
   };
 }
 
+function normalizeMuro(m: GpxMuro): NormalizedMuro {
+  return {
+    start_idx: m.start_idx,
+    end_idx: m.end_idx,
+    gain_m: m.gain_m,
+    distance_m: m.distance_m,
+    avg_slope_pct: m.avg_slope_pct,
+  };
+}
+
+function normalizeRecoveryZone(r: GpxRecoveryZone): NormalizedRecoveryZone {
+  return {
+    start_idx: r.start_idx,
+    end_idx: r.end_idx,
+    distance_m: r.distance_m,
+  };
+}
+
+function normalizeKmVertical(kv: GpxKmVertical | null): NormalizedKmVertical | null {
+  if (kv === null) return null;
+  return {
+    start_idx: kv.start_idx,
+    end_idx: kv.end_idx,
+    gain_m: kv.gain_m,
+    distance_m: kv.distance_m,
+  };
+}
+
 /** Convert a StoredTrackDetail into the plain-shape NormalizedTrackDetail.
  *
  * Backend nests the inner track metadata under `detail.track.track`
@@ -153,5 +208,8 @@ export function normalizeTrackDetail(detail: StoredTrackDetail): NormalizedTrack
     analysis: normalizeAnalysis(detail.track.analysis),
     climbs: detail.climbs.map(normalizeClimb),
     risk_zones: detail.risk_zones.map(normalizeRiskZone),
+    muros: detail.muros.map(normalizeMuro),
+    recovery_zones: detail.recovery_zones.map(normalizeRecoveryZone),
+    km_vertical: normalizeKmVertical(detail.km_vertical),
   };
 }

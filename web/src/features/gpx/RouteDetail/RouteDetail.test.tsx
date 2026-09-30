@@ -50,6 +50,9 @@ function makeData(overrides: Partial<NormalizedTrackDetail> = {}): NormalizedTra
       },
     ],
     risk_zones: [{ start_idx: 5, end_idx: 8, category: 'steep', severity: 0.85 }],
+    muros: [],
+    recovery_zones: [],
+    km_vertical: null,
     ...overrides,
   };
 }
@@ -135,5 +138,46 @@ describe('RouteDetail', () => {
       </MemoryRouter>,
     );
     expect(screen.getByTestId('elevation-profile')).toBeInTheDocument();
+  });
+
+  it('renders the three climb-derived panels (km_vertical, muros, recovery)', () => {
+    render(
+      <MemoryRouter>
+        <RouteDetail
+          data={makeData({
+            muros: [
+              { start_idx: 5, end_idx: 15, gain_m: 120, distance_m: 900, avg_slope_pct: 13.3 },
+            ],
+            recovery_zones: [{ start_idx: 20, end_idx: 30, distance_m: 600 }],
+            km_vertical: {
+              start_idx: 40,
+              end_idx: 200,
+              gain_m: 850,
+              distance_m: 10000,
+            },
+          })}
+        />
+      </MemoryRouter>,
+    );
+    expect(screen.getByTestId('route-km-vertical')).toBeInTheDocument();
+    expect(screen.getByTestId('route-muros')).toBeInTheDocument();
+    expect(screen.getByTestId('route-recovery')).toBeInTheDocument();
+  });
+
+  it('renders the empty states for the three new panels', () => {
+    render(
+      <MemoryRouter>
+        <RouteDetail
+          data={makeData({
+            muros: [],
+            recovery_zones: [],
+            km_vertical: null,
+          })}
+        />
+      </MemoryRouter>,
+    );
+    expect(screen.getByTestId('route-km-vertical-empty')).toBeInTheDocument();
+    expect(screen.getByTestId('route-muros-empty')).toBeInTheDocument();
+    expect(screen.getByTestId('route-recovery-empty')).toBeInTheDocument();
   });
 });

@@ -214,12 +214,54 @@ export interface GpxTrackSummary {
 }
 
 /**
+ * Muro: tramo de subida sostenido con gradiente agresivo (PR1 Fase 1.3).
+ * Es la salida de FindMuros en internal/gpx/climbs.go. La fuente canónica
+ * es `gpx_muros` (1 row por muro). Los campos numéricos ya están en
+ * `number` (no pgtype) por el flatten del backend.
+ */
+export interface GpxMuro {
+  start_idx: number;
+  end_idx: number;
+  gain_m: number;
+  distance_m: number;
+  avg_slope_pct: number;
+}
+
+/**
+ * Zona de recuperación: tramo posterior a un muro con pérdida de altura
+ * sostenida (PR1 Fase 1.3). Es la salida de FindRecoveryZones. La fuente
+ * canónica es `gpx_recovery_zones`. Sin gain_m ni avg_slope_pct — solo
+ * distancia y rango de índices.
+ */
+export interface GpxRecoveryZone {
+  start_idx: number;
+  end_idx: number;
+  distance_m: number;
+}
+
+/**
+ * Km vertical: tramo de subida acumulada continua ≥ 50 m (PR1 Fase 1.3).
+ * Es la salida singleton de FindKmVertical. La fuente canónica es
+ * `gpx_km_vertical` (UNIQUE por track_id). `null` cuando el track no
+ * tiene un tramo que cumpla el umbral.
+ */
+export interface GpxKmVertical {
+  start_idx: number;
+  end_idx: number;
+  gain_m: number;
+  distance_m: number;
+}
+
+/**
  * Track con detalle: lo que devuelve GetGPX/{id}.
  */
 export interface StoredTrackDetail {
   track: GpxTrackSummary;
   climbs: GpxClimb[];
   risk_zones: GpxRiskZone[];
+  muros: GpxMuro[];
+  recovery_zones: GpxRecoveryZone[];
+  km_vertical: GpxKmVertical | null;
 }
 
 export interface PaginatedTracks {

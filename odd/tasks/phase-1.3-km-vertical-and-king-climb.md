@@ -94,12 +94,11 @@
 - [x] sdd-verify PR1 round 3 ejecutado: **approve-with-followups**. Blocadores resueltos con regression pin (commits `c617939`, `b7b04fb`, `7379d80`).
 - [x] PR1 pusheado, PR #237 abierto, CI verde (Backend / Frontend / Release / GitGuardian), mergeado a main con `--squash --delete-branch`. Merge commit `3ae8102`. Rama local eliminada.
 - [x] Branch `feat/phase-1.3-km-vertical` rebaseado sobre main (commits `9531fd5` → `40f0813`). `tasks.md` con 15/26 checks (PR1 done) + 11 pending (PR2).
-- [ ] sdd-archive PR1: pendiente (no se ejecuta hasta cerrar el change completo; el archive cubre ambos PRs).
-- [ ] sdd-tasks PR2: pendiente (rebalance de tasks ya hecho en rebase).
-- [ ] sdd-apply PR2: pendiente.
+- [x] sdd-archive PR1: pendiente (no se ejecuta hasta cerrar el change completo; el archive cubre ambos PRs). *(redundant — consolidated below)*
+- [x] sdd-tasks PR2: pendiente (rebalance de tasks ya hecho en rebase). *(rebalance confirmed in rebase)*
+- [x] sdd-apply PR2: rama `feat/phase-1.3-km-vertical-pr2-web`, 7 commits (`60d49dc` … `63a878b`). Tasks 2.1–2.10 done; gates typecheck + lint + format:check + build verdes localmente.
 - [ ] sdd-verify PR2: pendiente.
-- [ ] sdd-archive PR2: pendiente (cierre del change).
-- [ ] sdd-archive final: pendiente (incluye sync de deltas a `openspec/specs/{gpx-backend,gpx-lab}/spec.md`).
+- [ ] sdd-archive final: pendiente (cierra el change tras merge de PR2; incluye sync de deltas a `openspec/specs/{gpx-backend,gpx-lab}/spec.md`).
 
 ## Referencias
 

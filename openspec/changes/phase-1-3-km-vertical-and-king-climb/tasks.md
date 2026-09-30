@@ -531,7 +531,7 @@ posture applies to every behaviour task below; mechanical tasks carry
 
 #### 2.1. Extend `StoredTrackDetail` and add three new interfaces
 
-- [ ]
+- [x]
 
 - **TDD**: RED. Run `pnpm -C web typecheck` BEFORE the edit; existing
   consumers that read `detail.muros` / `detail.recovery_zones` /
@@ -573,7 +573,7 @@ posture applies to every behaviour task below; mechanical tasks carry
 
 #### 2.2. Add three normalizers + extend `normalizeTrackDetail`
 
-- [ ]
+- [x]
 
 - **TDD**: RED. In `web/src/features/gpx/normalize.test.ts`, add
   fixture data with one muro, one recovery zone, and a non-null
@@ -601,7 +601,7 @@ posture applies to every behaviour task below; mechanical tasks carry
 
 #### 2.3. `RouteKmVertical` component + tests
 
-- [ ]
+- [x]
 
 - **TDD**: RED. Create `web/src/features/gpx/RouteKmVertical/RouteKmVertical.test.tsx`
   with two cases:
@@ -627,7 +627,7 @@ posture applies to every behaviour task below; mechanical tasks carry
 
 #### 2.4. `RouteMuros` component + `MuroCard` subcomponent + tests
 
-- [ ]
+- [x]
 
 - **TDD**: RED. Three test cases in
   `web/src/features/gpx/RouteMuros/RouteMuros.test.tsx`:
@@ -651,7 +651,7 @@ posture applies to every behaviour task below; mechanical tasks carry
 
 #### 2.5. `RouteRecovery` component + `RecoveryCard` subcomponent + tests
 
-- [ ]
+- [x]
 
 - **TDD**: RED. Two test cases in
   `web/src/features/gpx/RouteRecovery/RouteRecovery.test.tsx`:
@@ -675,7 +675,7 @@ posture applies to every behaviour task below; mechanical tasks carry
 
 #### 2.6. Compose three new panels in `RouteDetail.tsx`
 
-- [ ]
+- [x]
 
 - **TDD**: RED. Extend the existing
   `web/src/features/gpx/RouteDetail/RouteDetail.test.tsx` with two
@@ -704,7 +704,7 @@ posture applies to every behaviour task below; mechanical tasks carry
 
 #### 2.7. Pin "data arrives via GET, not upload" in `RouteDetailContainer.test.tsx`
 
-- [ ]
+- [x]
 
 - **TDD**: RED. Extend
   `web/src/features/gpx/RouteDetailContainer.test.tsx` (the
@@ -728,7 +728,7 @@ posture applies to every behaviour task below; mechanical tasks carry
 
 #### 2.8. Confirm `uploadGpx` keeps narrow return type
 
-- [ ]
+- [x]
 
 - **Mechanical, no separate RED phase.** Read
   `web/src/lib/api/gpx.ts:95-115`; verify it still returns
@@ -743,7 +743,7 @@ posture applies to every behaviour task below; mechanical tasks carry
 
 #### 2.9. Run `pnpm -C web typecheck lint format:check test:run` final gate (PR2)
 
-- [ ]
+- [x]
 
 - **Mechanical, no separate RED phase.** Final quality gate.
   - `pnpm -C web typecheck` (`tsc --noEmit`).

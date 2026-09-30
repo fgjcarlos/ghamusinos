@@ -8,6 +8,9 @@ import { rawPointsToTrackPoints } from '../rawPointsToTrackPoints';
 import { RouteHeader } from '../RouteHeader/RouteHeader';
 import { RouteMetrics } from '../RouteMetrics/RouteMetrics';
 import { RouteClimbs } from '../RouteClimbs/RouteClimbs';
+import { RouteKmVertical } from '../RouteKmVertical/RouteKmVertical';
+import { RouteMuros } from '../RouteMuros/RouteMuros';
+import { RouteRecovery } from '../RouteRecovery/RouteRecovery';
 import { RouteRisks } from '../RouteRisks/RouteRisks';
 import type { NormalizedTrackDetail } from '../normalize';
 import styles from './RouteDetail.module.css';
@@ -37,7 +40,10 @@ export function RouteDetail({ data }: RouteDetailProps) {
       <RouteMetrics analysis={data.analysis} />
       <div className={styles.columns}>
         <RouteClimbs climbs={data.climbs} />
+        <RouteKmVertical data={data.km_vertical} />
+        <RouteMuros data={data.muros} />
         <RouteRisks risks={data.risk_zones} />
+        <RouteRecovery data={data.recovery_zones} />
       </div>
     </article>
   );

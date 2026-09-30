@@ -64,7 +64,14 @@ const climbs: GpxClimb[] = [
 
 const risks: GpxRiskZone[] = [{ start_idx: 30, end_idx: 35, category: 'steep', severity: 0.9 }];
 
-const detail: StoredTrackDetail = { track: trackSummary, climbs, risk_zones: risks };
+const detail: StoredTrackDetail = {
+  track: trackSummary,
+  climbs,
+  risk_zones: risks,
+  muros: [],
+  recovery_zones: [],
+  km_vertical: null,
+};
 
 describe('normalizeTrackDetail', () => {
   it('converts the inner-track id and user_id from pgtype to string', () => {
@@ -91,6 +98,9 @@ describe('normalizeTrackDetail', () => {
       track: signedSummary,
       climbs,
       risk_zones: risks,
+      muros: [],
+      recovery_zones: [],
+      km_vertical: null,
     });
     expect(out.analysis.max_elevation_m).toBe(1500);
     expect(out.analysis.min_elevation_m).toBe(-50);
@@ -106,6 +116,9 @@ describe('normalizeTrackDetail', () => {
       track: noElevSummary,
       climbs,
       risk_zones: risks,
+      muros: [],
+      recovery_zones: [],
+      km_vertical: null,
     });
     expect(out.analysis.max_elevation_m).toBeNull();
   });
@@ -116,6 +129,9 @@ describe('normalizeTrackDetail', () => {
       track: { ...trackSummary, analysis: withCoverage },
       climbs,
       risk_zones: risks,
+      muros: [],
+      recovery_zones: [],
+      km_vertical: null,
     });
     expect(out.analysis.elevation_coverage).toBe(0.87);
 
@@ -142,5 +158,75 @@ describe('normalizeTrackDetail', () => {
     const out = normalizeTrackDetail(detail);
     expect(out.track.uploaded_at).toBeInstanceOf(Date);
     expect(out.track.uploaded_at.toISOString()).toBe('2025-09-15T08:00:00.000Z');
+  });
+
+  it('round-trips a populated muro through normalization', () => {
+    const populated: StoredTrackDetail = {
+      track: trackSummary,
+      climbs,
+      risk_zones: risks,
+      muros: [{ start_idx: 10, end_idx: 30, gain_m: 200, distance_m: 1500, avg_slope_pct: 12.5 }],
+      recovery_zones: [],
+      km_vertical: null,
+    };
+    const out = normalizeTrackDetail(populated);
+    expect(out.muros).toHaveLength(1);
+    expect(out.muros[0].start_idx).toBe(10);
+    expect(out.muros[0].end_idx).toBe(30);
+    expect(out.muros[0].gain_m).toBe(200);
+    expect(out.muros[0].distance_m).toBe(1500);
+    expect(out.muros[0].avg_slope_pct).toBe(12.5);
+  });
+
+  it('round-trips a populated recovery zone through normalization', () => {
+    const populated: StoredTrackDetail = {
+      track: trackSummary,
+      climbs,
+      risk_zones: risks,
+      muros: [],
+      recovery_zones: [{ start_idx: 50, end_idx: 80, distance_m: 1200 }],
+      km_vertical: null,
+    };
+    const out = normalizeTrackDetail(populated);
+    expect(out.recovery_zones).toHaveLength(1);
+    expect(out.recovery_zones[0].start_idx).toBe(50);
+    expect(out.recovery_zones[0].end_idx).toBe(80);
+    expect(out.recovery_zones[0].distance_m).toBe(1200);
+  });
+
+  it('round-trips a populated km_vertical through normalization', () => {
+    const populated: StoredTrackDetail = {
+      track: trackSummary,
+      climbs,
+      risk_zones: risks,
+      muros: [],
+      recovery_zones: [],
+      km_vertical: { start_idx: 100, end_idx: 350, gain_m: 850, distance_m: 12000 },
+    };
+    const out = normalizeTrackDetail(populated);
+    expect(out.km_vertical).not.toBeNull();
+    expect(out.km_vertical?.start_idx).toBe(100);
+    expect(out.km_vertical?.end_idx).toBe(350);
+    expect(out.km_vertical?.gain_m).toBe(850);
+    expect(out.km_vertical?.distance_m).toBe(12000);
+  });
+
+  it('preserves km_vertical === null', () => {
+    const noKv: StoredTrackDetail = {
+      track: trackSummary,
+      climbs,
+      risk_zones: risks,
+      muros: [],
+      recovery_zones: [],
+      km_vertical: null,
+    };
+    const out = normalizeTrackDetail(noKv);
+    expect(out.km_vertical).toBeNull();
+  });
+
+  it('preserves empty muros and recovery_zones arrays (no undefined elements)', () => {
+    const out = normalizeTrackDetail(detail);
+    expect(out.muros).toEqual([]);
+    expect(out.recovery_zones).toEqual([]);
   });
 });
