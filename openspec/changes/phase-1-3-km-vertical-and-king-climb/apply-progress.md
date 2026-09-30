@@ -73,3 +73,68 @@ PR1 stays within the 400-line limit: 386 authored added lines (generated SQLC fi
 
 - `[ ]` 1.16. CI green on pushed branch (verification only, do not actually push).
 - PR2 tasks 2.1–2.10 remain untouched and unchecked; they are outside this assigned PR1 slice.
+
+## PR2 progress (Web UI)
+
+Branch `feat/phase-1.3-km-vertical-pr2-web` carries the PR2 work.
+Tasks 2.1–2.10 are checked in `tasks.md`. No new migration files;
+PR2 only touches `web/**` per the PR1/PR2 split in the proposal.
+
+### What changed in PR2
+
+- 2.1: `web/src/lib/api/types.ts` — three new interfaces
+  (`GpxMuro`, `GpxRecoveryZone`, `GpxKmVertical`) and three new
+  fields on `StoredTrackDetail` (`muros`, `recovery_zones`,
+  `km_vertical`). Fixtures in `ComparisonMode.test.tsx`,
+  `RouteComparator.test.tsx`, `TrackDetailPage.test.tsx`,
+  `RouteDetailContainer.test.tsx`, and `normalize.test.ts` updated
+  to include empty values so the typecheck stays green.
+- 2.2: `web/src/features/gpx/normalize.ts` — three new
+  Normalized* interfaces, three normalizer helpers, and the
+  `normalizeTrackDetail` extended to forward the three new
+  fields. `km_vertical: null` is preserved (not mapped to `[]`).
+  Tests in `normalize.test.ts` cover populated and null/empty
+  round-trips.
+- 2.3 / 2.4 / 2.5: `web/src/features/gpx/RouteKmVertical/`,
+  `RouteMuros/`, `RouteRecovery/`. Each folder has a `.tsx`
+  production component, a `.module.css` (RouteMuros + RouteRecovery
+  each have an extra `MuroCard.tsx` / `RecoveryCard.tsx`), and a
+  `.test.tsx` with vitest + testing-library. The empty-state
+  testids are `route-km-vertical-empty`, `route-muros-empty`,
+  `route-recovery-empty`; the populated root testids are
+  `route-km-vertical`, `route-muros`, `route-recovery`.
+- 2.6: `RouteDetail.tsx` composes the three new panels. RouteKmVertical
+  sits between RouteMetrics and the columns block (singleton, full
+  width); RouteMuros and RouteRecovery join RouteClimbs and RouteRisks
+  in the columns block. Two new root testids added.
+- 2.7: `RouteDetailContainer.test.tsx` — new pin test asserts the
+  climb-derived data is read from `getGpxTrack` (GET), not from
+  `uploadGpx` (POST). This documents the PR1/PR2 split: the SPA
+  contract for upload is still `Promise<{ id: string }>`.
+- 2.8: confirmed `uploadGpx` in `web/src/lib/api/gpx.ts` still
+  returns `Promise<{ id: string }>`. PR1's wrapper removal did not
+  change the SPA contract.
+- 2.9: local gates (`pnpm typecheck`, `pnpm lint`, `pnpm
+  format:check`, `pnpm build`) all green. `pnpm test:run` cannot
+  be executed locally because of a pre-existing react@19.3.0 /
+  react-dom@19.2.8 version mismatch in `web/package.json`; CI's
+  frontend job (`typecheck + lint + format:check + build`) does
+  not depend on vitest and is unaffected.
+
+### Work-unit commits on PR2 branch
+
+- `feat(web): extend StoredTrackDetail with muros/recovery_zones/km_vertical`
+- `feat(web): extend normalizeTrackDetail with muros/recovery/km_vertical`
+- `feat(web): RouteKmVertical panel for km_vertical singleton`
+- `feat(web): RouteMuros panel + MuroCard subcomponent`
+- `feat(web): RouteRecovery panel + RecoveryCard subcomponent`
+- `feat(web): compose RouteKmVertical + RouteMuros + RouteRecovery in RouteDetail`
+- `test(web): pin 'data arrives via GET, not upload' for climb-derived panels`
+
+### Out of scope for PR2
+
+- Backfill of pre-existing tracks (muros/recovery/km_vertical stay
+  empty for tracks uploaded before PR1 #237). This is explicit in
+  the proposal; per-track re-derivation happens on next re-upload.
+- The pre-existing react/react-dom version mismatch is **not**
+  addressed by PR2 (separate hygiene PR).
