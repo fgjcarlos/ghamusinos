@@ -64,7 +64,14 @@ const climbs: GpxClimb[] = [
 
 const risks: GpxRiskZone[] = [{ start_idx: 30, end_idx: 35, category: 'steep', severity: 0.9 }];
 
-const detail: StoredTrackDetail = { track: trackSummary, climbs, risk_zones: risks };
+const detail: StoredTrackDetail = {
+  track: trackSummary,
+  climbs,
+  risk_zones: risks,
+  muros: [],
+  recovery_zones: [],
+  km_vertical: null,
+};
 
 describe('normalizeTrackDetail', () => {
   it('converts the inner-track id and user_id from pgtype to string', () => {
@@ -91,6 +98,9 @@ describe('normalizeTrackDetail', () => {
       track: signedSummary,
       climbs,
       risk_zones: risks,
+      muros: [],
+      recovery_zones: [],
+      km_vertical: null,
     });
     expect(out.analysis.max_elevation_m).toBe(1500);
     expect(out.analysis.min_elevation_m).toBe(-50);
@@ -106,6 +116,9 @@ describe('normalizeTrackDetail', () => {
       track: noElevSummary,
       climbs,
       risk_zones: risks,
+      muros: [],
+      recovery_zones: [],
+      km_vertical: null,
     });
     expect(out.analysis.max_elevation_m).toBeNull();
   });
@@ -116,6 +129,9 @@ describe('normalizeTrackDetail', () => {
       track: { ...trackSummary, analysis: withCoverage },
       climbs,
       risk_zones: risks,
+      muros: [],
+      recovery_zones: [],
+      km_vertical: null,
     });
     expect(out.analysis.elevation_coverage).toBe(0.87);
 

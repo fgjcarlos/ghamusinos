@@ -58,6 +58,9 @@ function makeDetail(overrides: Partial<GpxTrackSummary['track']> = {}): StoredTr
     },
     climbs: [],
     risk_zones: [],
+    muros: [],
+    recovery_zones: [],
+    km_vertical: null,
   };
 }
 

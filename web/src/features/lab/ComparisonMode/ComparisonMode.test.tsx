@@ -58,6 +58,9 @@ function makeFakeTrack(
     },
     climbs: [],
     risk_zones: [],
+    muros: [],
+    recovery_zones: [],
+    km_vertical: null,
   };
 }
 
