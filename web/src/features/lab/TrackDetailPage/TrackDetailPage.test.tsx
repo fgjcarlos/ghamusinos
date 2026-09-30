@@ -54,6 +54,9 @@ function makeData(overrides: Partial<NormalizedTrackDetail['track']> = {}): Norm
     },
     climbs: [],
     risk_zones: [],
+    muros: [],
+    recovery_zones: [],
+    km_vertical: null,
   };
 }
 

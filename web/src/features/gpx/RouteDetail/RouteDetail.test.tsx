@@ -50,6 +50,9 @@ function makeData(overrides: Partial<NormalizedTrackDetail> = {}): NormalizedTra
       },
     ],
     risk_zones: [{ start_idx: 5, end_idx: 8, category: 'steep', severity: 0.85 }],
+    muros: [],
+    recovery_zones: [],
+    km_vertical: null,
     ...overrides,
   };
 }
