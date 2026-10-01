@@ -112,7 +112,7 @@
 - Resultado esperado: al menos 3 tests verdes: 7-day range con 3 missing → 7 filas con TSS 0 en huecos; `from > to` returns empty sin panic; serie vacía `raw=[]DailyLoad{}` → todas TSS=0.
 - Work-unit commit: `feat(metrics): FillMissingDays UTC-day granularity with no warm-up (#16)`
 
-- [ ] **1.9** — Cobertura `internal/metrics` ≥ 90% (criterion)
+- [x] **1.9** — Cobertura `internal/metrics` ≥ 90% (criterion)
 - Acción: añadir tests adicionales si la cobertura no llega; revisar ramas no cubiertas. Sin código nuevo más allá de tests.
 - Comando de test: `GOTOOLCHAIN=local go test -cover ./internal/metrics/...` (debe mostrar `coverage: ≥ 90.0%`).
 - Resultado esperado: línea de cobertura ≥ 90%; todas las funciones públicas tienen al menos un test.
