@@ -70,16 +70,19 @@ what makes the 4-PR split cheap to review.
 - **Six ported metrics in pure Go** (`internal/metrics/`):
   - `TSSCycling(ftp, durationSec, npWatts)` — TrainingPeaks
     formula.
-  - `TSSRunning(thresholdPaceSecPerKm, durationSec, actualPaceSecPerKm)`
-    — Running Balanced/PI definition.
+  - `TSSRunning(thresholdSecPerKm, durationSec, actualSecPerKm)`
+    — canonical formula: `(durationSec / 3600) ×
+    (thresholdSecPerKm / actualSecPerKm)^2 × 100` (M-002). A
+    faster-than-threshold pace therefore has intensity factor > 1.
   - `IntensityFactor(ftp, npWatts)` — Coggan IF.
   - `GradeAdjustedPace(grade, paceSecPerKm)` — Minetti
     curve, normalized against Strava GAP convention
     (E6 risk).
   - `EfficiencyFactor(npWatts, avgHR)` — Coggan EF.
-  - `CardiacDrift(hrStart, hrEnd)` and
-    `CardiacDriftSeries([]int)` — Minetti/Cardiac-Drift
-    convention (Pauley, Laukkanen).
+  - `CardiacDrift(hrStart, hrEnd)` returns
+    `(HR_end - HR_start) / HR_start × 100` (Pauley convention),
+    with `HR_start <= 0` returning 0; `CardiacDriftSeries([]int)`
+    compares the first- and third-quartile means (M-006).
   - `CTL([]DailyLoad)`, `ATL([]DailyLoad)`, `TSB(ctl, atl)`
     — PMC of Coggan (42-day / 7-day EMA) with empty-day
     fill of `FillMissingDays(from, to, raw) []DailyLoad`
@@ -136,8 +139,9 @@ what makes the 4-PR split cheap to review.
     `web/package.json` as the very first PR4 commit.
   - `G5` enforced: Cardiac Drift panel renders only
     when HR streams exist for the queried range; otherwise
-    the panel is hidden with the empty-state label
-    "necesita streams HR para calcular".
+    the panel is hidden and its parent wrapper or
+    `DashboardSummaryCard` displays "necesita streams HR
+    para calcular".
 - **Tests at every boundary the chain touches**:
   metric unit tests (table-driven with literature
   goldens + degenerate cases), service unit tests
@@ -299,14 +303,18 @@ and are consigned here without rewriting them:
 3. **`internal/metrics/health.go`** —
    `CardiacDrift(hrStart, hrEnd) float64` returns
    `(hrEnd - hrStart) / hrStart * 100` (Pauley
-   convention). `CardiacDriftSeries([]int) float64`
-   averages per-pair across the slice; returns `0`
-   when the slice has fewer than two samples.
+   convention; `hrStart <= 0` returns `0`).
+   `CardiacDriftSeries([]int) float64` compares the first-
+   and third-quartile means; it returns `0` when fewer than
+   two samples are supplied.
 4. **`internal/metrics/fatigue.go`** — `CTL`,
    `ATL`, `TSB`, `FillMissingDays(from, to, raw)`. The
-   empty-day filler guarantees one row per calendar
-   day in `[from, to]` inclusive, with `TSS = 0` for
-   any missing day; downstream EMA never sees a hole.
+   EMA cold-starts at zero with no warm-up: only supplied
+   days are processed, and days before the first activity
+   do not influence the result (M-007). The empty-day
+   filler guarantees one row per calendar day in `[from, to]`
+   inclusive, with `TSS = 0` for any missing day; downstream
+   EMA never sees a hole.
 5. **`internal/metrics/*_test.go`** — table-driven
    per metric with three cases each: golden from
    literature, degenerate (zero / negative inputs),
@@ -562,9 +570,10 @@ and are consigned here without rewriting them:
      `activity_streams` existence via a small
      dedicated endpoint OR via a header in the HR
      zones response; when no HR streams are present,
-     the panel is hidden with the empty-state label
-     "necesita streams HR para calcular". PR4 ships
-     the conditional render and the empty state;
+     the panel is hidden and its parent wrapper or
+     `DashboardSummaryCard` displays "necesita streams HR
+     para calcular". PR4 ships the conditional render and
+     the empty state;
      PR3 does not need to change to accommodate it
      because the panel reads its own dependency.
 5. **Page mount** — `/dashboard` route added to the

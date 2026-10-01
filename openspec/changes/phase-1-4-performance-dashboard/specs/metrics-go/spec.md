@@ -55,12 +55,11 @@ return `0` and SHALL NOT panic.
 
 `internal/metrics/performance.go`
 `TSSRunning(thresholdSecPerKm int, durationSec int, actualSecPerKm int) float64`
-SHALL compute `rTSS = (durationSec × IF²) / 3600 × 100` where
-`IF = actualSecPerKm / thresholdSecPerKm` (lower pace = faster
-= higher IF; the inverted ratio maps to TrainingPeaks Running TSS
-with `vFTP = 1000/thresholdSecPerKm` m/s and `vActual =
-1000/actualSecPerKm` m/s). Inputs `<= 0` MUST return `0` with no
-panic.
+SHALL compute `TSS_running = (durationSec / 3600) ×
+(thresholdSecPerKm / actualSecPerKm)^2 × 100`. The pace ratio
+is the ratio of actual to threshold velocity, expressed using
+seconds per kilometer; therefore a faster-than-threshold pace
+has `IF > 1`. Inputs `<= 0` MUST return `0` with no panic.
 
 **Project root**: `.`
 **Gating test command**: `make test`
@@ -78,7 +77,14 @@ panic.
 - GIVEN `thresholdSecPerKm = 240`, `durationSec = 1200`
   (20 min), `actualSecPerKm = 240`
 - WHEN `TSSRunning(240, 1200, 240)` is invoked
-- THEN it returns a value within float64 tolerance of `50.0`
+- THEN it returns a value within float64 tolerance of `33.333…`
+
+#### Scenario: faster-than-threshold pace yields IF greater than 1
+
+- GIVEN `thresholdSecPerKm = 240` and `actualSecPerKm = 200`
+- WHEN `TSSRunning(240, 3600, 200)` is invoked
+- THEN the pace intensity factor `240 / 200` is greater than `1`
+- AND the returned TSS is greater than `100.0`
 
 ### Requirement: `IntensityFactor` is the Coggan ratio (`M-003`)
 
@@ -123,19 +129,19 @@ since 2018 per the proposal's E6 risk). `grade` is clamped to
 - WHEN `GradeAdjustedPace(0.0, 360)` is invoked
 - THEN it returns a value within float64 tolerance of `360.0`
 
-#### Scenario: grade=+10% roughly doubles the pace (golden)
+#### Scenario: grade=+10% applies the normalized Minetti cost ratio (golden)
 
 - GIVEN `grade = 0.10`, `paceSecPerKm = 360`
 - WHEN `GradeAdjustedPace(0.10, 360)` is invoked
-- THEN it returns a value within float64 tolerance of `720.0`
-  (multiplier ≈ 2.0 on the normalized Minetti curve at g=+0.10)
+- THEN it returns a value within float64 tolerance of `596.8214`
+  (multiplier ≈ 1.65784 on the normalized Minetti curve at g=+0.10)
 
-#### Scenario: grade=-10% roughly halves the pace (golden)
+#### Scenario: grade=-10% applies the normalized Minetti cost ratio (golden)
 
 - GIVEN `grade = -0.10`, `paceSecPerKm = 360`
 - WHEN `GradeAdjustedPace(-0.10, 360)` is invoked
-- THEN it returns a value within float64 tolerance of `162.0`
-  (multiplier ≈ 0.45 on the normalized Minetti curve at g=-0.10)
+- THEN it returns a value within float64 tolerance of `215.1706`
+  (multiplier ≈ 0.59770 on the normalized Minetti curve at g=-0.10)
 
 ### Requirement: `EfficiencyFactor` is the Coggan NP/HR ratio (`M-005`)
 
@@ -186,6 +192,13 @@ dashboard-web `DW-005`; PR1 only ships the math).
 - WHEN `CardiacDrift(100, 110)` is invoked
 - THEN it returns a value within float64 tolerance of `10.0`
 
+#### Scenario: HR_start=0 returns sentinel 0
+
+- GIVEN `hrStart = 0` and `hrEnd = 110`
+- WHEN `CardiacDrift(0, 110)` is invoked
+- THEN it returns `0.0`
+- AND it does NOT panic and does NOT return `NaN`
+
 #### Scenario: empty series returns sentinel 0
 
 - GIVEN `samples = []int{}` (no HR samples available)
@@ -200,26 +213,36 @@ dashboard-web `DW-005`; PR1 only ships the math).
 chronic training load via exponential moving average with
 time constant `TauCTL = 42` days:
 `CTL_t = CTL_{t-1} + (TSS_t − CTL_{t-1}) × (1 − exp(−1/42))`.
-`CTL_0` of an empty series MUST be `0`. `TauCTL` SHALL be
-exported so PR2's service layer can reuse the same constant
-without duplicating the literal.
+An empty series returns `0`. For a non-empty series, the EMA is
+seeded with the first supplied day's TSS and processes subsequent
+supplied daily values using the recurrence above; there is no
+synthetic warm-up. Days before the first supplied activity do not
+influence the result. `TauCTL` SHALL be exported so PR2's service
+layer can reuse the same constant without duplicating the literal.
 
 **Project root**: `.`
 **Gating test command**: `make test`
 **Pin point**: `internal/metrics/fatigue.go` `CTL`, `TauCTL`
 
-#### Scenario: constant TSS=100 over 42 days converges to CTL≈100 (golden)
+#### Scenario: constant TSS=100 over 42 days yields CTL=100 (golden)
 
 - GIVEN a `daily` slice of 42 entries with `TSS = 100` each day
 - WHEN `CTL(daily)` is invoked
 - THEN it returns a value within float64 tolerance of `100.0`
-  (the EMA converges to the constant input after ≥ τ samples)
+  (the EMA is seeded with the first observed daily input)
 
 #### Scenario: empty series returns 0
 
 - GIVEN `daily = []DailyLoad{}`
 - WHEN `CTL(daily)` is invoked
 - THEN it returns `0.0`
+
+#### Scenario: first activity cold-starts the EMA without warm-up
+
+- GIVEN the first activity occurs on day N with `TSS = 100`
+- WHEN `CTL` is invoked with only the daily values beginning on day N
+- THEN day N's CTL is computed from initial zero and that day's TSS
+- AND days before day N do not affect the result
 
 ### Requirement: `ATL` is the 7-day EMA of TSS (`M-008`)
 
@@ -238,7 +261,7 @@ Same initialization and sentinel rules as `CTL`.
 - GIVEN a first `daily[0]` with `TSS = 100` and `ATL(0) = 100`
   followed by 7 entries with `TSS = 0`
 - WHEN the 7-day zero window is applied (full series of 8 days)
-- THEN the resulting ATL is within float64 tolerance of `41.7`
+- THEN the resulting ATL is within float64 tolerance of `36.79`
 
 #### Scenario: empty series returns 0
 

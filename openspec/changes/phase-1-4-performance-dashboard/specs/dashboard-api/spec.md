@@ -192,10 +192,10 @@ include sections
 `training_load_rows: number`,
 `ai: { enabled: boolean }`.
 The header requirement is independent of the DB-OK vs DB-down
-branch (DA-006). This resolves the proposal's G3 decision:
-header-gated extension keeps the public `/healthz` shape
-stable for load balancers and uptime monitors while exposing
-operational detail to internal callers.
+branch (DA-006). A DB failure always returns a degraded body
+including `db.ok = false`, whether or not the header is present.
+This keeps the healthy public `/healthz` shape stable while
+making DB failure explicit.
 
 **Project root**: `.`
 **Gating test command**: `make test`
@@ -229,27 +229,22 @@ operational detail to internal callers.
 
 When the DB ping (shared helper from
 `internal/db/status/`) fails, the handler SHALL return
-`503 Service Unavailable`. The body SHALL be
-`{ "status": "degraded", "db": { "ok": false } }`. When the
-internal header is present, the remaining extended sections
+`503 Service Unavailable` with body
+`{ "status": "degraded", "db": { "ok": false } }`, with or
+without the internal header. The remaining extended sections
 (`strava`, `last_recalc_at`, `training_load_rows`, `ai`) SHALL
-be omitted (or set to `null`) because they depend on DB
-state. When the internal header is absent and the DB is
-down, the public body SHALL still contain `status` and a
-non-failing DB ping would not have allowed the 503 — so the
-public 503 body is `{ "status": "degraded" }` with no other
-keys (or only `db` keys when the header is present).
+be omitted because they depend on DB state.
 
 **Project root**: `.`
 **Gating test command**: `make test`
 **Pin point**: `internal/http/handlers/health.go` degraded branch
 
-#### Scenario: public degraded response carries only status
+#### Scenario: public degraded response reports DB failure
 
 - GIVEN the DB ping returns an error
 - WHEN `GET /healthz` is invoked with no `X-Internal-Health` header
 - THEN the response status is `503`
-- AND the body is `{ "status": "degraded" }` (no extra keys)
+- AND the body is `{ "status": "degraded", "db": { "ok": false } }`
 
 #### Scenario: internal degraded response carries db.ok=false and omits DB-dependent sections
 

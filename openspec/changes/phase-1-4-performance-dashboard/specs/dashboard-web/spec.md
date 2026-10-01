@@ -179,11 +179,12 @@ render the empty-state label (see `DW-006`).
 render only when the dependency check (HR streams present
 for the queried range) resolves to `true`. When the check
 resolves to `false`, the panel MUST be hidden from the DOM
-AND SHALL display (or be replaced by) the empty-state label
-`"necesita streams HR para calcular"` so users understand why
-the drift is missing. This resolves the proposal's G5
-decision: Cardiac Drift is gated by `activity_streams`
-availability, not invented from `avg_hr` alone (E3).
+and its parent wrapper or `DashboardSummaryCard` SHALL display
+the empty-state label `"necesita streams HR para calcular"` so
+users understand why drift is missing. This resolves the
+proposal's G5 decision: Cardiac Drift is gated by
+`activity_streams` availability, not invented from `avg_hr`
+alone (E3).
 
 **Project root**: `web/`
 **Gating test command**: `pnpm -C web test:run`
@@ -206,8 +207,9 @@ availability, not invented from `avg_hr` alone (E3).
 - WHEN `<CardiacDriftPanel>` is rendered (or its parent
   decides whether to mount it)
 - THEN the panel container is NOT in the document
-- AND the empty-state label `"necesita streams HR para
-  calcular"` (testid `cardiac-drift-empty`) IS in the document
+- AND its parent wrapper or summary card displays the empty-state
+  label `"necesita streams HR para calcular"` (testid
+  `cardiac-drift-empty`)
 
 ### Requirement: Empty state for users with no activities yet (`DW-006`)
 

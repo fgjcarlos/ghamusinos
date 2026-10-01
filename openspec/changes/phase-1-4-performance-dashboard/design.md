@@ -28,7 +28,7 @@
 - **Decision:** `X-Internal-Health: 1` solicita secciones ampliadas; el GET sano sin header mantiene `{ "status": "ok" }`.
 - **Rationale:** conserva el contrato público para probes y limita la exposición ordinaria.
 - **Alternatives:** endpoint separado `/healthz/full`; bearer token (mayor coste operativo); respuesta completa pública.
-- **Tradeoffs:** el header es un selector de representación, no una credencial. La red/deploy debe limitar el acceso interno si los datos necesitan protección fuerte. El body de fallo DB público está en conflicto: proposal dice incluir `db.ok=false`, spec DA-006 prescribe solo `status`; cerrar antes de implementar.
+- **Tradeoffs:** el header es un selector de representación, no una credencial. La red/deploy debe limitar el acceso interno si los datos necesitan protección fuerte. Cuando falla el ping DB, ambas representaciones devuelven HTTP 503 con `{ "status": "degraded", "db": { "ok": false } }`; las secciones operativas restantes se omiten.
 
 ### D5 — `POST /api/v1/dashboard/recalc` en PR3 (G4)
 - **Context:** historiales anteriores al recálculo incremental requieren un disparador explícito.
