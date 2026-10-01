@@ -94,7 +94,7 @@
 - Resultado esperado: dos tests verdes; alinea con M-005.
 - Work-unit commit: `feat(metrics): EfficiencyFactor with HR=0 edge case (#16)`
 
-- [ ] **1.6** — CardiacDrift y CardiacDriftSeries (fórmula canónica de P2, alineado con M-006)
+- [x] **1.6** — CardiacDrift y CardiacDriftSeries (fórmula canónica de P2, alineado con M-006)
 - Acción: `internal/metrics/health.go` con dos funciones: `CardiacDrift(hrStart, hrEnd float64) float64` (Pauley convention: `(hrEnd - hrStart) / hrStart * 100`; si `hrStart <= 0` devuelve `0.0` sin panic, sin NaN) y `CardiacDriftSeries(samples []int) float64` (compara la media del primer cuartil vs la media del tercer cuartil — más conservador que first-half vs second-half; evita el warm-up bias). Si `samples` está vacío o tiene menos de 2 muestras, devuelve `0.0`. **NO usar `CardioDriftSeries` con params `(hrStream []int, t, l, h int) (float64, error)`** — esa API estaba en una versión anterior de esta task y NO está en M-006.
 - Comando de test: `GOTOOLCHAIN=local go test ./internal/metrics/... -run CardiacDrift -v`.
 - Resultado esperado: al menos 4 tests verdes: HR 100→110 yields 10%; `CardiacDriftSeries([]int{})` returns `0.0` sin panic; primer cuartil = tercer cuartil yields 0%; HR drift normal ~5%.
