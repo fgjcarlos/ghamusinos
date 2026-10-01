@@ -129,19 +129,19 @@ since 2018 per the proposal's E6 risk). `grade` is clamped to
 - WHEN `GradeAdjustedPace(0.0, 360)` is invoked
 - THEN it returns a value within float64 tolerance of `360.0`
 
-#### Scenario: grade=+10% roughly doubles the pace (golden)
+#### Scenario: grade=+10% applies the normalized Minetti cost ratio (golden)
 
 - GIVEN `grade = 0.10`, `paceSecPerKm = 360`
 - WHEN `GradeAdjustedPace(0.10, 360)` is invoked
-- THEN it returns a value within float64 tolerance of `720.0`
-  (multiplier ≈ 2.0 on the normalized Minetti curve at g=+0.10)
+- THEN it returns a value within float64 tolerance of `596.8214`
+  (multiplier ≈ 1.65784 on the normalized Minetti curve at g=+0.10)
 
-#### Scenario: grade=-10% roughly halves the pace (golden)
+#### Scenario: grade=-10% applies the normalized Minetti cost ratio (golden)
 
 - GIVEN `grade = -0.10`, `paceSecPerKm = 360`
 - WHEN `GradeAdjustedPace(-0.10, 360)` is invoked
-- THEN it returns a value within float64 tolerance of `162.0`
-  (multiplier ≈ 0.45 on the normalized Minetti curve at g=-0.10)
+- THEN it returns a value within float64 tolerance of `215.1706`
+  (multiplier ≈ 0.59770 on the normalized Minetti curve at g=-0.10)
 
 ### Requirement: `EfficiencyFactor` is the Coggan NP/HR ratio (`M-005`)
 

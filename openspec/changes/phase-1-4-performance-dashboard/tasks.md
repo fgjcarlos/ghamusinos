@@ -82,7 +82,7 @@
 - Resultado esperado: tests verdes; edge case divide-by-zero manejado sin panic.
 - Work-unit commit: `feat(metrics): IntensityFactor for cycling and running (#16)`
 
-- [ ] **1.4** — GradeAdjustedPace (Minetti-normalized)
+- [x] **1.4** — GradeAdjustedPace (Minetti-normalized)
 - Acción: `internal/metrics/gap.go` con `GradeAdjustedPace(distanceM, elapsedSec, grade)` aplicando la curva de coste metabólico de Minetti. Tests: llano→pace original, subida 5%→pace equivalente más lento, llano 0%→sin cambio.
 - Comando de test: `GOTOOLCHAIN=local go test ./internal/metrics/... -run GradeAdjusted -v`.
 - Resultado esperado: tres tests verdes; alinea con M-004.
