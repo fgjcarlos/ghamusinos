@@ -14,7 +14,7 @@
 > exploration, proposal, specs y design. Sin estas, las fórmulas divergen
 > entre docs y código.
 
-- [ ] **P0** — Fijar rango `users.running_threshold_sec_per_km` a 120..1800 (G-α)
+- [x] **P0** — Fijar rango `users.running_threshold_sec_per_km` a 120..1800 (G-α)
 - Acción: editar `openspec/changes/phase-1-4-performance-dashboard/exploration.md`, `proposal.md`, `specs/training-load/spec.md` (TL-003) y `design.md` (D2) para alinear 120..1800 (reemplazar menciones 180..1800 en exploration).
 - Comando de test: solo `edit` (sin ejecución).
 - Resultado esperado: `grep -RE "running_threshold_sec_per_km.*(12[0-9]|18[0-9])\.\.1800" openspec/changes/phase-1-4-performance-dashboard/` lista exactamente los cuatro archivos y todos dicen 120..1800.
