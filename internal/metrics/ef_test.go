@@ -7,10 +7,10 @@ import (
 
 func TestEfficiencyFactor(t *testing.T) {
 	for _, tt := range []struct {
-		name string
+		name  string
 		power int
-		hr int
-		want float64
+		hr    int
+		want  float64
 	}{
 		{name: "power over heart rate", power: 200, hr: 150, want: 4.0 / 3.0},
 		{name: "zero heart rate", power: 200, hr: 0, want: 0},

@@ -118,7 +118,7 @@
 - Resultado esperado: línea de cobertura ≥ 90%; todas las funciones públicas tienen al menos un test.
 - Work-unit commit: `test(metrics): raise coverage to ≥ 90% (#16)`
 
-- [ ] **1.10** — `make fmt/vet/test/lint` verde
+- [x] **1.10** — `make fmt/vet/test/lint` verde
 - Acción: ejecutar toolchain completo; resolver cualquier warning de `go vet` o `golangci-lint`. Sin código nuevo.
 - Comando de test: `GOTOOLCHAIN=local make fmt && GOTOOLCHAIN=local make vet && GOTOOLCHAIN=local make test && GOTOOLCHAIN=local make lint`.
 - Resultado esperado: los cuatro comandos exit 0; sin diffs residuales de `gofmt`.

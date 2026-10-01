@@ -7,7 +7,7 @@ import (
 
 func TestGradeAdjustedPace(t *testing.T) {
 	for _, tt := range []struct {
-		name string
+		name  string
 		grade float64
 		pace  float64
 		want  float64

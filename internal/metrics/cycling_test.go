@@ -7,11 +7,11 @@ import (
 
 func TestTSSCycling(t *testing.T) {
 	tests := []struct {
-		name       string
-		ftp        int
-		duration   int
-		np         int
-		want       float64
+		name     string
+		ftp      int
+		duration int
+		np       int
+		want     float64
 	}{
 		{name: "one hour at FTP", ftp: 250, duration: 3600, np: 250, want: 100},
 		{name: "half hour at FTP", ftp: 250, duration: 1800, np: 250, want: 50},

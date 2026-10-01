@@ -7,9 +7,9 @@ import (
 
 func TestCardiacDrift(t *testing.T) {
 	for _, tt := range []struct {
-		name string
+		name       string
 		start, end float64
-		want float64
+		want       float64
 	}{
 		{name: "ten percent drift", start: 100, end: 110, want: 10},
 		{name: "zero start", start: 0, end: 110, want: 0},
@@ -25,9 +25,9 @@ func TestCardiacDrift(t *testing.T) {
 
 func TestCardiacDriftSeries(t *testing.T) {
 	for _, tt := range []struct {
-		name string
+		name    string
 		samples []int
-		want float64
+		want    float64
 	}{
 		{name: "empty", samples: nil, want: 0},
 		{name: "single sample", samples: []int{100}, want: 0},

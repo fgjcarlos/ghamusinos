@@ -7,11 +7,11 @@ import (
 
 func TestTSSRunning(t *testing.T) {
 	tests := []struct {
-		name                   string
-		thresholdSecPerKm      int
-		durationSec            int
-		actualSecPerKm         int
-		want                   float64
+		name              string
+		thresholdSecPerKm int
+		durationSec       int
+		actualSecPerKm    int
+		want              float64
 	}{
 		{name: "one hour at threshold", thresholdSecPerKm: 240, durationSec: 3600, actualSecPerKm: 240, want: 100},
 		{name: "twenty minutes at threshold", thresholdSecPerKm: 240, durationSec: 1200, actualSecPerKm: 240, want: 100.0 / 3.0},
