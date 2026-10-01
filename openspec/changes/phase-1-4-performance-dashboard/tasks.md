@@ -14,7 +14,7 @@
 > exploration, proposal, specs y design. Sin estas, las fórmulas divergen
 > entre docs y código.
 
-- [x] **P0** — Fijar rango `users.running_threshold_sec_per_km` a 120..1800 (G-α)
+- [ ] **P0** — Fijar rango `users.running_threshold_sec_per_km` a 120..1800 (G-α)
 - Acción: editar `openspec/changes/phase-1-4-performance-dashboard/exploration.md`, `proposal.md`, `specs/training-load/spec.md` (TL-003) y `design.md` (D2) para alinear 120..1800 (reemplazar menciones 180..1800 en exploration).
 - Comando de test: solo `edit` (sin ejecución).
 - Resultado esperado: `grep -RE "running_threshold_sec_per_km.*(12[0-9]|18[0-9])\.\.1800" openspec/changes/phase-1-4-performance-dashboard/` lista exactamente los cuatro archivos y todos dicen 120..1800.
@@ -94,23 +94,23 @@
 - Resultado esperado: dos tests verdes; alinea con M-005.
 - Work-unit commit: `feat(metrics): EfficiencyFactor with HR=0 edge case (#16)`
 
-- [ ] **1.6** — CardioDriftSeries (fórmula canónica de P2)
-- Acción: `internal/metrics/cardiac_drift.go` con `CardioDriftSeries(hrStream []int, t, l, h int) (driftPct float64, err error)`. Aplica la fórmula P2: `(HR_end - HR_start) / HR_start × 100`. Edge: `HR_start == 0` → devuelve `0, nil` (no panic, no error). Tests: nominal (drift ~5%), HR_start=0, longitud de stream < h+l → error sentinela.
-- Comando de test: `GOTOOLCHAIN=local go test ./internal/metrics/... -run CardioDrift -v`.
-- Resultado esperado: tres tests verdes; alinea con M-006.
-- Work-unit commit: `feat(metrics): CardioDriftSeries with HR_start=0 edge (#16)`
+- [ ] **1.6** — CardiacDrift y CardiacDriftSeries (fórmula canónica de P2, alineado con M-006)
+- Acción: `internal/metrics/health.go` con dos funciones: `CardiacDrift(hrStart, hrEnd float64) float64` (Pauley convention: `(hrEnd - hrStart) / hrStart * 100`; si `hrStart <= 0` devuelve `0.0` sin panic, sin NaN) y `CardiacDriftSeries(samples []int) float64` (compara la media del primer cuartil vs la media del tercer cuartil — más conservador que first-half vs second-half; evita el warm-up bias). Si `samples` está vacío o tiene menos de 2 muestras, devuelve `0.0`. **NO usar `CardioDriftSeries` con params `(hrStream []int, t, l, h int) (float64, error)`** — esa API estaba en una versión anterior de esta task y NO está en M-006.
+- Comando de test: `GOTOOLCHAIN=local go test ./internal/metrics/... -run CardiacDrift -v`.
+- Resultado esperado: al menos 4 tests verdes: HR 100→110 yields 10%; `CardiacDriftSeries([]int{})` returns `0.0` sin panic; primer cuartil = tercer cuartil yields 0%; HR drift normal ~5%.
+- Work-unit commit: `feat(metrics): CardiacDrift and CardiacDriftSeries canonical (RED→GREEN) (#16)`
 
-- [ ] **1.7** — CTL / ATL / TSB (TauCTL=42, TauATL=7)
-- Acción: `internal/metrics/load.go` con `EBalance(dailyTSS []float64) (ctl, atl, tsb []float64)`. EMA exponencial con τ=42 y τ=7. Tests: TSS constante 100 durante 42 días → CTL≈63.21; TSS 0 → ATL→0 asintótico; TSB = CTL - ATL.
-- Comando de test: `GOTOOLCHAIN=local go test ./internal/metrics/... -run EBalance -v`.
-- Resultado esperado: tres tests verdes; valores numéricos validados con tolerancia 0.5.
-- Work-unit commit: `feat(metrics): CTL/ATL/TSB EBalance with TauCTL=42, TauATL=7 (#16)`
+- [ ] **1.7** — CTL / ATL / TSB con constantes TauCTL=42, TauATL=7 (alineado con M-007, M-008, M-009)
+- Acción: `internal/metrics/fatigue.go` define el tipo `DailyLoad struct { Day time.Time; TSS float64 }` y las funciones `CTL(daily []DailyLoad) float64`, `ATL(daily []DailyLoad) float64`, `TSB(ctl, atl float64) float64`. EMA exponencial con τ=42 (CTL) y τ=7 (ATL): `CTL_t = CTL_{t-1} + (TSS_t − CTL_{t-1}) × (1 − exp(−1/τ))`. Constantes `TauCTL = 42` y `TauATL = 7` **EXPORTADAS** (PR2 las reutiliza). `CTL/ATL([]DailyLoad{})` → `0.0`. **NO usar `EBalance(dailyTSS []float64) (ctl, atl, tsb []float64)`** — esa API estaba en una versión anterior y NO está en M-007/M-008/M-009 (que reciben `[]DailyLoad`, no `[]float64`).
+- Comando de test: `GOTOOLCHAIN=local go test ./internal/metrics/... -run 'CTL|ATL|TSB' -v`.
+- Resultado esperado: al menos 6 tests verdes: TSS=100 constante sobre 42 días → CTL≈100; TSS=100 sobre 7 días → ATL≈100; CTL=42.1, ATL=31.0 → TSB≈11.1; CTL=ATL → TSB=0; serie vacía → 0; TSS=0 cae ATL asintóticamente.
+- Work-unit commit: `feat(metrics): CTL/ATL/TSB with DailyLoad and Tau constants (RED→GREEN) (#16)`
 
-- [ ] **1.8** — FillMissingDays (P5: sin warm-up)
-- Acción: `internal/metrics/load.go` añade `FillMissingDays(from, to time.Time, daily map[string]float64) []Day`. Días sin entrada → 0. La serie resultante se pasa tal cual a EBalance; sin shift ni relleno previo. Tests: hueco de 5 días en medio → 5 ceros; rango vacío → serie vacía; primera actividad en día N → ceros hasta N-1.
-- Comando de test: `GOTOOLCHAIN=local go test ./internal/metrics/... -run FillMissing -v`.
-- Resultado esperado: tres tests verdes; alinea con M-007 (sin warm-up).
-- Work-unit commit: `feat(metrics): FillMissingDays with no-warm-up contract (#16)`
+- [ ] **1.8** — FillMissingDays con `[]DailyLoad` y UTC-day granularity (alineado con M-010 y P5)
+- Acción: `internal/metrics/fatigue.go` añade `FillMissingDays(from, to time.Time, raw []DailyLoad) []DailyLoad`. Devuelve exactamente `(to.Sub(from).Hours()/24) + 1` filas en UTC-day granularity. Días presentes en `raw` se trasladan con su TSS original; días ausentes → TSS=0 (P5: EMA cold-start sin warm-up, la serie resultante va tal cual a CTL/ATL). Si `from > to`, devuelve `nil` o slice vacío sin panic. **NO usar `FillMissingDays(..., map[string]float64) []Day`** — la API canónica recibe `[]DailyLoad` (tipo de M-007), no `map`.
+- Comando de test: `GOTOOLCHAIN=local go test ./internal/metrics/... -run FillMissingDays -v`.
+- Resultado esperado: al menos 3 tests verdes: 7-day range con 3 missing → 7 filas con TSS 0 en huecos; `from > to` returns empty sin panic; serie vacía `raw=[]DailyLoad{}` → todas TSS=0.
+- Work-unit commit: `feat(metrics): FillMissingDays UTC-day granularity with no warm-up (#16)`
 
 - [ ] **1.9** — Cobertura `internal/metrics` ≥ 90% (criterion)
 - Acción: añadir tests adicionales si la cobertura no llega; revisar ramas no cubiertas. Sin código nuevo más allá de tests.
@@ -127,7 +127,7 @@
 - [ ] **1.11** — Commit con conventional commit y push branch
 - Acción: revisar historial; squash si hay commits de "wip"; push a `origin/feat/phase-1.4-pr1-metrics-pure-go`.
 - Comando de test: `git log --oneline -10` (mensajes conventional), `git push -u origin feat/phase-1.4-pr1-metrics-pure-go`.
-- Resultado esperado: branch remoto actualizado; todos los commits del PR1 forman un narrativa coherente (SPEC → TSSCycling → TSSRunning → IF → GAP → EF → Drift → EBalance → FillMissingDays → coverage → fmt/vet).
+- Resultado esperado: branch remoto actualizado; todos los commits del PR1 forman un narrativa coherente (SPEC → TSSCycling → TSSRunning → IF → GAP → EF → CardiacDrift → CTL/ATL/TSB → FillMissingDays → coverage → fmt/vet).
 - Work-unit commit: (no se crea commit nuevo; es la publicación del conjunto).
 
 - [ ] **1.12** — PR abierto contra `main`, CI verde, merge
@@ -196,7 +196,7 @@
 - Acción: worker River con `RecalcTrainingLoadArgs{UserID int64}`, lógica:
   1. Lee `dashboard_metadata` para `last_recalc_at`.
   2. Llama `ComputeDailyLoad` desde `last_recalc_at` (o desde la primera actividad si nulo).
-  3. Llama `FillMissingDays` + `EBalance` (de PR1).
+  3. Llama `FillMissingDays` + `CTL/ATL` (de PR1).
   4. Upsert en `training_load_daily`.
   5. Upsert `dashboard_metadata.last_recalc_at = NOW()` y status=`ok`.
   6. UniqueOpts por `user_id` (E7) para evitar jobs concurrentes.
@@ -218,7 +218,7 @@
 - Work-unit commit: `test(jobs): recalc idempotency (#16)`
 
 - [ ] **2.10** — Tests del worker (mock DB + job runner)
-- Acción: tests unitarios con mock del `DBTX` que verifican la secuencia: leer metadata → ComputeDailyLoad → FillMissingDays+EBalance → upsert training_load_daily → upsert dashboard_metadata. Cubre el caso "no last_recalc_at" → usa primera actividad.
+- Acción: tests unitarios con mock del `DBTX` que verifican la secuencia: leer metadata → ComputeDailyLoad → FillMissingDays+CTL/ATL → upsert training_load_daily → upsert dashboard_metadata. Cubre el caso "no last_recalc_at" → usa primera actividad.
 - Comando de test: `GOTOOLCHAIN=local go test ./internal/jobs/... -run TestWorker -v`.
 - Resultado esperado: secuencia validada; mocks verifican llamadas esperadas.
 - Work-unit commit: `test(jobs): worker sequence with mock DB (#16)`
