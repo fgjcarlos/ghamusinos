@@ -303,14 +303,18 @@ and are consigned here without rewriting them:
 3. **`internal/metrics/health.go`** —
    `CardiacDrift(hrStart, hrEnd) float64` returns
    `(hrEnd - hrStart) / hrStart * 100` (Pauley
-   convention). `CardiacDriftSeries([]int) float64`
-   averages per-pair across the slice; returns `0`
-   when the slice has fewer than two samples.
+   convention; `hrStart <= 0` returns `0`).
+   `CardiacDriftSeries([]int) float64` compares the first-
+   and third-quartile means; it returns `0` when fewer than
+   two samples are supplied.
 4. **`internal/metrics/fatigue.go`** — `CTL`,
    `ATL`, `TSB`, `FillMissingDays(from, to, raw)`. The
-   empty-day filler guarantees one row per calendar
-   day in `[from, to]` inclusive, with `TSS = 0` for
-   any missing day; downstream EMA never sees a hole.
+   EMA cold-starts at zero with no warm-up: only supplied
+   days are processed, and days before the first activity
+   do not influence the result (M-007). The empty-day
+   filler guarantees one row per calendar day in `[from, to]`
+   inclusive, with `TSS = 0` for any missing day; downstream
+   EMA never sees a hole.
 5. **`internal/metrics/*_test.go`** — table-driven
    per metric with three cases each: golden from
    literature, degenerate (zero / negative inputs),

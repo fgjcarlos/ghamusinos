@@ -213,9 +213,12 @@ dashboard-web `DW-005`; PR1 only ships the math).
 chronic training load via exponential moving average with
 time constant `TauCTL = 42` days:
 `CTL_t = CTL_{t-1} + (TSS_t − CTL_{t-1}) × (1 − exp(−1/42))`.
-`CTL_0` of an empty series MUST be `0`. `TauCTL` SHALL be
-exported so PR2's service layer can reuse the same constant
-without duplicating the literal.
+`CTL_0` MUST be `0`, with no warm-up period; days before the
+first supplied activity do not influence the EMA. Equivalently,
+for a series of `n_days`, only the supplied daily values are
+processed (no synthetic pre-history). `TauCTL` SHALL be exported
+so PR2's service layer can reuse the same constant without
+duplicating the literal.
 
 **Project root**: `.`
 **Gating test command**: `make test`
@@ -233,6 +236,13 @@ without duplicating the literal.
 - GIVEN `daily = []DailyLoad{}`
 - WHEN `CTL(daily)` is invoked
 - THEN it returns `0.0`
+
+#### Scenario: first activity cold-starts the EMA without warm-up
+
+- GIVEN the first activity occurs on day N with `TSS = 100`
+- WHEN `CTL` is invoked with only the daily values beginning on day N
+- THEN day N's CTL is computed from initial zero and that day's TSS
+- AND days before day N do not affect the result
 
 ### Requirement: `ATL` is the 7-day EMA of TSS (`M-008`)
 

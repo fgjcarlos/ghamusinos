@@ -44,7 +44,7 @@
 - Resultado esperado: DW-005 incluye scenario "no HR streams → card oculta + texto informativo presente".
 - Work-unit commit: `docs(phase-1-4): add cardiac-drift fallback message contract (#16)`
 
-- [ ] **P5** — EMA sin warm-up (G-ζ)
+- [x] **P5** — EMA sin warm-up (G-ζ)
 - Acción: documentar en `specs/metrics-go/spec.md` (M-007) y `proposal.md` que la EMA arranca con cero hasta tener datos (`today_with_warmup = today + max(0, n_days-1) × 0`); los días previos a la primera actividad no influyen en el cálculo.
 - Comando de test: sin código; validar descripción en spec.
 - Resultado esperado: M-007 incluye scenario "primera actividad en día N → CTL en N se calcula solo con TSS de N".
