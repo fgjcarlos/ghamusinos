@@ -139,8 +139,9 @@ what makes the 4-PR split cheap to review.
     `web/package.json` as the very first PR4 commit.
   - `G5` enforced: Cardiac Drift panel renders only
     when HR streams exist for the queried range; otherwise
-    the panel is hidden with the empty-state label
-    "necesita streams HR para calcular".
+    the panel is hidden and its parent wrapper or
+    `DashboardSummaryCard` displays "necesita streams HR
+    para calcular".
 - **Tests at every boundary the chain touches**:
   metric unit tests (table-driven with literature
   goldens + degenerate cases), service unit tests
@@ -565,9 +566,10 @@ and are consigned here without rewriting them:
      `activity_streams` existence via a small
      dedicated endpoint OR via a header in the HR
      zones response; when no HR streams are present,
-     the panel is hidden with the empty-state label
-     "necesita streams HR para calcular". PR4 ships
-     the conditional render and the empty state;
+     the panel is hidden and its parent wrapper or
+     `DashboardSummaryCard` displays "necesita streams HR
+     para calcular". PR4 ships the conditional render and
+     the empty state;
      PR3 does not need to change to accommodate it
      because the panel reads its own dependency.
 5. **Page mount** — `/dashboard` route added to the

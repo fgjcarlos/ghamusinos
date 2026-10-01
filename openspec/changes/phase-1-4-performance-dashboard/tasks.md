@@ -38,7 +38,7 @@
 - Resultado esperado: ambos scenarios (con y sin header) recogen `db.ok=false` cuando DB caída.
 - Work-unit commit: `docs(phase-1-4): align /healthz degraded semantics across proposal and specs (#16)`
 
-- [ ] **P4** — Cardiac Drift UI: mensaje cuando panel oculto (G-ε)
+- [x] **P4** — Cardiac Drift UI: mensaje cuando panel oculto (G-ε)
 - Acción: documentar en `specs/dashboard-web/spec.md` (DW-005) y `proposal.md` que si `CardiacDriftCard` se oculta del DOM, el `DashboardSummaryCard` o el wrapper muestra un texto "necesita streams HR".
 - Comando de test: sin código; validar copy en spec.
 - Resultado esperado: DW-005 incluye scenario "no HR streams → card oculta + texto informativo presente".
