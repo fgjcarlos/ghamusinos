@@ -77,7 +77,7 @@ has `IF > 1`. Inputs `<= 0` MUST return `0` with no panic.
 - GIVEN `thresholdSecPerKm = 240`, `durationSec = 1200`
   (20 min), `actualSecPerKm = 240`
 - WHEN `TSSRunning(240, 1200, 240)` is invoked
-- THEN it returns a value within float64 tolerance of `50.0`
+- THEN it returns a value within float64 tolerance of `33.333…`
 
 #### Scenario: faster-than-threshold pace yields IF greater than 1
 

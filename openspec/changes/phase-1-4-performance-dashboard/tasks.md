@@ -70,7 +70,7 @@
 - Resultado esperado: tres tests verdes; `go test -cover ./internal/metrics/...` ≥ 80% provisional.
 - Work-unit commit: `feat(metrics): TSSCycling with golden tests (RED→GREEN) (#16)`
 
-- [ ] **1.2** — TSSRunning (fórmula canónica de P1)
+- [x] **1.2** — TSSRunning (fórmula canónica de P1)
 - Acción: implementar `internal/metrics/running.go` con `TSSRunning(durationSec, thresholdSecPerKm, actualPaceSecPerKm)` y tests: 1h@umbral→100, pace más rápido que umbral→TSS>100, pace más lento→TSS<100, duración 0→0. RED→GREEN.
 - Comando de test: `GOTOOLCHAIN=local go test ./internal/metrics/... -run TSSRunning -v`.
 - Resultado esperado: cuatro tests verdes; alineado con M-002 scenario "pace faster than threshold → IF > 1".
