@@ -88,7 +88,7 @@
 - Resultado esperado: tres tests verdes; alinea con M-004.
 - Work-unit commit: `feat(metrics): GradeAdjustedPace Minetti-normalized (#16)`
 
-- [ ] **1.5** — EfficiencyFactor
+- [x] **1.5** — EfficiencyFactor
 - Acción: `internal/metrics/ef.go` con `EfficiencyFactor(np, avgHr)`. Tests: NP=200W, HR=150→EF=1.333; HR=0→EF=0 (no panic).
 - Comando de test: `GOTOOLCHAIN=local go test ./internal/metrics/... -run EfficiencyFactor -v`.
 - Resultado esperado: dos tests verdes; alinea con M-005.
