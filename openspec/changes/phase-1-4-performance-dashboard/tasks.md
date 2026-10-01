@@ -100,7 +100,7 @@
 - Resultado esperado: al menos 4 tests verdes: HR 100→110 yields 10%; `CardiacDriftSeries([]int{})` returns `0.0` sin panic; primer cuartil = tercer cuartil yields 0%; HR drift normal ~5%.
 - Work-unit commit: `feat(metrics): CardiacDrift and CardiacDriftSeries canonical (RED→GREEN) (#16)`
 
-- [ ] **1.7** — CTL / ATL / TSB con constantes TauCTL=42, TauATL=7 (alineado con M-007, M-008, M-009)
+- [x] **1.7** — CTL / ATL / TSB con constantes TauCTL=42, TauATL=7 (alineado con M-007, M-008, M-009)
 - Acción: `internal/metrics/fatigue.go` define el tipo `DailyLoad struct { Day time.Time; TSS float64 }` y las funciones `CTL(daily []DailyLoad) float64`, `ATL(daily []DailyLoad) float64`, `TSB(ctl, atl float64) float64`. EMA exponencial con τ=42 (CTL) y τ=7 (ATL): `CTL_t = CTL_{t-1} + (TSS_t − CTL_{t-1}) × (1 − exp(−1/τ))`. Constantes `TauCTL = 42` y `TauATL = 7` **EXPORTADAS** (PR2 las reutiliza). `CTL/ATL([]DailyLoad{})` → `0.0`. **NO usar `EBalance(dailyTSS []float64) (ctl, atl, tsb []float64)`** — esa API estaba en una versión anterior y NO está en M-007/M-008/M-009 (que reciben `[]DailyLoad`, no `[]float64`).
 - Comando de test: `GOTOOLCHAIN=local go test ./internal/metrics/... -run 'CTL|ATL|TSB' -v`.
 - Resultado esperado: al menos 6 tests verdes: TSS=100 constante sobre 42 días → CTL≈100; TSS=100 sobre 7 días → ATL≈100; CTL=42.1, ATL=31.0 → TSB≈11.1; CTL=ATL → TSB=0; serie vacía → 0; TSS=0 cae ATL asintóticamente.

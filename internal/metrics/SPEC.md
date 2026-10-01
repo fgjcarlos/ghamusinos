@@ -28,7 +28,7 @@ This package implements pure Go functions for phase 1.4. Public signatures and s
 
 ## M-007–M-009 — Training load
 
-`DailyLoad` carries `Day time.Time` and `TSS float64`. `CTL(daily)` and `ATL(daily)` return the final Coggan Performance Management Chart exponential moving average with τ=42 and τ=7 days respectively: `load_t = load_(t−1) + (TSS_t−load_(t−1)) × (1−exp(−1/τ))`. Exported `TauCTL=42` and `TauATL=7` are the shared constants. Both averages cold-start at zero, with no synthetic warm-up; values before the first supplied day do not influence the result. Empty input returns zero. `TSB(ctl, atl)` returns `ctl−atl`. Golden: constant TSS=100 over 42 days yields CTL approximately 100; CTL 42.1 minus ATL 31.0 yields 11.1.
+`DailyLoad` carries `Day time.Time` and `TSS float64`. `CTL(daily)` and `ATL(daily)` return the final Coggan Performance Management Chart exponential moving average with τ=42 and τ=7 days respectively: `load_t = load_(t−1) + (TSS_t−load_(t−1)) × (1−exp(−1/τ))`. Exported `TauCTL=42` and `TauATL=7` are the shared constants. An empty series returns zero; a non-empty EMA is seeded from its first supplied TSS value, with no synthetic warm-up. Values before the first supplied day do not influence the result. `TSB(ctl, atl)` returns `ctl−atl`. Golden: constant TSS=100 over 42 days yields CTL approximately 100; CTL 42.1 minus ATL 31.0 yields 11.1.
 
 ## M-010 — Missing calendar days
 

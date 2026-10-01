@@ -213,23 +213,23 @@ dashboard-web `DW-005`; PR1 only ships the math).
 chronic training load via exponential moving average with
 time constant `TauCTL = 42` days:
 `CTL_t = CTL_{t-1} + (TSS_t − CTL_{t-1}) × (1 − exp(−1/42))`.
-`CTL_0` MUST be `0`, with no warm-up period; days before the
-first supplied activity do not influence the EMA. Equivalently,
-for a series of `n_days`, only the supplied daily values are
-processed (no synthetic pre-history). `TauCTL` SHALL be exported
-so PR2's service layer can reuse the same constant without
-duplicating the literal.
+An empty series returns `0`. For a non-empty series, the EMA is
+seeded with the first supplied day's TSS and processes subsequent
+supplied daily values using the recurrence above; there is no
+synthetic warm-up. Days before the first supplied activity do not
+influence the result. `TauCTL` SHALL be exported so PR2's service
+layer can reuse the same constant without duplicating the literal.
 
 **Project root**: `.`
 **Gating test command**: `make test`
 **Pin point**: `internal/metrics/fatigue.go` `CTL`, `TauCTL`
 
-#### Scenario: constant TSS=100 over 42 days converges to CTL≈100 (golden)
+#### Scenario: constant TSS=100 over 42 days yields CTL=100 (golden)
 
 - GIVEN a `daily` slice of 42 entries with `TSS = 100` each day
 - WHEN `CTL(daily)` is invoked
 - THEN it returns a value within float64 tolerance of `100.0`
-  (the EMA converges to the constant input after ≥ τ samples)
+  (the EMA is seeded with the first observed daily input)
 
 #### Scenario: empty series returns 0
 
@@ -261,7 +261,7 @@ Same initialization and sentinel rules as `CTL`.
 - GIVEN a first `daily[0]` with `TSS = 100` and `ATL(0) = 100`
   followed by 7 entries with `TSS = 0`
 - WHEN the 7-day zero window is applied (full series of 8 days)
-- THEN the resulting ATL is within float64 tolerance of `41.7`
+- THEN the resulting ATL is within float64 tolerance of `36.79`
 
 #### Scenario: empty series returns 0
 
