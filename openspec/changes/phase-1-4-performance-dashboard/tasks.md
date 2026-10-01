@@ -76,7 +76,7 @@
 - Resultado esperado: cuatro tests verdes; alineado con M-002 scenario "pace faster than threshold → IF > 1".
 - Work-unit commit: `feat(metrics): TSSRunning canonical formula with tests (#16)`
 
-- [ ] **1.3** — IntensityFactor
+- [x] **1.3** — IntensityFactor
 - Acción: `internal/metrics/if.go` con `IntensityFactor(np, ftp)` y `IntensityFactorRunning(velocity, thresholdVelocity)`. Tests: NP=FTP→1.0, NP=0.7*FTP→0.7, divide-by-zero→IF=0.
 - Comando de test: `GOTOOLCHAIN=local go test ./internal/metrics/... -run IntensityFactor -v`.
 - Resultado esperado: tests verdes; edge case divide-by-zero manejado sin panic.
