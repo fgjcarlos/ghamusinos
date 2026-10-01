@@ -64,7 +64,7 @@
 - Resultado esperado: SPEC.md enlaza cada fórmula a su requirement (M-002 → TSSRunning, M-006 → CardiacDrift, M-007 → CTL/ATL/TSB).
 - Work-unit commit: `docs(metrics): add SPEC.md anchoring canonical formulas (#16)`
 
-- [ ] **1.1** — TSSCycling con tests golden
+- [x] **1.1** — TSSCycling con tests golden
 - Acción: implementar `internal/metrics/cycling.go` con `TSSCycling(durationSec, ftp, np)` y tests `cycling_test.go` con tres casos golden: 1h@FTP→100, 30min@FTP→50, duración 0→0. RED primero (tests fallan), luego GREEN.
 - Comando de test: `GOTOOLCHAIN=local go test ./internal/metrics/... -run TSSCycling -v`.
 - Resultado esperado: tres tests verdes; `go test -cover ./internal/metrics/...` ≥ 80% provisional.
