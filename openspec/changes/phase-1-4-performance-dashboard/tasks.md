@@ -32,7 +32,7 @@
 - Resultado esperado: M-006 contiene la fórmula, un scenario nominal y un scenario `HR_start=0 → drift=0`.
 - Work-unit commit: `docs(phase-1-4): canonicalize cardiac drift formula and HR_start=0 edge (#16)`
 
-- [ ] **P3** — Resolver `/healthz` degradado (G-δ)
+- [x] **P3** — Resolver `/healthz` degradado (G-δ)
 - Acción: alinear `proposal.md`, `specs/dashboard-api/spec.md` (DA-005, DA-006) y `design.md` (D4). Forma: si DB caída → HTTP 503 con `{status:"degraded", db:{ok:false}}` siempre, con o sin header `X-Internal-Health`. Forma sana con header: `{status:"ok", db:{ok:true}, strava:{...}, last_recalc_at, training_load_rows}`. Forma sana sin header: `{status:"ok"}` con 200.
 - Comando de test: sin código; validar shape de spec DA-005/DA-006.
 - Resultado esperado: ambos scenarios (con y sin header) recogen `db.ok=false` cuando DB caída.
