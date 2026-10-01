@@ -58,7 +58,7 @@
 > comportamiento. Cobertura `internal/metrics` ≥ 90% (criterion merge).
 > Branch base: `main`. Merge strategy: squash al trunk de la cadena (stacked).
 
-- [ ] **1.0** (pre) — Crear `internal/metrics/SPEC.md` con fórmulas y referencias literarias
+- [x] **1.0** (pre) — Crear `internal/metrics/SPEC.md` con fórmulas y referencias literarias
 - Acción: crear `internal/metrics/SPEC.md` referenciando M-001..M-010 y citando las fórmulas canónicas fijadas en P1, P2 y P5. Documentar unidades, bordes y orden de precondición de cada función pública.
 - Comando de test: `git diff --stat internal/metrics/SPEC.md` (archivo nuevo, ~60 líneas).
 - Resultado esperado: SPEC.md enlaza cada fórmula a su requirement (M-002 → TSSRunning, M-006 → CardiacDrift, M-007 → CTL/ATL/TSB).
