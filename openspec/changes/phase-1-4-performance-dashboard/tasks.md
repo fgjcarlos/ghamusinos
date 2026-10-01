@@ -26,7 +26,7 @@
 - Resultado esperado: spec M-002 contiene la fórmula exacta y un scenario "pace faster than threshold → IF > 1".
 - Work-unit commit: `docs(phase-1-4): fix canonical TSSRunning formula and cross-references (#16)`
 
-- [ ] **P2** — Fijar Cardiac Drift canónica (G-γ)
+- [x] **P2** — Fijar Cardiac Drift canónica (G-γ)
 - Acción: documentar la fórmula canónica en `internal/metrics/SPEC.md` (PR1 task 1.0), `specs/metrics-go/spec.md` (M-006) y `proposal.md`. Fórmula: `drift_pct = (HR_end - HR_start) / HR_start × 100`. Edge: `HR_start == 0` → `drift_pct = 0` (no panic).
 - Comando de test: sin código aún; validar que la spec describe el edge case.
 - Resultado esperado: M-006 contiene la fórmula, un scenario nominal y un scenario `HR_start=0 → drift=0`.

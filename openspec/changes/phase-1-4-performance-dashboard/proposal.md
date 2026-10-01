@@ -79,9 +79,10 @@ what makes the 4-PR split cheap to review.
     curve, normalized against Strava GAP convention
     (E6 risk).
   - `EfficiencyFactor(npWatts, avgHR)` — Coggan EF.
-  - `CardiacDrift(hrStart, hrEnd)` and
-    `CardiacDriftSeries([]int)` — Minetti/Cardiac-Drift
-    convention (Pauley, Laukkanen).
+  - `CardiacDrift(hrStart, hrEnd)` returns
+    `(HR_end - HR_start) / HR_start × 100` (Pauley convention),
+    with `HR_start <= 0` returning 0; `CardiacDriftSeries([]int)`
+    compares the first- and third-quartile means (M-006).
   - `CTL([]DailyLoad)`, `ATL([]DailyLoad)`, `TSB(ctl, atl)`
     — PMC of Coggan (42-day / 7-day EMA) with empty-day
     fill of `FillMissingDays(from, to, raw) []DailyLoad`

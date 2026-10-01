@@ -192,6 +192,13 @@ dashboard-web `DW-005`; PR1 only ships the math).
 - WHEN `CardiacDrift(100, 110)` is invoked
 - THEN it returns a value within float64 tolerance of `10.0`
 
+#### Scenario: HR_start=0 returns sentinel 0
+
+- GIVEN `hrStart = 0` and `hrEnd = 110`
+- WHEN `CardiacDrift(0, 110)` is invoked
+- THEN it returns `0.0`
+- AND it does NOT panic and does NOT return `NaN`
+
 #### Scenario: empty series returns sentinel 0
 
 - GIVEN `samples = []int{}` (no HR samples available)
