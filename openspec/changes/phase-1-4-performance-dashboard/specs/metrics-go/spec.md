@@ -55,12 +55,11 @@ return `0` and SHALL NOT panic.
 
 `internal/metrics/performance.go`
 `TSSRunning(thresholdSecPerKm int, durationSec int, actualSecPerKm int) float64`
-SHALL compute `rTSS = (durationSec × IF²) / 3600 × 100` where
-`IF = actualSecPerKm / thresholdSecPerKm` (lower pace = faster
-= higher IF; the inverted ratio maps to TrainingPeaks Running TSS
-with `vFTP = 1000/thresholdSecPerKm` m/s and `vActual =
-1000/actualSecPerKm` m/s). Inputs `<= 0` MUST return `0` with no
-panic.
+SHALL compute `TSS_running = (durationSec / 3600) ×
+(thresholdSecPerKm / actualSecPerKm)^2 × 100`. The pace ratio
+is the ratio of actual to threshold velocity, expressed using
+seconds per kilometer; therefore a faster-than-threshold pace
+has `IF > 1`. Inputs `<= 0` MUST return `0` with no panic.
 
 **Project root**: `.`
 **Gating test command**: `make test`
@@ -79,6 +78,13 @@ panic.
   (20 min), `actualSecPerKm = 240`
 - WHEN `TSSRunning(240, 1200, 240)` is invoked
 - THEN it returns a value within float64 tolerance of `50.0`
+
+#### Scenario: faster-than-threshold pace yields IF greater than 1
+
+- GIVEN `thresholdSecPerKm = 240` and `actualSecPerKm = 200`
+- WHEN `TSSRunning(240, 3600, 200)` is invoked
+- THEN the pace intensity factor `240 / 200` is greater than `1`
+- AND the returned TSS is greater than `100.0`
 
 ### Requirement: `IntensityFactor` is the Coggan ratio (`M-003`)
 

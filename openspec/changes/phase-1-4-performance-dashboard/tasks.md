@@ -20,7 +20,7 @@
 - Resultado esperado: `grep -RE "running_threshold_sec_per_km.*(12[0-9]|18[0-9])\.\.1800" openspec/changes/phase-1-4-performance-dashboard/` lista exactamente los cuatro archivos y todos dicen 120..1800.
 - Work-unit commit: `docs(phase-1-4): align running_threshold_sec_per_km range to 120..1800 (#16)`
 
-- [ ] **P1** — Fijar TSSRunning canónica en proposal+spec+design (G-β)
+- [x] **P1** — Fijar TSSRunning canónica en proposal+spec+design (G-β)
 - Acción: documentar la fórmula canónica en `internal/metrics/SPEC.md` (creado en PR1 task 1.0) y referenciarla en `specs/metrics-go/spec.md` (M-002) y `proposal.md`. Fórmula: `TSS_running = (durationSec / 3600) × (running_pace_threshold_sec_per_km / actual_pace_sec_per_km)^2 × 100`.
 - Comando de test: scenario M-002 alineado en spec; no se ejecuta código aquí.
 - Resultado esperado: spec M-002 contiene la fórmula exacta y un scenario "pace faster than threshold → IF > 1".

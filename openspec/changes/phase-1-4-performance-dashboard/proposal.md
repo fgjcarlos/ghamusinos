@@ -70,8 +70,10 @@ what makes the 4-PR split cheap to review.
 - **Six ported metrics in pure Go** (`internal/metrics/`):
   - `TSSCycling(ftp, durationSec, npWatts)` — TrainingPeaks
     formula.
-  - `TSSRunning(thresholdPaceSecPerKm, durationSec, actualPaceSecPerKm)`
-    — Running Balanced/PI definition.
+  - `TSSRunning(thresholdSecPerKm, durationSec, actualSecPerKm)`
+    — canonical formula: `(durationSec / 3600) ×
+    (thresholdSecPerKm / actualSecPerKm)^2 × 100` (M-002). A
+    faster-than-threshold pace therefore has intensity factor > 1.
   - `IntensityFactor(ftp, npWatts)` — Coggan IF.
   - `GradeAdjustedPace(grade, paceSecPerKm)` — Minetti
     curve, normalized against Strava GAP convention
