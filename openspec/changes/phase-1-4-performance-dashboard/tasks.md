@@ -106,7 +106,7 @@
 - Resultado esperado: al menos 6 tests verdes: TSS=100 constante sobre 42 días → CTL≈100; TSS=100 sobre 7 días → ATL≈100; CTL=42.1, ATL=31.0 → TSB≈11.1; CTL=ATL → TSB=0; serie vacía → 0; TSS=0 cae ATL asintóticamente.
 - Work-unit commit: `feat(metrics): CTL/ATL/TSB with DailyLoad and Tau constants (RED→GREEN) (#16)`
 
-- [ ] **1.8** — FillMissingDays con `[]DailyLoad` y UTC-day granularity (alineado con M-010 y P5)
+- [x] **1.8** — FillMissingDays con `[]DailyLoad` y UTC-day granularity (alineado con M-010 y P5)
 - Acción: `internal/metrics/fatigue.go` añade `FillMissingDays(from, to time.Time, raw []DailyLoad) []DailyLoad`. Devuelve exactamente `(to.Sub(from).Hours()/24) + 1` filas en UTC-day granularity. Días presentes en `raw` se trasladan con su TSS original; días ausentes → TSS=0 (P5: EMA cold-start sin warm-up, la serie resultante va tal cual a CTL/ATL). Si `from > to`, devuelve `nil` o slice vacío sin panic. **NO usar `FillMissingDays(..., map[string]float64) []Day`** — la API canónica recibe `[]DailyLoad` (tipo de M-007), no `map`.
 - Comando de test: `GOTOOLCHAIN=local go test ./internal/metrics/... -run FillMissingDays -v`.
 - Resultado esperado: al menos 3 tests verdes: 7-day range con 3 missing → 7 filas con TSS 0 en huecos; `from > to` returns empty sin panic; serie vacía `raw=[]DailyLoad{}` → todas TSS=0.

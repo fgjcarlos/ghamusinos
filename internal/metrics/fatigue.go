@@ -35,6 +35,32 @@ func TSB(ctl, atl float64) float64 {
 	return ctl - atl
 }
 
+// FillMissingDays returns one row per inclusive UTC calendar date, preserving
+// observed TSS and filling absent days with zero. Reversed ranges are empty.
+func FillMissingDays(from, to time.Time, raw []DailyLoad) []DailyLoad {
+	start := utcDay(from)
+	end := utcDay(to)
+	if start.After(end) {
+		return nil
+	}
+
+	loads := make(map[time.Time]float64, len(raw))
+	for _, entry := range raw {
+		loads[utcDay(entry.Day)] = entry.TSS
+	}
+
+	filled := make([]DailyLoad, 0, int(end.Sub(start).Hours()/24)+1)
+	for day := start; !day.After(end); day = day.AddDate(0, 0, 1) {
+		filled = append(filled, DailyLoad{Day: day, TSS: loads[day]})
+	}
+	return filled
+}
+
+func utcDay(day time.Time) time.Time {
+	day = day.UTC()
+	return time.Date(day.Year(), day.Month(), day.Day(), 0, 0, 0, 0, time.UTC)
+}
+
 func ema(daily []DailyLoad, tau int) float64 {
 	if len(daily) == 0 {
 		return 0
