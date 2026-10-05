@@ -81,6 +81,37 @@ func (q *Queries) GetUserByClerkID(ctx context.Context, clerkUserID string) (Use
 	return i, err
 }
 
+const getUserByID = `-- name: GetUserByID :one
+SELECT id, clerk_user_id, email, display_name, invite_status, hr_max, lthr, ftp, level, running_threshold_sec_per_km, timezone, ai_enabled, created_at, updated_at
+FROM users
+WHERE id = $1
+`
+
+// Carga un usuario por su UUID interno. Usado por el worker
+// RecalcTrainingLoad para leer ftp / running_threshold_sec_per_km /
+// timezone, sin tocar la fila clerk_user_id-based usada por el resolver.
+func (q *Queries) GetUserByID(ctx context.Context, id pgtype.UUID) (User, error) {
+	row := q.db.QueryRow(ctx, getUserByID, id)
+	var i User
+	err := row.Scan(
+		&i.ID,
+		&i.ClerkUserID,
+		&i.Email,
+		&i.DisplayName,
+		&i.InviteStatus,
+		&i.HrMax,
+		&i.Lthr,
+		&i.Ftp,
+		&i.Level,
+		&i.RunningThresholdSecPerKm,
+		&i.Timezone,
+		&i.AiEnabled,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
 const getUserHRMaxByID = `-- name: GetUserHRMaxByID :one
 SELECT hr_max FROM users WHERE id = $1 LIMIT 1
 `

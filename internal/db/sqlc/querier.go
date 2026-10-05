@@ -60,6 +60,10 @@ type Querier interface {
 	// Recupera los tokens OAuth de Strava de un usuario (cifrados).
 	GetStravaTokensByUserID(ctx context.Context, userID pgtype.UUID) (StravaToken, error)
 	GetUserByClerkID(ctx context.Context, clerkUserID string) (User, error)
+	// Carga un usuario por su UUID interno. Usado por el worker
+	// RecalcTrainingLoad para leer ftp / running_threshold_sec_per_km /
+	// timezone, sin tocar la fila clerk_user_id-based usada por el resolver.
+	GetUserByID(ctx context.Context, id pgtype.UUID) (User, error)
 	// Obtiene el hr_max del usuario para cálculos de zonas HR.
 	GetUserHRMaxByID(ctx context.Context, id pgtype.UUID) (pgtype.Int2, error)
 	// The scalar subquery always returns one row. An unknown athlete therefore
