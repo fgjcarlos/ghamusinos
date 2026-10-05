@@ -365,3 +365,35 @@ func TestGetPreferences_ReturnsCurrentValues(t *testing.T) {
 		t.Errorf("expected default empty prefs, got %q", w.Body.String())
 	}
 }
+
+func (m *preferencesMockQuerier) FirstActivityForUser(ctx context.Context, userID pgtype.UUID) (pgtype.Timestamptz, error) {
+	return pgtype.Timestamptz{}, nil
+}
+
+func (m *preferencesMockQuerier) GetDashboardMetadata(ctx context.Context, userID pgtype.UUID) (sqlc.DashboardMetadatum, error) {
+	return sqlc.DashboardMetadatum{}, nil
+}
+
+func (m *preferencesMockQuerier) ListActivitiesInRange(ctx context.Context, arg sqlc.ListActivitiesInRangeParams) ([]sqlc.ListActivitiesInRangeRow, error) {
+	return []sqlc.ListActivitiesInRangeRow{}, nil
+}
+
+func (m *preferencesMockQuerier) ListTrainingLoadFromFirstActivity(ctx context.Context, userID pgtype.UUID) ([]sqlc.TrainingLoadDaily, error) {
+	return []sqlc.TrainingLoadDaily{}, nil
+}
+
+func (m *preferencesMockQuerier) ListTrainingLoadRange(ctx context.Context, arg sqlc.ListTrainingLoadRangeParams) ([]sqlc.TrainingLoadDaily, error) {
+	return []sqlc.TrainingLoadDaily{}, nil
+}
+
+func (m *preferencesMockQuerier) ListUserIDsForTrainingLoadRecalc(ctx context.Context) ([]pgtype.UUID, error) {
+	return nil, nil
+}
+
+func (m *preferencesMockQuerier) UpsertDashboardMetadata(ctx context.Context, arg sqlc.UpsertDashboardMetadataParams) (sqlc.DashboardMetadatum, error) {
+	return sqlc.DashboardMetadatum{}, nil
+}
+
+func (m *preferencesMockQuerier) UpsertTrainingLoadDaily(ctx context.Context, arg sqlc.UpsertTrainingLoadDailyParams) (sqlc.TrainingLoadDaily, error) {
+	return sqlc.TrainingLoadDaily{}, nil
+}

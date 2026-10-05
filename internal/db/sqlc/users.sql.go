@@ -15,7 +15,7 @@ import (
 const createUser = `-- name: CreateUser :one
 INSERT INTO users (clerk_user_id, email, display_name, invite_status)
 VALUES ($1, $2, $3, $4)
-RETURNING id, clerk_user_id, email, display_name, invite_status, hr_max, lthr, ftp, level, timezone, ai_enabled, created_at, updated_at
+RETURNING id, clerk_user_id, email, display_name, invite_status, hr_max, lthr, ftp, level, running_threshold_sec_per_km, timezone, ai_enabled, created_at, updated_at
 `
 
 type CreateUserParams struct {
@@ -43,6 +43,7 @@ func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, e
 		&i.Lthr,
 		&i.Ftp,
 		&i.Level,
+		&i.RunningThresholdSecPerKm,
 		&i.Timezone,
 		&i.AiEnabled,
 		&i.CreatedAt,
@@ -52,7 +53,7 @@ func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, e
 }
 
 const getUserByClerkID = `-- name: GetUserByClerkID :one
-SELECT id, clerk_user_id, email, display_name, invite_status, hr_max, lthr, ftp, level, timezone, ai_enabled, created_at, updated_at
+SELECT id, clerk_user_id, email, display_name, invite_status, hr_max, lthr, ftp, level, running_threshold_sec_per_km, timezone, ai_enabled, created_at, updated_at
 FROM users
 WHERE clerk_user_id = $1
 LIMIT 1
@@ -71,6 +72,7 @@ func (q *Queries) GetUserByClerkID(ctx context.Context, clerkUserID string) (Use
 		&i.Lthr,
 		&i.Ftp,
 		&i.Level,
+		&i.RunningThresholdSecPerKm,
 		&i.Timezone,
 		&i.AiEnabled,
 		&i.CreatedAt,
@@ -129,7 +131,7 @@ SET
     invite_status = $2,
     updated_at    = now()
 WHERE id = $1
-RETURNING id, clerk_user_id, email, display_name, invite_status, hr_max, lthr, ftp, level, timezone, ai_enabled, created_at, updated_at
+RETURNING id, clerk_user_id, email, display_name, invite_status, hr_max, lthr, ftp, level, running_threshold_sec_per_km, timezone, ai_enabled, created_at, updated_at
 `
 
 type UpdateUserInviteStatusParams struct {
@@ -150,6 +152,7 @@ func (q *Queries) UpdateUserInviteStatus(ctx context.Context, arg UpdateUserInvi
 		&i.Lthr,
 		&i.Ftp,
 		&i.Level,
+		&i.RunningThresholdSecPerKm,
 		&i.Timezone,
 		&i.AiEnabled,
 		&i.CreatedAt,
@@ -169,7 +172,7 @@ SET
     ai_enabled = $7,
     updated_at = now()
 WHERE id = $1
-RETURNING id, clerk_user_id, email, display_name, invite_status, hr_max, lthr, ftp, level, timezone, ai_enabled, created_at, updated_at
+RETURNING id, clerk_user_id, email, display_name, invite_status, hr_max, lthr, ftp, level, running_threshold_sec_per_km, timezone, ai_enabled, created_at, updated_at
 `
 
 type UpdateUserPreferencesParams struct {
@@ -206,6 +209,7 @@ func (q *Queries) UpdateUserPreferences(ctx context.Context, arg UpdateUserPrefe
 		&i.Lthr,
 		&i.Ftp,
 		&i.Level,
+		&i.RunningThresholdSecPerKm,
 		&i.Timezone,
 		&i.AiEnabled,
 		&i.CreatedAt,
@@ -220,7 +224,7 @@ SET
     display_name = $2,
     updated_at   = now()
 WHERE id = $1
-RETURNING id, clerk_user_id, email, display_name, invite_status, hr_max, lthr, ftp, level, timezone, ai_enabled, created_at, updated_at
+RETURNING id, clerk_user_id, email, display_name, invite_status, hr_max, lthr, ftp, level, running_threshold_sec_per_km, timezone, ai_enabled, created_at, updated_at
 `
 
 type UpdateUserProfileParams struct {
@@ -241,6 +245,7 @@ func (q *Queries) UpdateUserProfile(ctx context.Context, arg UpdateUserProfilePa
 		&i.Lthr,
 		&i.Ftp,
 		&i.Level,
+		&i.RunningThresholdSecPerKm,
 		&i.Timezone,
 		&i.AiEnabled,
 		&i.CreatedAt,

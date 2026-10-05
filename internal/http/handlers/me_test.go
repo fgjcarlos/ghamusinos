@@ -224,3 +224,35 @@ func (m *mockMeQuerier) ListGPXRiskZonesByTrack(ctx context.Context, trackID pgt
 func (m *mockMeQuerier) ListGPXTracksByUser(ctx context.Context, arg sqlc.ListGPXTracksByUserParams) ([]sqlc.ListGPXTracksByUserRow, error) {
 	return nil, nil
 }
+
+func (m *mockMeQuerier) FirstActivityForUser(ctx context.Context, userID pgtype.UUID) (pgtype.Timestamptz, error) {
+	return pgtype.Timestamptz{}, nil
+}
+
+func (m *mockMeQuerier) GetDashboardMetadata(ctx context.Context, userID pgtype.UUID) (sqlc.DashboardMetadatum, error) {
+	return sqlc.DashboardMetadatum{}, nil
+}
+
+func (m *mockMeQuerier) ListActivitiesInRange(ctx context.Context, arg sqlc.ListActivitiesInRangeParams) ([]sqlc.ListActivitiesInRangeRow, error) {
+	return []sqlc.ListActivitiesInRangeRow{}, nil
+}
+
+func (m *mockMeQuerier) ListTrainingLoadFromFirstActivity(ctx context.Context, userID pgtype.UUID) ([]sqlc.TrainingLoadDaily, error) {
+	return []sqlc.TrainingLoadDaily{}, nil
+}
+
+func (m *mockMeQuerier) ListTrainingLoadRange(ctx context.Context, arg sqlc.ListTrainingLoadRangeParams) ([]sqlc.TrainingLoadDaily, error) {
+	return []sqlc.TrainingLoadDaily{}, nil
+}
+
+func (m *mockMeQuerier) ListUserIDsForTrainingLoadRecalc(ctx context.Context) ([]pgtype.UUID, error) {
+	return nil, nil
+}
+
+func (m *mockMeQuerier) UpsertDashboardMetadata(ctx context.Context, arg sqlc.UpsertDashboardMetadataParams) (sqlc.DashboardMetadatum, error) {
+	return sqlc.DashboardMetadatum{}, nil
+}
+
+func (m *mockMeQuerier) UpsertTrainingLoadDaily(ctx context.Context, arg sqlc.UpsertTrainingLoadDailyParams) (sqlc.TrainingLoadDaily, error) {
+	return sqlc.TrainingLoadDaily{}, nil
+}

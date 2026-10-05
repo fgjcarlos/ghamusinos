@@ -142,86 +142,123 @@
 
 > Budget ~360 LoC. Si excede, split de contingencia en PR2a (schema+queries)
 > y PR2b (worker+hook). TDD para worker (mock DB); SQL validado con
-> `make db-test-migrations` local. Branch base: `main` (post-PR1).
-> Riesgo E9: guard timescaledb en migrations.go.
+> `make migrate` local + tests integration contra el contenedor timescaledb.
+> Branch base: `main` (post-PR1).
 
-- [ ] **2.0** (pre) — Verificar guard timescaledb en `internal/db/migrations.go` (E9)
-- Acción: leer `internal/db/migrations.go` (sí, es código de proyecto, no codebase exploration); confirmar que la lógica de detección de la extensión timescaledb registra warning y no aborta si la extensión no está disponible. Si falta, añadir guard antes de aplicar 00012.
-- Comando de test: `GOTOOLCHAIN=local go test ./internal/db/... -run Migration -v`; inspección manual del guard.
-- Resultado esperado: si la extensión no está, las migraciones se aplican igualmente (tablas planas) y se loggea un warning estructurado.
-- Work-unit commit: `chore(db): harden timescaledb absence guard in migrations (#16)`
+### Ajustes al plan original detectados en la exploración previa (2026-10-01)
 
-- [ ] **2.1** — Migración `00012_training_load_daily.sql`
-- Acción: crear `internal/db/migrations/00012_training_load_daily.sql` con:
-  - `CREATE TABLE training_load_daily (user_id BIGINT NOT NULL, day DATE NOT NULL, ctl DOUBLE PRECISION NOT NULL DEFAULT 0, atl DOUBLE PRECISION NOT NULL DEFAULT 0, tsb DOUBLE PRECISION NOT NULL DEFAULT 0, tss DOUBLE PRECISION NOT NULL DEFAULT 0, updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), PRIMARY KEY (user_id, day));`
-  - `SELECT create_hypertable('training_load_daily', 'day', chunk_time_interval => INTERVAL '7 days', if_not_exists => TRUE);` envuelto en `DO $$ BEGIN ... EXCEPTION WHEN OTHERS THEN RAISE NOTICE 'timescaledb absent, training_load_daily stays plain'; END $$;`
-  - `CREATE INDEX IF NOT EXISTS training_load_daily_user_day_idx ON training_load_daily (user_id, day DESC);`
-  - `CREATE TABLE dashboard_metadata (user_id BIGINT PRIMARY KEY, last_recalc_at TIMESTAMPTZ, last_recalc_status TEXT, last_recalc_error TEXT);`
-  - Sección `Down` simétrica: `DROP TABLE`, `DROP INDEX`, `DROP TABLE dashboard_metadata`.
-- Comando de test: `GOTOOLCHAIN=local make db-test-migrations` (sube Postgres, aplica, verifica esquema, hace rollback, reaplica).
-- Resultado esperado: `db-test-migrations` exit 0; sin warnings críticos; hypertable creada o aviso de timescaledb ausente registrado.
-- Work-unit commit: `feat(db): migration 00012 training_load_daily + dashboard_metadata (#16)`
+Antes de ejecutar PR2 se confirman estos detalles contra `main`:
 
-- [ ] **2.2** — Migración `00013_users_running_threshold.sql` (G-α, G1)
-- Acción: crear `internal/db/migrations/00013_users_running_threshold.sql` con `ALTER TABLE users ADD COLUMN running_threshold_sec_per_km SMALLINT NULL; ALTER TABLE users ADD CONSTRAINT users_running_threshold_chk CHECK (running_threshold_sec_per_km IS NULL OR (running_threshold_sec_per_km BETWEEN 120 AND 1800));`. Down: `DROP CONSTRAINT`, `DROP COLUMN`.
-- Comando de test: `GOTOOLCHAIN=local make db-test-migrations`; `psql ... -c "INSERT INTO users (..., running_threshold_sec_per_km) VALUES (..., 100);"` debe fallar con CHECK violation; valor 200 debe pasar.
-- Resultado esperado: constraint 120..1800 activa; UP y DOWN reversibles.
+- **Tipo de `user_id`**: el codebase ya consolidó `user_id UUID` (no BIGINT como en una versión inicial del plan). PR2 usa UUID.
+- **`schema.sql` es la fuente de sqlc**; las migraciones Goose son la fuente en runtime. Hay que tocar ambos para que `make generate` funcione y las migraciones produzcan el mismo esquema.
+- **`migrations.go` no tiene guard de timescaledb**: la extensión se asume activa por el `docker-compose` y el CI (imagen `timescale/timescaledb:2.27.2-pg16`). Si quisiéramos soportar Postgres "vanilla", añadiríamos un guard. Para PR2, alineamos con el patrón actual: `create_hypertable` envuelto en `DO $$ ... EXCEPTION WHEN undefined_function THEN ...` que cae a tabla normal con `RAISE NOTICE`.
+- **No existe query `ListActivitiesInRange` ni `FirstActivityForUser`** en `internal/db/queries/activities.sql`. Hay que añadirlas.
+- **No existe target `db-test-migrations` en Makefile**; usamos `make migrate` + tests Go integration contra el `docker-compose` o `testcontainers-go`.
+- **`internal/metrics` PR1 firma todas las funciones con `int`** (no float). `ComputeDailyLoad` debe respetar esto: TSS se acumula en `float64` desde los inputs ya en el wrapper.
+
+### Tareas
+
+- [ ] **2.0** (pre) — Verificar contenedor timescaledb arriba y congelar la rama base
+- Acción: `docker compose up -d postgres` (imagen timescale/timescaledb:2.27.2-pg16). `git checkout -b feat/phase-1.4-pr2-timescaledb-recalc main`. Snapshot del HEAD antes del primer commit (anotado en `odd/tasks/phase-1-4-performance-dashboard.md`).
+- Comando de test: `docker compose ps` (running) y `git rev-parse HEAD` (registrado).
+- Resultado esperado: rama creada; Postgres+timescales operativo.
+- Work-unit commit: (sin commit, es un setup).
+
+- [ ] **2.1** — Migración `00012_training_load_daily.sql` (hypertable + dashboard_metadata)
+- Acción: crear `internal/db/migrations/00012_training_load_daily.sql`. Esquema:
+  - `CREATE TABLE training_load_daily (user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE, day DATE NOT NULL, tss DOUBLE PRECISION NOT NULL DEFAULT 0, activity_count INT NOT NULL DEFAULT 0, distance_m DOUBLE PRECISION NOT NULL DEFAULT 0, elevation_gain_m DOUBLE PRECISION NOT NULL DEFAULT 0, computed_at TIMESTAMPTZ NOT NULL DEFAULT now(), PRIMARY KEY (user_id, day));`
+  - `CREATE INDEX IF NOT EXISTS training_load_daily_user_day_desc_idx ON training_load_daily (user_id, day DESC);`
+  - `do $$ begin perform create_hypertable('training_load_daily', 'day', chunk_time_interval => INTERVAL '7 days', if_not_exists => TRUE); exception when undefined_function then raise notice 'timescaledb absent, training_load_daily stays plain'; end $$;` (mantiene portabilidad: si un día se ejecuta contra Postgres vanilla, la tabla sigue funcionando como tabla plana).
+  - `CREATE TABLE dashboard_metadata (user_id UUID PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE, last_recalc_at TIMESTAMPTZ, last_recalc_status TEXT, last_recalc_error TEXT, training_load_rows INT NOT NULL DEFAULT 0, updated_at TIMESTAMPTZ NOT NULL DEFAULT now());`
+  - Down simétrico: `DROP TABLE`, `DROP INDEX`, `DROP TABLE`.
+- Comando de test: `docker compose up -d postgres && make migrate && make migrate-down && make migrate` (round-trip up/down/up). Verificación adicional: `psql ... -c "\d training_load_daily"` muestra la hypertable o el fallback plano; `docker compose exec postgres psql -U ghamusinos -d ghamusinos -c "SELECT count(*) FROM _timescaledb_catalog.hypertable WHERE hypertable_name='training_load_daily';"` (debe devolver 1 si timescale está activa).
+- Resultado esperado: migración forward/backward limpia; tabla existe y la hypertable se crea (o se loggea el notice si la extensión no está).
+- Work-unit commit: `feat(db): migration 00012 training_load_daily hypertable + dashboard_metadata (#16)`
+
+- [ ] **2.2** — Migración `00013_users_running_threshold.sql`
+- Acción: crear `internal/db/migrations/00013_users_running_threshold.sql` con `ALTER TABLE users ADD COLUMN running_threshold_sec_per_km SMALLINT NULL CONSTRAINT users_running_threshold_chk CHECK (running_threshold_sec_per_km IS NULL OR (running_threshold_sec_per_km BETWEEN 120 AND 1800));`. Down: `DROP CONSTRAINT`, `DROP COLUMN`.
+- Comando de test: `make migrate && docker compose exec postgres psql -U ghamusinos -d ghamusinos -c "INSERT INTO users (clerk_user_id, email, running_threshold_sec_per_km) VALUES ('test', 'test@example.com', 100);"` debe fallar con CHECK violation; valor 240 debe pasar.
+- Resultado esperado: constraint 120..1800 activa; UP/DOWN reversibles.
 - Work-unit commit: `feat(db): migration 00013 users.running_threshold_sec_per_km 120..1800 (#16)`
 
-- [ ] **2.3** — `make generate` (sqlc); commit `internal/db/sqlc/*`
-- Acción: actualizar `internal/db/queries.sql` o equivalente para que sqlc incluya las nuevas tablas; ejecutar `make generate`; revisar diff de `internal/db/sqlc/` y `internal/db/sqlc.json` (o el nombre vigente en el repo).
-- Comando de test: `GOTOOLCHAIN=local make generate`; `git diff --stat internal/db/sqlc/`.
-- Resultado esperado: métodos `UpsertTrainingLoadDaily`, `ListTrainingLoadRange`, `ListTrainingLoadFromFirstActivity`, `ListUserIDsForRecalc`, `UpsertDashboardMetadata`, `GetDashboardMetadata` disponibles.
-- Work-unit commit: `feat(db): sqlc generated bindings for training_load + dashboard_metadata (#16)`
+- [ ] **2.3** — Sincronizar `internal/db/schema.sql` con migraciones 00012 + 00013
+- Acción: añadir a `internal/db/schema.sql` las definiciones equivalentes de `training_load_daily`, `dashboard_metadata` y la columna `users.running_threshold_sec_per_km`. `schema.sql` es la fuente que sqlc lee para generar bindings, por lo que debe coincidir con el estado migrado.
+- Comando de test: `grep -n "training_load_daily\|dashboard_metadata\|running_threshold_sec_per_km" internal/db/schema.sql` lista las 3 ocurrencias.
+- Resultado esperado: sqlc generará los modelos y queries esperados.
+- Work-unit commit: `feat(db): sync schema.sql with 00012/00013 for sqlc (#16)`
 
-- [ ] **2.4** — `internal/db/queries/training_load.sql`
-- Acción: crear queries sqlc: `UpsertTrainingLoadDaily`, `ListTrainingLoadRange (user_id, from, to)`, `ListTrainingLoadFromFirstActivity (user_id)`, `ListUserIDsForRecalc`.
-- Comando de test: `GOTOOLCHAIN=local make generate` + `GOTOOLCHAIN=local go test ./internal/db/... -v`.
-- Resultado esperado: queries compilan; tests de sqlc integration verdes.
-- Work-unit commit: `feat(db): training_load queries (upsert/list/listFromFirst/listUsers) (#16)`
+- [ ] **2.4** — Queries sqlc: `internal/db/queries/training_load.sql` + `dashboard_metadata.sql` + `activities_ext.sql`
+- Acción: crear tres archivos de queries:
+  - `training_load.sql`: `UpsertTrainingLoadDaily :one`, `ListTrainingLoadRange :many` (user_id, from, to orden ascendente), `ListTrainingLoadFromFirstActivity :many` (user_id; para la primera actividad del usuario hasta hoy), `ListUserIDsForTrainingLoadRecalc :many` (user_id distinto).
+  - `dashboard_metadata.sql`: `UpsertDashboardMetadata :one`, `GetDashboardMetadata :one`, `IncrementDashboardMetadataRows :exec` (SUM +1 por recalc), `SetDashboardMetadataRecalcStatus :exec`.
+  - `activities_ext.sql`: `ListActivitiesInRange :many` (user_id, from, to — solo campos necesarios para TSS), `FirstActivityForUser :one` (MIN(started_at) por user_id).
+- Comando de test: `make generate` (regenera `internal/db/sqlc/`); `git diff --stat internal/db/sqlc/` debe listar los nuevos archivos `training_load.sql.go`, `dashboard_metadata.sql.go`, `activities_ext.sql.go` con los nombres correctos.
+- Resultado esperado: sqlc genera bindings; tests de sqlc existentes siguen verdes.
+- Work-unit commit: `feat(db): sqlc queries for training_load + dashboard_metadata + activities_ext (#16)`
 
-- [ ] **2.5** — `internal/db/queries/dashboard_metadata.sql`
-- Acción: crear queries sqlc: `UpsertDashboardMetadata`, `GetDashboardMetadata (user_id)`.
-- Comando de test: `GOTOOLCHAIN=local make generate`; test de round-trip insert+get.
-- Resultado esperado: dos queries compiladas; round-trip verde.
-- Work-unit commit: `feat(db): dashboard_metadata queries (upsert/get) (#16)`
+- [ ] **2.5** — `internal/metrics/training_load.go` (ComputeDailyLoad — orquestador)
+- Acción: capa de servicio, no pura. Tipo `ComputeDailyLoadDeps { Queries ActivityRangeQuerier; ActivityLoader ...; ... }`. Función `ComputeDailyLoad(ctx context.Context, deps ComputeDailyLoadDeps, userID pgtype.UUID, from, to time.Time) ([]metrics.DailyLoad, error)`:
+  1. Carga actividades del usuario en el rango.
+  2. Por cada actividad: detecta sport_type (cycling/running/otro); calcula TSS usando `metrics.TSSCycling(ftp, durationSec, np)` o `metrics.TSSRunning(thresholdSecPerKm, durationSec, actualSecPerKm)`. `np` ≈ `avg_power` si existe; si no, `IF = distance/(elapsed/3600)` y se deriva `np ≈ FTP * IF` (fallback documentado). Para running, `actualSecPerKm = elapsedSec / (distanceKm)` si hay distancia; si no, omite la actividad (sin pace no se calcula TSS running).
+  3. Para "otros" deportes (Walk, Hike, Swim): TSS no se calcula en PR2; se cuentan en `activity_count` pero no en `tss` total (devuelve 0 TSS diario). Documentado en godoc.
+  4. Agrupa por día UTC usando `metrics.FillMissingDays` (PR1).
+- Tests:
+  - `TestComputeDailyLoad_CyclingTSS` con 2 actividades cycling mismo día: TSS agregado correcto.
+  - `TestComputeDailyLoadRunningWithoutFTP` con 1 actividad running con `users.ftp=NULL` → TSS=0 sentinel (no panic).
+  - `TestComputeDailyLoadGroupsByDay` con 3 actividades distribuidas en 2 días: 2 filas.
+  - `TestComputeDailyLoadSkipsOtherSports` (Walk): TSS=0, activity_count>0.
+  - Mock de las queries (interface `ActivityRangeQuerier`).
+- Comando de test: `GOTOOLCHAIN=local go test ./internal/metrics/... -run ComputeDailyLoad -v`.
+- Resultado esperado: 4 tests verdes; cobertura de la rama.
+- Work-unit commit: `feat(metrics): ComputeDailyLoad service aggregator with mocked queries (#16)`
 
-- [ ] **2.6** — `internal/metrics/training_load.go` (ComputeDailyLoad — servicio)
-- Acción: implementar `ComputeDailyLoad(ctx, userID, since time.Time) (map[time.Time]float64, error)` que agrega TSS por día (cycling+running) usando `internal/db/queries/activity.sql` existente. Es un orquestador, no función pura: depende de DB.
-- Comando de test: `GOTOOLCHAIN=local go test ./internal/metrics/... -run TestComputeDailyLoad -v` (con sqlc mock o testcontainers; el patrón de 1.3 indica preferencia por sqlc con DB de tests).
-- Resultado esperado: función verde con fixture de 3 actividades distribuidas en 2 días; TSS agregado por día.
-- Work-unit commit: `feat(metrics): ComputeDailyLoad service aggregator (#16)`
-
-- [ ] **2.7** — `internal/jobs/recalc_training_load.go`
-- Acción: worker River con `RecalcTrainingLoadArgs{UserID int64}`, lógica:
-  1. Lee `dashboard_metadata` para `last_recalc_at`.
-  2. Llama `ComputeDailyLoad` desde `last_recalc_at` (o desde la primera actividad si nulo).
-  3. Llama `FillMissingDays` + `CTL/ATL` (de PR1).
-  4. Upsert en `training_load_daily`.
-  5. Upsert `dashboard_metadata.last_recalc_at = NOW()` y status=`ok`.
-  6. UniqueOpts por `user_id` (E7) para evitar jobs concurrentes.
-  Tests: mock DB; job idempotente; segunda ejecución con mismo input no duplica filas.
-- Comando de test: `GOTOOLCHAIN=local go test ./internal/jobs/... -run RecalcTrainingLoad -v`.
-- Resultado esperado: tests verdes; UniqueOpts configurado.
+- [ ] **2.6** — `internal/jobs/recalc_training_load.go` (River worker)
+- Acción: tipos `RecalcTrainingLoadArgs{UserID string; From *time.Time; To *time.Time}` con `Kind() = "recalc_training_load"`. Worker:
+  1. Parsea `userID` a `pgtype.UUID`.
+  2. Lee `dashboard_metadata`; si no hay `last_recalc_at`, llama `FirstActivityForUser` y usa esa fecha como `from`. Si tampoco hay primera actividad, termina con status=`ok` (sin filas).
+  3. `ComputeDailyLoad` desde `from` hasta `now`.
+  4. Aplica `FillMissingDays` + `CTL/ATL` (PR1).
+  5. Upsert por día en `training_load_daily`.
+  6. Upsert `dashboard_metadata` con `last_recalc_at=now`, `status='ok'`, `training_load_rows=SUM(count)`.
+  7. En caso de error, `status='error'` + `last_recalc_error=err.Error()`.
+  8. `UniqueOpts{ByArgs: true, Period: 1 * time.Minute}` (E7-ish, evita runs concurrentes del mismo user).
+- Tests:
+  - `TestRecalcTrainingLoadWorker_FirstRun` (sin metadata → usa primera actividad).
+  - `TestRecalcTrainingLoadWorker_NoActivities` (sin actividades → status ok, 0 filas).
+  - `TestRecalcTrainingLoadWorker_Idempotent` (segunda ejecución: no duplica filas; `last_recalc_at` se actualiza; `training_load_rows` estable si no hay nuevas actividades).
+  - `TestRecalcTrainingLoadWorker_RecordsError`.
+- Mock: `TrainingLoadStore`, `ActivityRangeQuerier`, `DashboardMetadataStore`, `MetricsComputer` (interface; el wrapper de `ComputeDailyLoad`).
+- Comando de test: `GOTOOLCHAIN=local go test ./internal/jobs/... -run RecalcTraining -v`.
+- Resultado esperado: 4 tests verdes; CTL/ATL/TSB coherentes con PR1.
 - Work-unit commit: `feat(jobs): RecalcTrainingLoad River worker with UniqueOpts (#16)`
 
-- [ ] **2.8** — Hook post-UpsertActivity en `internal/strava/oauth_sqlc.go`
-- Acción: en la función que persiste una actividad Strava, encolar `RecalcTrainingLoadArgs{UserID}` con River tras el upsert. Ventana de dedupe día ± 3: si en los últimos 3 días ya se encoló un recalc para este usuario, omitir (G-δ, E7).
-- Comando de test: `GOTOOLCHAIN=local go test ./internal/strava/... -run TestUpsertActivityEnqueuesRecalc -v`.
-- Resultado esperado: actividad nueva → job encolado; segunda actividad del mismo usuario en la misma ventana → segundo job omitido por UniqueOpts.
-- Work-unit commit: `feat(strava): enqueue RecalcTrainingLoad on activity upsert (window ±3d) (#16)`
+- [ ] **2.7** — Registrar worker en `NewRiverWorkers`
+- Acción: en `internal/jobs/workers.go`, instanciar `NewRecalcTrainingLoadWorker` con las deps (queries + config); añadir `river.AddWorker(workers, w)` y pasar la nueva `RiverArgs` al registrar en `cmd/ghamusinos` (la fila "IngestActivityEvent" ya hace lo mismo). Sin Strava-bound: este se registra siempre (no depende de Strava).
+- Comando de test: `GOTOOLCHAIN=local go build ./cmd/ghamusinos` (compila); `grep -n "recalc_training_load\|RecalcTrainingLoad" internal/jobs/workers.go` debe listar el binding.
+- Resultado esperado: worker registrado; startup log lo muestra.
+- Work-unit commit: `feat(jobs): register RecalcTrainingLoad worker in NewRiverWorkers (#16)`
 
-- [ ] **2.9** — Tests de idempotencia
-- Acción: test integration que ejecuta `RecalcTrainingLoad` dos veces con el mismo set de actividades; verifica que `COUNT(*)` de `training_load_daily` no crece y los valores CTL/ATL/TSB son idénticos.
-- Comando de test: `GOTOOLCHAIN=local go test ./internal/jobs/... -run TestRecalcIdempotency -v` (con DB de tests).
-- Resultado esperado: dos ejecuciones producen mismos rows; `last_recalc_at` se actualiza en ambas pero no genera drift.
-- Work-unit commit: `test(jobs): recalc idempotency (#16)`
+- [ ] **2.8** — Encolar recalc desde post-`UpsertActivity`
+- Acción: en `internal/jobs/workers.go` (función `Work` del `BackfillStravaActivitiesWorker` y `IngestActivityEventWorker`), tras un upsert exitoso, encolar `RecalcTrainingLoadArgs{UserID: userID.String()}` con `UniqueOpts{Period: 1 * time.Minute}` para evitar ráfagas (E7). Esto cubre backfill inicial e ingesta por webhook.
+- Tests: añadir a `backfill_test.go` y/o nuevo `strava_test.go` un test que verifique que tras upsert se llama al river inserter con los args correctos. Usar el mock `fakeRiverJobInserter` (ya existe en `river_test.go`) extendido.
+- Comando de test: `GOTOOLCHAIN=local go test ./internal/jobs/... -run TestEnqueuesRecalc -v`.
+- Resultado esperado: 2 tests verdes (uno por worker que upsertea); idempotente bajo ráfaga.
+- Work-unit commit: `feat(jobs): enqueue RecalcTrainingLoad on activity upsert (webhook + backfill) (#16)`
 
-- [ ] **2.10** — Tests del worker (mock DB + job runner)
-- Acción: tests unitarios con mock del `DBTX` que verifican la secuencia: leer metadata → ComputeDailyLoad → FillMissingDays+CTL/ATL → upsert training_load_daily → upsert dashboard_metadata. Cubre el caso "no last_recalc_at" → usa primera actividad.
-- Comando de test: `GOTOOLCHAIN=local go test ./internal/jobs/... -run TestWorker -v`.
-- Resultado esperado: secuencia validada; mocks verifican llamadas esperadas.
-- Work-unit commit: `test(jobs): worker sequence with mock DB (#16)`
+- [ ] **2.9** — Tests integration: idempotencia contra Postgres+timescale
+- Acción: test integration `internal/jobs/recalc_training_load_integration_test.go` con `//go:build integration` (mismo patrón que `webhook_integration_test.go`) que:
+  1. Crea user + 2 actividades.
+  2. Ejecuta `RecalcTrainingLoad` 2 veces.
+  3. Verifica `COUNT(*) FROM training_load_daily WHERE user_id=$1` igual entre ambas; valores CTL/ATL/TSB idénticos.
+- Comando de test: `GOTOOLCHAIN=local go test -tags=integration ./internal/jobs/... -run TestRecalcIdempotency -v`.
+- Resultado esperado: idempotente bajo runs repetidos.
+- Work-unit commit: `test(jobs): recalc_training_load idempotency integration (#16)`
+
+- [ ] **2.10** — Tests del worker (mock DB + job runner, sin Postgres)
+- Acción: ya cubiertos por 2.6 (4 tests con mocks). Verificar que `TestWorkerSequence` (mock) cubre la cadena: leer metadata → ComputeDailyLoad → FillMissingDays+CTL/ATL → upsert training_load_daily → upsert dashboard_metadata.
+- Comando de test: `GOTOOLCHAIN=local go test ./internal/jobs/... -run TestWorkerSequence -v`.
+- Resultado esperado: secuencia validada con mocks.
+- Work-unit commit: (parte de 2.6; commit adicional solo si se necesita otro test independiente).
 
 - [ ] **2.11** — `make fmt/vet/test/lint` verde
 - Acción: ejecutar toolchain completo; resolver warnings.
@@ -229,28 +266,17 @@
 - Resultado esperado: los cuatro exit 0.
 - Work-unit commit: `chore(db): make fmt/vet/test/lint clean (#16)`
 
-- [ ] **2.12** — PR merge
-- Acción: `gh pr create --base main --head feat/phase-1.4-pr2-timescaledb-recalc`; esperar CI verde (Postgres+timescaledb en CI); squash & merge.
+- [ ] **2.12** — PR abierto contra `main`, CI verde, merge
+- Acción: `gh pr create --base main --head feat/phase-1.4-pr2-timescaledb-recalc --title "feat(db+jobs): training_load_daily + RecalcTrainingLoad worker (PR2/4)" --body-file .github/pr-templates/phase-1-4-pr2.md`. Esperar CI verde (Postgres+timescale). Squash & merge a `main`.
 - Comando de test: `gh pr checks` (todos en verde), `gh pr view --json state` (`MERGED`).
 - Resultado esperado: PR mergeado; `main` contiene migraciones 00012 y 00013, sqlc bindings, worker y hook.
 - Work-unit commit: (merge commit).
 
 > **Contingencia split PR2a/PR2b**: si el diff de PR2 > 400 LoC, dividir en
-> PR2a (`feat/phase-1.4-pr2a-schema-queries`: tasks 2.0–2.5) y PR2b
-> (`feat/phase-1.4-pr2b-worker-hook`: tasks 2.6–2.12), ambos stacked
-> sobre `main`. Si se activa, las tasks 2.6–2.12 se renumeran 2b.1–2b.7 y
+> PR2a (`feat/phase-1.4-pr2a-schema-queries`: tasks 2.0–2.4) y PR2b
+> (`feat/phase-1.4-pr2b-worker-hook`: tasks 2.5–2.12), ambos stacked
+> sobre `main`. Si se activa, las tasks 2.5–2.12 se renumeran 2b.1–2b.7 y
 > 2.5–2.11 siguen el patrón 1.10/1.12.
-
----
-
-## PR3 — `feat/phase-1.4-pr3-api-dashboard` (handlers + /healthz)
-
-> Budget ~350 LoC. TDD con `httptest` por endpoint. Branch base: `main`
-> (post-PR2). Acepta header `X-Internal-Health: 1` para `/healthz` extendido.
-
-- [ ] **3.1** — `internal/http/handlers/dashboard.go` (esqueleto)
-- Acción: crear archivo con cuatro handlers `DashboardSummary`, `DashboardLoad`, `DashboardHRZones`, `DashboardRecalc`; firma y dependencias por constructor (DI). Sin lógica de negocio aún.
-- Comando de test: `GOTOOLCHAIN=local go build ./internal/http/...` (compila sin lógica).
 - Resultado esperado: compilación verde; esqueleto listo para TDD por endpoint.
 - Work-unit commit: `feat(http): dashboard handlers skeleton (#16)`
 

@@ -30,6 +30,10 @@ type Querier interface {
 	DeleteStravaTokensByUserID(ctx context.Context, userID pgtype.UUID) error
 	// Return the existing row when Strava retries the same natural event key.
 	EnqueueActivityEvent(ctx context.Context, arg EnqueueActivityEventParams) (ActivityEvent, error)
+	// Fecha de la primera actividad del usuario. RecalcTrainingLoad la usa
+	// cuando dashboard_metadata.last_recalc_at es NULL para acotar la
+	// ventana inicial del recálculo.
+	FirstActivityForUser(ctx context.Context, userID pgtype.UUID) (pgtype.Timestamptz, error)
 	// Devuelve la invitación vigente para un email dado.
 	// "Vigente" significa: status pending o accepted, y no expirada
 	// (expires_at es NULL o está en el futuro).
@@ -42,6 +46,10 @@ type Querier interface {
 	GetActivityByExternalID(ctx context.Context, arg GetActivityByExternalIDParams) (Activity, error)
 	// Load an event by the internal UUID passed to IngestActivityEventWorker.
 	GetActivityEventByID(ctx context.Context, id pgtype.UUID) (ActivityEvent, error)
+	// Lee la fila de metadata del usuario. Si nunca se ejecutó un recalc,
+	// la fila no existe; el handler /healthz extendido debe distinguir "sin
+	// metadata" (status=`never`) de "último recalc falló" (status=`error`).
+	GetDashboardMetadata(ctx context.Context, userID pgtype.UUID) (DashboardMetadatum, error)
 	GetGPXKmVerticalByTrack(ctx context.Context, trackID pgtype.UUID) (GpxKmVertical, error)
 	GetGPXTrackByHash(ctx context.Context, arg GetGPXTrackByHashParams) (GpxTrack, error)
 	GetGPXTrackByID(ctx context.Context, arg GetGPXTrackByIDParams) (GpxTrack, error)
@@ -70,6 +78,11 @@ type Querier interface {
 	// (es el mismo para todas). issue #172, M6 — antes el handler
 	// devolvía `offset + len(rows) (+ 1 si has_next)`, que no es un total.
 	ListActivitiesByUser(ctx context.Context, arg ListActivitiesByUserParams) ([]ListActivitiesByUserRow, error)
+	// Actividades de un usuario en un rango temporal, ordenadas ascendente.
+	// Solo columnas necesarias para ComputeDailyLoad: cada actividad se
+	// convierte en una entrada de TSS diario. Mantener la proyección
+	// estrecha evita cargar JSONB en el worker de recálculo.
+	ListActivitiesInRange(ctx context.Context, arg ListActivitiesInRangeParams) ([]ListActivitiesInRangeRow, error)
 	ListGPXClimbsByTrack(ctx context.Context, trackID pgtype.UUID) ([]GpxClimb, error)
 	ListGPXMurosByTrack(ctx context.Context, trackID pgtype.UUID) ([]GpxMuro, error)
 	ListGPXRecoveryZonesByTrack(ctx context.Context, trackID pgtype.UUID) ([]GpxRecoveryZone, error)
@@ -83,6 +96,17 @@ type Querier interface {
 	ListPendingActivityEvents(ctx context.Context, limit int32) ([]ActivityEvent, error)
 	// Lista las sesiones de sincronización del usuario, más recientes primero.
 	ListSyncSessionsByUser(ctx context.Context, arg ListSyncSessionsByUserParams) ([]SyncSession, error)
+	// Serie completa desde la primera actividad hasta hoy. Usada por el job
+	// RecalcTrainingLoad cuando no hay `last_recalc_at` registrado.
+	ListTrainingLoadFromFirstActivity(ctx context.Context, userID pgtype.UUID) ([]TrainingLoadDaily, error)
+	// Serie diaria en orden cronológico ascendente. Útil para CTL/ATL/TSB
+	// dashboards: si el rango es anterior a la primera actividad, devuelve 0
+	// filas (el handler rellena con FillMissingDays, issue #16).
+	ListTrainingLoadRange(ctx context.Context, arg ListTrainingLoadRangeParams) ([]TrainingLoadDaily, error)
+	// Para un job fan-out (futuro): lista todos los user_id con actividades
+	// que requieren recálculo. PR2 no la usa; queda cableada para PR3 o un
+	// job cron. Mantenerla aquí evita un nuevo PR cuando se encienda.
+	ListUserIDsForTrainingLoadRecalc(ctx context.Context) ([]pgtype.UUID, error)
 	// Marca un evento como procesado una vez consumido por el job.
 	MarkActivityEventProcessed(ctx context.Context, id pgtype.UUID) error
 	MarkInviteAccepted(ctx context.Context, id pgtype.UUID) error
@@ -103,6 +127,9 @@ type Querier interface {
 	// Guarda/actualiza un stream concreto de una actividad (HR, watts, ...).
 	// PRIMARY KEY (activity_id, stream_type) hace el upsert natural.
 	UpsertActivityStream(ctx context.Context, arg UpsertActivityStreamParams) (ActivityStream, error)
+	// Inserta o actualiza la fila completa. El campo `training_load_rows`
+	// lo mantiene el caller (lo cuenta antes o lo deja en su valor previo).
+	UpsertDashboardMetadata(ctx context.Context, arg UpsertDashboardMetadataParams) (DashboardMetadatum, error)
 	UpsertGPXKmVertical(ctx context.Context, arg UpsertGPXKmVerticalParams) (GpxKmVertical, error)
 	// Idempotente por PK activity_id. Upsert de zonas HR calculadas.
 	UpsertHRZones(ctx context.Context, arg UpsertHRZonesParams) (HrZone, error)
@@ -110,6 +137,10 @@ type Querier interface {
 	// Strava solo permite un set de tokens activo por usuario; ON CONFLICT cubre
 	// el caso "usuario reconecta" y el refresh que rota access_token.
 	UpsertStravaTokens(ctx context.Context, arg UpsertStravaTokensParams) (StravaToken, error)
+	// Idempotente. Inserta o actualiza la fila diaria de training load para
+	// (user_id, day). El caller calcula CTL/ATL/TSB; aquí solo persiste TSS +
+	// KPI crudos.
+	UpsertTrainingLoadDaily(ctx context.Context, arg UpsertTrainingLoadDailyParams) (TrainingLoadDaily, error)
 }
 
 var _ Querier = (*Queries)(nil)
