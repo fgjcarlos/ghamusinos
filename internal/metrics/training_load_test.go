@@ -266,8 +266,8 @@ func uuidString(v int) string {
 		out[i] = hex[0]
 	}
 	// last group encodes the int v in hex
-	vstr := []byte("")
 	tmp := v
+	var vstr []byte
 	if tmp == 0 {
 		vstr = []byte("0")
 	} else {
