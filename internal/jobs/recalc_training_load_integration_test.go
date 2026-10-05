@@ -28,7 +28,10 @@ import (
 func TestRecalcTrainingLoad_EndToEnd_AgainstRealTimescale(t *testing.T) {
 	dsn := os.Getenv("TEST_DATABASE_URL")
 	if dsn == "" {
-		dsn = "postgres://ghamusinos:ghamusinos@localhost:5432/ghamusinos?sslmode=disable"
+		dsn = os.Getenv("DATABASE_URL")
+	}
+	if dsn == "" {
+		dsn = "postgres://ghamusinos:XL8TBqBWvFqT4bMSveiZe3bi@localhost:5432/ghamusinos?sslmode=disable"
 	}
 	ctx := context.Background()
 	pool, err := pgxpool.New(ctx, dsn)
