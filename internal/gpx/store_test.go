@@ -638,3 +638,7 @@ func (m *mockGPXQuerier) UpsertDashboardMetadata(ctx context.Context, arg sqlc.U
 func (m *mockGPXQuerier) UpsertTrainingLoadDaily(ctx context.Context, arg sqlc.UpsertTrainingLoadDailyParams) (sqlc.TrainingLoadDaily, error) {
 	return sqlc.TrainingLoadDaily{}, nil
 }
+
+func (m *mockGPXQuerier) GetUserByID(ctx context.Context, id pgtype.UUID) (sqlc.User, error) {
+	return sqlc.User{}, nil
+}

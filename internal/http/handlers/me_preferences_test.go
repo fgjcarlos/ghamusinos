@@ -397,3 +397,7 @@ func (m *preferencesMockQuerier) UpsertDashboardMetadata(ctx context.Context, ar
 func (m *preferencesMockQuerier) UpsertTrainingLoadDaily(ctx context.Context, arg sqlc.UpsertTrainingLoadDailyParams) (sqlc.TrainingLoadDaily, error) {
 	return sqlc.TrainingLoadDaily{}, nil
 }
+
+func (m *preferencesMockQuerier) GetUserByID(ctx context.Context, id pgtype.UUID) (sqlc.User, error) {
+	return sqlc.User{}, nil
+}
