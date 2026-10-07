@@ -52,3 +52,11 @@ SET
     updated_at = now()
 WHERE id = $1
 RETURNING *;
+
+-- name: GetUserByID :one
+-- Carga un usuario por su UUID interno. Usado por el worker
+-- RecalcTrainingLoad para leer ftp / running_threshold_sec_per_km /
+-- timezone, sin tocar la fila clerk_user_id-based usada por el resolver.
+SELECT *
+FROM users
+WHERE id = $1;

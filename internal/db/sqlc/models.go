@@ -49,6 +49,15 @@ type ActivityStream struct {
 	Data       []byte      `json:"data"`
 }
 
+type DashboardMetadatum struct {
+	UserID           pgtype.UUID        `json:"user_id"`
+	LastRecalcAt     pgtype.Timestamptz `json:"last_recalc_at"`
+	LastRecalcStatus pgtype.Text        `json:"last_recalc_status"`
+	LastRecalcError  pgtype.Text        `json:"last_recalc_error"`
+	TrainingLoadRows int32              `json:"training_load_rows"`
+	UpdatedAt        pgtype.Timestamptz `json:"updated_at"`
+}
+
 type GpxClimb struct {
 	ID          pgtype.UUID    `json:"id"`
 	TrackID     pgtype.UUID    `json:"track_id"`
@@ -168,18 +177,29 @@ type SyncSession struct {
 	FinishedAt      pgtype.Timestamptz `json:"finished_at"`
 }
 
+type TrainingLoadDaily struct {
+	UserID         pgtype.UUID        `json:"user_id"`
+	Day            pgtype.Date        `json:"day"`
+	Tss            float64            `json:"tss"`
+	ActivityCount  int32              `json:"activity_count"`
+	DistanceM      float64            `json:"distance_m"`
+	ElevationGainM float64            `json:"elevation_gain_m"`
+	ComputedAt     pgtype.Timestamptz `json:"computed_at"`
+}
+
 type User struct {
-	ID           pgtype.UUID         `json:"id"`
-	ClerkUserID  string              `json:"clerk_user_id"`
-	Email        string              `json:"email"`
-	DisplayName  pgtype.Text         `json:"display_name"`
-	InviteStatus status.InviteStatus `json:"invite_status"`
-	HrMax        pgtype.Int2         `json:"hr_max"`
-	Lthr         pgtype.Int2         `json:"lthr"`
-	Ftp          pgtype.Int2         `json:"ftp"`
-	Level        pgtype.Text         `json:"level"`
-	Timezone     string              `json:"timezone"`
-	AiEnabled    bool                `json:"ai_enabled"`
-	CreatedAt    pgtype.Timestamptz  `json:"created_at"`
-	UpdatedAt    pgtype.Timestamptz  `json:"updated_at"`
+	ID                       pgtype.UUID         `json:"id"`
+	ClerkUserID              string              `json:"clerk_user_id"`
+	Email                    string              `json:"email"`
+	DisplayName              pgtype.Text         `json:"display_name"`
+	InviteStatus             status.InviteStatus `json:"invite_status"`
+	HrMax                    pgtype.Int2         `json:"hr_max"`
+	Lthr                     pgtype.Int2         `json:"lthr"`
+	Ftp                      pgtype.Int2         `json:"ftp"`
+	Level                    pgtype.Text         `json:"level"`
+	RunningThresholdSecPerKm pgtype.Int2         `json:"running_threshold_sec_per_km"`
+	Timezone                 string              `json:"timezone"`
+	AiEnabled                bool                `json:"ai_enabled"`
+	CreatedAt                pgtype.Timestamptz  `json:"created_at"`
+	UpdatedAt                pgtype.Timestamptz  `json:"updated_at"`
 }

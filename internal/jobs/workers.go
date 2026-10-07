@@ -52,6 +52,11 @@ type Deps struct {
 	Config    *config.Config
 	Strava    *strava.Client
 	CipherKey []byte
+	// RiverClient is the live River queue used to enqueue follow-up jobs
+	// (e.g. RecalcTrainingLoad after an UpsertActivity). It is optional:
+	// when nil, the workers register but skip enqueue. Production wires it;
+	// dev / tests that don't run River may leave it nil.
+	RiverClient RiverJobInserter
 }
 
 // validate returns a non-nil error if a required dependency is missing.
@@ -92,6 +97,7 @@ type importDeps struct {
 	stravaRefresher TokenRefresher
 	cipher          []byte
 	backfill        int32
+	riverEnqueuer   RiverJobInserter
 }
 
 // NewRiverWorkers creates a river.Workers instance with every handler bound to
@@ -120,6 +126,7 @@ func NewRiverWorkers(d Deps, registerStravaWorkers bool) (*river.Workers, error)
 			stravaRefresher: d.Strava, // *strava.Client satisfies TokenRefresher
 			cipher:          d.CipherKey,
 			backfill:        int32(d.Config.Strava.BackfillDays),
+			riverEnqueuer:   d.RiverClient,
 		}
 		river.AddWorker(workers, NewImportStravaWorker(id))
 		river.AddWorker(workers, NewRefreshStravaTokenWorker(id))
@@ -139,6 +146,17 @@ func NewRiverWorkers(d Deps, registerStravaWorkers bool) (*river.Workers, error)
 			queries,
 			d.CipherKey,
 			d.Strava,
+			d.RiverClient,
+		))
+		// PR2 (#16): recalc training load on every new/edited activity.
+		// The worker is idempotent and period-deduplicated upstream.
+		river.AddWorker(workers, NewRecalcTrainingLoadWorker(
+			queries,
+			NewSQLCActivityRangeAdapter(queries),
+			NewSQLCUserPhysiologyAdapter(queries),
+			slog.Default(),
+			nil, // use time.Now
+			WindowFromDashboardMetadata,
 		))
 	} else {
 		// NewClient is retained as a usable test seam when Strava is disabled.
@@ -181,13 +199,14 @@ func (w *StubWorker) Work(ctx context.Context, job *river.Job[StubJob]) error {
 // longer reads from package globals and no longer guards "if nil" per field.
 type ImportStravaWorker struct {
 	river.WorkerDefaults[ImportStravaArgs]
-	fetcher   ActivityFetcher
-	refresher TokenRefresher
-	store     SyncSessionStore
-	inserter  ActivityInserter
-	querier   TokenQuerier
-	cipher    []byte
-	backfill  int32
+	fetcher       ActivityFetcher
+	refresher     TokenRefresher
+	store         SyncSessionStore
+	inserter      ActivityInserter
+	querier       TokenQuerier
+	cipher        []byte
+	backfill      int32
+	riverEnqueuer RiverJobInserter
 }
 
 // NewImportStravaWorker builds an ImportStravaWorker wired to the supplied
@@ -195,15 +214,20 @@ type ImportStravaWorker struct {
 // ActivityFetcher (for the paginated GetActivities) and TokenRefresher (for
 // refreshing the OAuth token before each call). The production *strava.Client
 // satisfies both.
+//
+// id.riverEnqueuer is optional: when non-nil, every successful UpsertActivity
+// enqueues a RecalcTrainingLoad job for that user with a 1-minute uniqueness
+// window so multiple uploads collapse into one recalc.
 func NewImportStravaWorker(id importDeps) *ImportStravaWorker {
 	return &ImportStravaWorker{
-		fetcher:   id.stravaFetcher,
-		refresher: id.stravaRefresher,
-		store:     id.queries,
-		inserter:  id.queries,
-		querier:   id.queries,
-		cipher:    id.cipher,
-		backfill:  id.backfill,
+		fetcher:       id.stravaFetcher,
+		refresher:     id.stravaRefresher,
+		store:         id.queries,
+		inserter:      id.queries,
+		querier:       id.queries,
+		cipher:        id.cipher,
+		backfill:      id.backfill,
+		riverEnqueuer: id.riverEnqueuer,
 	}
 }
 
@@ -334,6 +358,22 @@ func (w *ImportStravaWorker) Work(ctx context.Context, job *river.Job[ImportStra
 				return err
 			}
 			imported++
+
+			// PR2 (#16): enqueue a training-load recalc for this user after
+			// every successfully imported activity. The 1-minute unique period
+			// collapses a backfill (dozens of activities) into one recalc.
+			if w.riverEnqueuer != nil {
+				if _, enqErr := w.riverEnqueuer.Insert(ctx,
+					&RecalcTrainingLoadArgs{UserID: userID.String()},
+					&river.InsertOpts{UniqueOpts: river.UniqueOpts{ByArgs: true, ByPeriod: 1 * time.Minute}},
+				); enqErr != nil {
+					slog.Warn("import_strava_activities: enqueue recalc_training_load failed",
+						slog.String("user_id", userID.String()),
+						slog.Int64("activity_id", activity.ID),
+						slog.String("err", enqErr.Error()),
+					)
+				}
+			}
 		}
 
 		// AUD-05 AC: total_activities reflects the cumulative total after
@@ -428,10 +468,15 @@ type IngestActivityEventWorker struct {
 	querier       TokenQuerier
 	cipher        []byte
 	refresher     TokenRefresher
+	riverEnqueuer RiverJobInserter
 }
 
 // NewIngestActivityEventWorker builds an IngestActivityEventWorker with each
 // dependency passed explicitly. Tests and production use the same boundary.
+//
+// riverEnqueuer is optional: when non-nil, a successful UpsertActivity
+// enqueues a RecalcTrainingLoad job for the affected user with a 1-minute
+// uniqueness window. When nil, the worker still upserts but skips enqueue.
 func NewIngestActivityEventWorker(
 	eventLoader ActivityEventLoader,
 	detailFetcher ActivityDetailFetcher,
@@ -439,6 +484,7 @@ func NewIngestActivityEventWorker(
 	querier TokenQuerier,
 	cipher []byte,
 	refresher TokenRefresher,
+	riverEnqueuer RiverJobInserter,
 ) *IngestActivityEventWorker {
 	return &IngestActivityEventWorker{
 		eventLoader:   eventLoader,
@@ -447,6 +493,7 @@ func NewIngestActivityEventWorker(
 		querier:       querier,
 		cipher:        cipher,
 		refresher:     refresher,
+		riverEnqueuer: riverEnqueuer,
 	}
 }
 
@@ -511,6 +558,23 @@ func (w *IngestActivityEventWorker) Work(ctx context.Context, job *river.Job[Ing
 	_, err = w.inserter.UpsertActivity(ctx, params)
 	if err != nil {
 		return fmt.Errorf("jobs: failed to upsert activity %d: %w", activity.ID, err)
+	}
+
+	// Enqueue training-load recalc for this user. Phase 1.4 PR2 (#16).
+	// Skip silently if no River client is wired (dev mode without River).
+	if w.riverEnqueuer != nil {
+		if _, enqErr := w.riverEnqueuer.Insert(ctx,
+			&RecalcTrainingLoadArgs{UserID: activityEvent.UserID.String()},
+			&river.InsertOpts{UniqueOpts: river.UniqueOpts{ByArgs: true, ByPeriod: 1 * time.Minute}},
+		); enqErr != nil {
+			// Log + continue: the upsert already succeeded. A follow-up
+			// /dashboard/recalc (or the next activity webhook) will catch up.
+			slog.Warn("ingest_activity_event: enqueue recalc_training_load failed",
+				slog.String("user_id", activityEvent.UserID.String()),
+				slog.Int64("activity_id", activity.ID),
+				slog.String("err", enqErr.Error()),
+			)
+		}
 	}
 
 	// Mark the event as processed

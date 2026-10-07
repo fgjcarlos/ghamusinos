@@ -15,6 +15,9 @@ CREATE TABLE users (
     lthr            SMALLINT    CONSTRAINT users_lthr_valido   CHECK (lthr   IS NULL OR (lthr   > 0 AND lthr   <= 260)),
     ftp             SMALLINT    CONSTRAINT users_ftp_valido    CHECK (ftp    IS NULL OR (ftp    > 0 AND ftp    <= 2000)),
     level           TEXT        CONSTRAINT users_level_valido  CHECK (level  IS NULL OR level IN ('beginner', 'intermediate', 'advanced')),
+    -- Fase 1.4 (issue #16, G1): umbral de ritmo running para TSSRunning.
+    -- NULL = no configurado; 120..1800 = 2 min/km..30 min/km.
+    running_threshold_sec_per_km SMALLINT NULL CONSTRAINT users_running_threshold_chk CHECK (running_threshold_sec_per_km IS NULL OR (running_threshold_sec_per_km BETWEEN 120 AND 1800)),
     timezone        TEXT        NOT NULL DEFAULT 'UTC'
                                 CONSTRAINT users_timezone_valido CHECK (timezone <> ''),
     ai_enabled      BOOLEAN     NOT NULL DEFAULT true,
@@ -236,3 +239,32 @@ CREATE TABLE gpx_km_vertical (
 CREATE INDEX idx_gpx_muros_track ON gpx_muros (track_id);
 CREATE INDEX idx_gpx_recovery_zones_track ON gpx_recovery_zones (track_id);
 CREATE INDEX idx_gpx_km_vertical_track ON gpx_km_vertical (track_id);
+
+-- Fase 1.4 (issue #16) — Persistencia diaria de training load por usuario.
+-- El TSS agregado es la materia prima que se lleva a internal/metrics para
+-- calcular CTL/ATL/TSB con la EMA de PR1.
+CREATE TABLE training_load_daily (
+    user_id            UUID         NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    day                DATE         NOT NULL,
+    tss                DOUBLE PRECISION NOT NULL DEFAULT 0,
+    activity_count     INTEGER      NOT NULL DEFAULT 0,
+    distance_m         DOUBLE PRECISION NOT NULL DEFAULT 0,
+    elevation_gain_m   DOUBLE PRECISION NOT NULL DEFAULT 0,
+    computed_at        TIMESTAMPTZ  NOT NULL DEFAULT now(),
+    PRIMARY KEY (user_id, day)
+);
+
+CREATE INDEX training_load_daily_user_day_desc_idx
+    ON training_load_daily (user_id, day DESC);
+
+-- Metadata del último recálculo por usuario. La idea es que /healthz
+-- extendido (PR3) lea `last_recalc_at` y `training_load_rows` directamente
+-- sin improvisar; el job RecalcTrainingLoad mantiene esta fila.
+CREATE TABLE dashboard_metadata (
+    user_id              UUID         PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+    last_recalc_at       TIMESTAMPTZ,
+    last_recalc_status   TEXT,
+    last_recalc_error    TEXT,
+    training_load_rows   INTEGER      NOT NULL DEFAULT 0,
+    updated_at           TIMESTAMPTZ  NOT NULL DEFAULT now()
+);
