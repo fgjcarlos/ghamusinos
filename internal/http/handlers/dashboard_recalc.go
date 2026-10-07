@@ -107,9 +107,9 @@ func PostDashboardRecalc(q FirstActivityQuerier, inserter jobs.RiverJobInserter)
 		queuedAt := time.Now().UTC().Format(time.RFC3339)
 
 		resp := map[string]interface{}{
-			"job_id":               formatJobID(jobID),
-			"queued_at":            queuedAt,
-			"will_recompute_from":  willRecomputeFrom,
+			"job_id":              formatJobID(jobID),
+			"queued_at":           queuedAt,
+			"will_recompute_from": willRecomputeFrom,
 		}
 		_ = FirstActivityQuerier(q) // type assertion silence: the variable is genuinely used.
 

@@ -267,8 +267,8 @@ func GetHRZones(q HRZonesQuerier) http.Handler {
 		}
 
 		hazones, err := q.SumHRZonesInRange(r.Context(), sqlc.SumHRZonesInRangeParams{
-			UserID:    userUUID,
-			StartedAt: pgtype.Timestamptz{Time: from, Valid: true},
+			UserID:      userUUID,
+			StartedAt:   pgtype.Timestamptz{Time: from, Valid: true},
 			StartedAt_2: pgtype.Timestamptz{Time: to, Valid: true},
 		})
 		if err != nil {
@@ -294,8 +294,8 @@ func GetHRZones(q HRZonesQuerier) http.Handler {
 			// when streams are absent; we honour that even though we used
 			// hr_zones (decisión de usuario: hr_zones es la fuente primaria).
 			totals, qErr := q.SumActivitiesDurationInRange(r.Context(), sqlc.SumActivitiesDurationInRangeParams{
-				UserID:    userUUID,
-				StartedAt: pgtype.Timestamptz{Time: from, Valid: true},
+				UserID:      userUUID,
+				StartedAt:   pgtype.Timestamptz{Time: from, Valid: true},
 				StartedAt_2: pgtype.Timestamptz{Time: to, Valid: true},
 			})
 			if qErr != nil {

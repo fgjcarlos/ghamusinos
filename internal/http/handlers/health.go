@@ -41,15 +41,15 @@ type HealthDBPinger interface {
 // Health handles GET /healthz. The behaviour is:
 //
 //   - No X-Internal-Health header:
-//       - DB OK  → 200 { status: "ok" }     (public shape, unchanged)
-//       - DB down → 503 { status: "degraded", db: { ok: false } }
+//   - DB OK  → 200 { status: "ok" }     (public shape, unchanged)
+//   - DB down → 503 { status: "degraded", db: { ok: false } }
 //   - With X-Internal-Health: 1:
-//       - DB OK  → 200 with extended sections (db, strava,
-//                   last_recalc_at, training_load_rows, ai)
-//       - DB down → 503 { status: "degraded", db: { ok: false } }
-//                   DB-dependent sections (strava, last_recalc_at,
-//                   training_load_rows, ai) are omitted because they
-//                   cannot be computed without a working DB.
+//   - DB OK  → 200 with extended sections (db, strava,
+//     last_recalc_at, training_load_rows, ai)
+//   - DB down → 503 { status: "degraded", db: { ok: false } }
+//     DB-dependent sections (strava, last_recalc_at,
+//     training_load_rows, ai) are omitted because they
+//     cannot be computed without a working DB.
 //
 // pinger may be nil (dev mode); the handler treats nil as DB-down.
 // q may be nil when no querier is wired (router skips /api routes).
