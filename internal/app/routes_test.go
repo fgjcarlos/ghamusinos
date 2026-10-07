@@ -59,7 +59,7 @@ func TestBuildRouter_DefaultRoutesAreWired(t *testing.T) {
 	cfg := &config.Config{
 		ClerkJWKSURL: "https://clerk.example.com/jwks",
 	}
-	h := buildRouter(cfg, nil, nil, nil, nil)
+	h := buildRouter(cfg, nil, nil, nil, nil, nil)
 
 	got := collectRoutes(t, h)
 
@@ -106,7 +106,7 @@ func TestBuildRouterMountsEveryRoute(t *testing.T) {
 			WebhookVerifyToken: "route-test-token",
 		},
 	}
-	h := buildRouter(cfg, nil, nil, nil, &routeWebhookStore{})
+	h := buildRouter(cfg, nil, nil, nil, &routeWebhookStore{}, nil)
 
 	got := collectRoutes(t, h)
 

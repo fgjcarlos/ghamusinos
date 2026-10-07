@@ -139,6 +139,14 @@ func TestListActivities_ReturnsActivitiesSortedAndPaginated(t *testing.T) {
 }
 
 // T1.2: GET /api/v1/activities returns HTTP 401 without valid Clerk JWT
+
+func (m *activitiesMockQuerier) SumHRZonesInRange(ctx context.Context, arg sqlc.SumHRZonesInRangeParams) (sqlc.SumHRZonesInRangeRow, error) {
+	return sqlc.SumHRZonesInRangeRow{}, nil
+}
+func (m *activitiesMockQuerier) SumActivitiesDurationInRange(ctx context.Context, arg sqlc.SumActivitiesDurationInRangeParams) (sqlc.SumActivitiesDurationInRangeRow, error) {
+	return sqlc.SumActivitiesDurationInRangeRow{}, nil
+}
+
 func TestListActivities_UnauthorizedWithoutJWT(t *testing.T) {
 	mockQ := newActivitiesMockQuerier(t)
 	handler := ListActivities(mockQ)

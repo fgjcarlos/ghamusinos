@@ -183,6 +183,13 @@ func (m *preferencesMockQuerier) ListGPXTracksByUser(ctx context.Context, arg sq
 	return nil, nil
 }
 
+func (m *preferencesMockQuerier) SumHRZonesInRange(ctx context.Context, arg sqlc.SumHRZonesInRangeParams) (sqlc.SumHRZonesInRangeRow, error) {
+	return sqlc.SumHRZonesInRangeRow{}, nil
+}
+func (m *preferencesMockQuerier) SumActivitiesDurationInRange(ctx context.Context, arg sqlc.SumActivitiesDurationInRangeParams) (sqlc.SumActivitiesDurationInRangeRow, error) {
+	return sqlc.SumActivitiesDurationInRangeRow{}, nil
+}
+
 // ----- Tests -----
 
 func TestGetPreferences_Unauthorized(t *testing.T) {
