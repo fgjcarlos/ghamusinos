@@ -16,3 +16,9 @@ type fakePinger struct {
 func (f *fakePinger) Ping(_ context.Context) error {
 	return f.err
 }
+
+// okPinger always succeeds. Used by tests that exercise the healthy
+// /healthz branch (issue #16 PR3, DA-005).
+type okPinger struct{}
+
+func (okPinger) Ping(_ context.Context) error { return nil }

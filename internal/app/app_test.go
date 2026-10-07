@@ -21,7 +21,7 @@ func TestBuildRouter_WithoutStrava(t *testing.T) {
 	cfg := &config.Config{
 		ClerkJWKSURL: "https://clerk.example.com/jwks",
 	}
-	h := buildRouter(cfg, nil, nil, nil, nil)
+	h := buildRouter(cfg, nil, nil, nil, nil, nil)
 
 	for _, path := range []string{
 		"/api/v1/strava/connect",
@@ -46,13 +46,15 @@ func TestBuildRouter_HealthzAliveWithoutPool(t *testing.T) {
 	cfg := &config.Config{
 		ClerkJWKSURL: "https://clerk.example.com/jwks",
 	}
-	h := buildRouter(cfg, nil, nil, nil, nil)
+	h := buildRouter(cfg, nil, nil, nil, nil, nil)
 
 	rec := httptest.NewRecorder()
 	req := httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/healthz", nil)
 	h.ServeHTTP(rec, req)
-	if rec.Code != http.StatusOK {
-		t.Errorf("/healthz: status = %d, want 200", rec.Code)
+	// Issue #16 PR3 (DA-005): /healthz degrada a 503 cuando no hay pool
+	// cableado, en lugar de colgar la request en un nil-deref.
+	if rec.Code != http.StatusServiceUnavailable {
+		t.Errorf("/healthz sin pool: status = %d, want 503", rec.Code)
 	}
 }
 

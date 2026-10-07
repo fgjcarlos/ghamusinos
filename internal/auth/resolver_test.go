@@ -11,6 +11,13 @@ import (
 )
 
 // Test 3.1: Known ClerkID returns existing user
+func (m *mockQuerier) SumHRZonesInRange(ctx context.Context, arg sqlc.SumHRZonesInRangeParams) (sqlc.SumHRZonesInRangeRow, error) {
+	return sqlc.SumHRZonesInRangeRow{}, nil
+}
+func (m *mockQuerier) SumActivitiesDurationInRange(ctx context.Context, arg sqlc.SumActivitiesDurationInRangeParams) (sqlc.SumActivitiesDurationInRangeRow, error) {
+	return sqlc.SumActivitiesDurationInRangeRow{}, nil
+}
+
 func TestResolveUser_ExistingUser(t *testing.T) {
 	cache := &mockQuerier{
 		users: map[string]sqlc.User{

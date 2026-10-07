@@ -16,6 +16,7 @@ import (
 	"github.com/fgjcarlos/ghamusinos/internal/frontend"
 	"github.com/fgjcarlos/ghamusinos/internal/gpx"
 	"github.com/fgjcarlos/ghamusinos/internal/http/handlers"
+	"github.com/fgjcarlos/ghamusinos/internal/jobs"
 	"github.com/fgjcarlos/ghamusinos/internal/strava"
 )
 
@@ -54,6 +55,11 @@ type Server struct {
 	gpxRiskDetector  gpx.RiskZoneDetector
 	gpxTypeDetector  gpx.TrackTypeDetector
 	gpxHasher        gpx.GPXHasher
+	// riverInserter is the River subset needed by POST /dashboard/recalc
+	// (DA-004, issue #16 PR3). Nil-safe: when nil the recalc handler
+	// returns 503 with a clear message instead of panicking (dev stack
+	// without River).
+	riverInserter jobs.RiverJobInserter
 }
 
 // NewServer crea un Server con el pool de base de datos y configuración proporcionados.
@@ -114,6 +120,14 @@ func (s *Server) WithGPX(
 	return s
 }
 
+// WithRiverInserter wires the River inserter used by POST /dashboard/recalc.
+// Returned *Server is for fluent chaining. Pass nil to disable recalc enqueue
+// (dev stack without River); the handler responds 503 explicitly.
+func (s *Server) WithRiverInserter(inserter jobs.RiverJobInserter) *Server {
+	s.riverInserter = inserter
+	return s
+}
+
 // Router construye el handler HTTP con el middleware base y todas las rutas.
 //
 // Middleware base:
@@ -147,8 +161,10 @@ func (s *Server) Router() http.Handler {
 	// usar handlers.IsBodyLimitError para responder 413. Issue #26.
 	r.Use(BodyLimit(s.cfg.MaxBodyBytes))
 
-	// Liveness: responde sin tocar la base de datos.
-	r.Get("/healthz", handlers.Health)
+	// Liveness: responde sin tocar la base de datos cuando el pinger
+	// está disponible (DA-005/DA-006, issue #16 PR3). Sin pinger el
+	// handler cae al path "db-down" y responde 503 con `db.ok=false`.
+	r.Get("/healthz", handlers.Health(s.pool, s.queries).ServeHTTP)
 
 	// Readiness: refleja el estado real de la base de datos.
 	r.Get("/readyz", handlers.Readyz(s.pool))
@@ -203,6 +219,18 @@ func (s *Server) Router() http.Handler {
 				r.Get("/sync/status", handlers.SyncStatus(s.queries).ServeHTTP)
 				r.Get("/me/preferences", handlers.GetPreferences(s.queries).ServeHTTP)
 				r.Patch("/me/preferences", handlers.PatchPreferences(s.queries).ServeHTTP)
+
+				// Fase 1.4 dashboard endpoints (issue #16, PR3).
+				// /summary + /load + /hr-zones + /recalc.
+				// El recalc handler necesita un River inserter (DA-004);
+				// si el server no tiene uno configurado, el handler
+				// responde 503 (decisión PR3) en lugar de panic.
+				r.Route("/dashboard", func(r chi.Router) {
+					r.Get("/summary", handlers.GetDashboardSummary(s.queries).ServeHTTP)
+					r.Get("/load", handlers.GetTrainingLoad(s.queries).ServeHTTP)
+					r.Get("/hr-zones", handlers.GetHRZones(s.queries).ServeHTTP)
+					r.Post("/recalc", handlers.PostDashboardRecalc(s.queries, s.riverInserter).ServeHTTP)
+				})
 			}
 
 			if s.gpxStore != nil {

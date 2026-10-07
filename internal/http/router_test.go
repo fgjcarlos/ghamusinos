@@ -218,14 +218,26 @@ func testGet(t *testing.T, url string) *http.Response {
 	return resp
 }
 
-func TestRouterHealthz(t *testing.T) {
+func (m *mockQuerier) SumHRZonesInRange(ctx context.Context, arg sqlc.SumHRZonesInRangeParams) (sqlc.SumHRZonesInRangeRow, error) {
+	return sqlc.SumHRZonesInRangeRow{}, nil
+}
+func (m *mockQuerier) SumActivitiesDurationInRange(ctx context.Context, arg sqlc.SumActivitiesDurationInRangeParams) (sqlc.SumActivitiesDurationInRangeRow, error) {
+	return sqlc.SumActivitiesDurationInRangeRow{}, nil
+}
+
+// TestRouterHealthzDegradedSinPool verifica que /healthz responde 503
+// cuando el server se construye sin pool (DA-005, issue #16 PR3).
+// El endpoint de health ya no debe devolver 200 en este caso: la
+// semántica cambió a "DB down = degraded", y un pinger nil es
+// equivalente a "no hay DB cableada".
+func TestRouterHealthzDegradedSinPool(t *testing.T) {
 	srv := nuevoServidor(t)
 
 	resp := testGet(t, srv.URL+"/healthz")
 	defer func() { _ = resp.Body.Close() }()
 
-	if resp.StatusCode != http.StatusOK {
-		t.Fatalf("status = %d, quería %d", resp.StatusCode, http.StatusOK)
+	if resp.StatusCode != http.StatusServiceUnavailable {
+		t.Fatalf("status = %d, quería %d (sin pool, healthz debe degradar)", resp.StatusCode, http.StatusServiceUnavailable)
 	}
 }
 
