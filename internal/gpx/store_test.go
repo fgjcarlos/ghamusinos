@@ -606,3 +606,39 @@ func TestSQLCStoreList_TotalComesFromCountOver(t *testing.T) {
 	require.Len(t, got.Data, 3, "el centinela +1 se descarta")
 	require.True(t, got.HasNext)
 }
+
+func (m *mockGPXQuerier) FirstActivityForUser(ctx context.Context, userID pgtype.UUID) (pgtype.Timestamptz, error) {
+	return pgtype.Timestamptz{}, nil
+}
+
+func (m *mockGPXQuerier) GetDashboardMetadata(ctx context.Context, userID pgtype.UUID) (sqlc.DashboardMetadatum, error) {
+	return sqlc.DashboardMetadatum{}, nil
+}
+
+func (m *mockGPXQuerier) ListActivitiesInRange(ctx context.Context, arg sqlc.ListActivitiesInRangeParams) ([]sqlc.ListActivitiesInRangeRow, error) {
+	return []sqlc.ListActivitiesInRangeRow{}, nil
+}
+
+func (m *mockGPXQuerier) ListTrainingLoadFromFirstActivity(ctx context.Context, userID pgtype.UUID) ([]sqlc.TrainingLoadDaily, error) {
+	return []sqlc.TrainingLoadDaily{}, nil
+}
+
+func (m *mockGPXQuerier) ListTrainingLoadRange(ctx context.Context, arg sqlc.ListTrainingLoadRangeParams) ([]sqlc.TrainingLoadDaily, error) {
+	return []sqlc.TrainingLoadDaily{}, nil
+}
+
+func (m *mockGPXQuerier) ListUserIDsForTrainingLoadRecalc(ctx context.Context) ([]pgtype.UUID, error) {
+	return nil, nil
+}
+
+func (m *mockGPXQuerier) UpsertDashboardMetadata(ctx context.Context, arg sqlc.UpsertDashboardMetadataParams) (sqlc.DashboardMetadatum, error) {
+	return sqlc.DashboardMetadatum{}, nil
+}
+
+func (m *mockGPXQuerier) UpsertTrainingLoadDaily(ctx context.Context, arg sqlc.UpsertTrainingLoadDailyParams) (sqlc.TrainingLoadDaily, error) {
+	return sqlc.TrainingLoadDaily{}, nil
+}
+
+func (m *mockGPXQuerier) GetUserByID(ctx context.Context, id pgtype.UUID) (sqlc.User, error) {
+	return sqlc.User{}, nil
+}

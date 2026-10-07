@@ -10,6 +10,7 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/riverqueue/river"
+	"github.com/riverqueue/river/rivertype"
 	"github.com/stretchr/testify/require"
 
 	"github.com/fgjcarlos/ghamusinos/internal/config"
@@ -339,6 +340,7 @@ func TestIngestActivityEventWorker_Work_ProcessesEvent(t *testing.T) {
 		newMockTokenQuerierForBackfill(cipherKey),
 		cipherKey,
 		&mockStravaForRefresh{},
+		nil,
 	)
 
 	job := &river.Job[IngestActivityEventArgs]{Args: IngestActivityEventArgs{EventID: "01020304-0506-0708-090a-0b0c0d0e0f10"}}
@@ -355,6 +357,7 @@ func TestIngestActivityEventWorker_Work_FetchesActivityDetail(t *testing.T) {
 		newMockTokenQuerierForBackfill(cipherKey),
 		cipherKey,
 		&mockStravaForRefresh{},
+		nil,
 	)
 
 	job := &river.Job[IngestActivityEventArgs]{Args: IngestActivityEventArgs{EventID: "01020304-0506-0708-090a-0b0c0d0e0f10"}}
@@ -371,6 +374,7 @@ func TestIngestActivityEventWorker_Work_MarksEventProcessed(t *testing.T) {
 		newMockTokenQuerierForBackfill(cipherKey),
 		cipherKey,
 		&mockStravaForRefresh{},
+		nil,
 	)
 
 	job := &river.Job[IngestActivityEventArgs]{Args: IngestActivityEventArgs{EventID: "01020304-0506-0708-090a-0b0c0d0e0f10"}}
@@ -777,4 +781,82 @@ type failingActivityFetcher struct {
 
 func (f *failingActivityFetcher) GetActivities(_ context.Context, _ string, _, _ time.Time, _, _ int) ([]strava.ActivitySummary, error) {
 	return nil, f.err
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// RecalcTrainingLoad enqueue hook (PR2 #16).
+// ─────────────────────────────────────────────────────────────────────────
+
+// enqueueCapturingInserter is a RiverJobInserter test double that captures
+// all Insert calls so the test can assert on args + opts (UniqueOpts).
+// We name it explicitly to avoid collision with the existing
+// fakeRiverJobInserter in river_test.go (same package).
+type enqueueCapturingInserter struct {
+	Args []river.JobArgs
+	Opts []*river.InsertOpts
+	Err  error
+}
+
+func (f *enqueueCapturingInserter) Insert(_ context.Context, args river.JobArgs, opts *river.InsertOpts) (*rivertype.JobInsertResult, error) {
+	f.Args = append(f.Args, args)
+	f.Opts = append(f.Opts, opts)
+	if f.Err != nil {
+		return nil, f.Err
+	}
+	return &rivertype.JobInsertResult{Job: &rivertype.JobRow{}}, nil
+}
+
+func TestIngestActivityEventWorker_EnqueuesRecalcAfterUpsert(t *testing.T) {
+	cipherKey := key32()
+	capt := &enqueueCapturingInserter{}
+	worker := NewIngestActivityEventWorker(
+		&mockActivityEventLoader{},
+		&mockActivityDetailFetcher{},
+		&mockActivityInserter{},
+		newMockTokenQuerierForBackfill(cipherKey),
+		cipherKey,
+		&mockStravaForRefresh{},
+		capt,
+	)
+
+	job := &river.Job[IngestActivityEventArgs]{Args: IngestActivityEventArgs{EventID: "01020304-0506-0708-090a-0b0c0d0e0f10"}}
+	err := worker.Work(context.Background(), job)
+	require.NoError(t, err)
+
+	if len(capt.Args) != 1 {
+		t.Fatalf("expected 1 enqueued job, got %d", len(capt.Args))
+	}
+	got, ok := capt.Args[0].(*RecalcTrainingLoadArgs)
+	if !ok {
+		t.Fatalf("expected *RecalcTrainingLoadArgs, got %T", capt.Args[0])
+	}
+	if got.UserID == "" {
+		t.Errorf("expected non-empty UserID, got empty")
+	}
+	if capt.Opts[0] == nil {
+		t.Fatalf("expected InsertOpts, got nil")
+	}
+	if !capt.Opts[0].UniqueOpts.ByArgs {
+		t.Errorf("expected UniqueOpts.ByArgs=true")
+	}
+	if capt.Opts[0].UniqueOpts.ByPeriod != time.Minute {
+		t.Errorf("expected ByPeriod=1m, got %v", capt.Opts[0].UniqueOpts.ByPeriod)
+	}
+}
+
+func TestIngestActivityEventWorker_NoEnqueueWhenRiverClientNil(t *testing.T) {
+	cipherKey := key32()
+	worker := NewIngestActivityEventWorker(
+		&mockActivityEventLoader{},
+		&mockActivityDetailFetcher{},
+		&mockActivityInserter{},
+		newMockTokenQuerierForBackfill(cipherKey),
+		cipherKey,
+		&mockStravaForRefresh{},
+		nil, // intentionally nil
+	)
+	job := &river.Job[IngestActivityEventArgs]{Args: IngestActivityEventArgs{EventID: "01020304-0506-0708-090a-0b0c0d0e0f10"}}
+	if err := worker.Work(context.Background(), job); err != nil {
+		t.Fatalf("Work() with nil river client should succeed: %v", err)
+	}
 }

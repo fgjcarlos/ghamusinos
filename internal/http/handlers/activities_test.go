@@ -704,3 +704,39 @@ func TestListActivities_HasNextCorrectOnExactLastPage(t *testing.T) {
 	require.Equal(t, false, resp["has_next"], "última página exacta debe decir has_next=false")
 	require.Equal(t, float64(45), resp["total"])
 }
+
+func (m *activitiesMockQuerier) FirstActivityForUser(ctx context.Context, userID pgtype.UUID) (pgtype.Timestamptz, error) {
+	return pgtype.Timestamptz{}, nil
+}
+
+func (m *activitiesMockQuerier) GetDashboardMetadata(ctx context.Context, userID pgtype.UUID) (sqlc.DashboardMetadatum, error) {
+	return sqlc.DashboardMetadatum{}, nil
+}
+
+func (m *activitiesMockQuerier) ListActivitiesInRange(ctx context.Context, arg sqlc.ListActivitiesInRangeParams) ([]sqlc.ListActivitiesInRangeRow, error) {
+	return []sqlc.ListActivitiesInRangeRow{}, nil
+}
+
+func (m *activitiesMockQuerier) ListTrainingLoadFromFirstActivity(ctx context.Context, userID pgtype.UUID) ([]sqlc.TrainingLoadDaily, error) {
+	return []sqlc.TrainingLoadDaily{}, nil
+}
+
+func (m *activitiesMockQuerier) ListTrainingLoadRange(ctx context.Context, arg sqlc.ListTrainingLoadRangeParams) ([]sqlc.TrainingLoadDaily, error) {
+	return []sqlc.TrainingLoadDaily{}, nil
+}
+
+func (m *activitiesMockQuerier) ListUserIDsForTrainingLoadRecalc(ctx context.Context) ([]pgtype.UUID, error) {
+	return nil, nil
+}
+
+func (m *activitiesMockQuerier) UpsertDashboardMetadata(ctx context.Context, arg sqlc.UpsertDashboardMetadataParams) (sqlc.DashboardMetadatum, error) {
+	return sqlc.DashboardMetadatum{}, nil
+}
+
+func (m *activitiesMockQuerier) UpsertTrainingLoadDaily(ctx context.Context, arg sqlc.UpsertTrainingLoadDailyParams) (sqlc.TrainingLoadDaily, error) {
+	return sqlc.TrainingLoadDaily{}, nil
+}
+
+func (m *activitiesMockQuerier) GetUserByID(ctx context.Context, id pgtype.UUID) (sqlc.User, error) {
+	return sqlc.User{}, nil
+}

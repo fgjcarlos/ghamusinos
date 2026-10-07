@@ -389,3 +389,39 @@ func TestRouterAPIv1MeBypassAuthDisabled(t *testing.T) {
 		t.Errorf("body = %s, quería contener \"invite_status\":\"active\"", body)
 	}
 }
+
+func (m *mockQuerier) FirstActivityForUser(ctx context.Context, userID pgtype.UUID) (pgtype.Timestamptz, error) {
+	return pgtype.Timestamptz{}, nil
+}
+
+func (m *mockQuerier) GetDashboardMetadata(ctx context.Context, userID pgtype.UUID) (sqlc.DashboardMetadatum, error) {
+	return sqlc.DashboardMetadatum{}, nil
+}
+
+func (m *mockQuerier) ListActivitiesInRange(ctx context.Context, arg sqlc.ListActivitiesInRangeParams) ([]sqlc.ListActivitiesInRangeRow, error) {
+	return []sqlc.ListActivitiesInRangeRow{}, nil
+}
+
+func (m *mockQuerier) ListTrainingLoadFromFirstActivity(ctx context.Context, userID pgtype.UUID) ([]sqlc.TrainingLoadDaily, error) {
+	return []sqlc.TrainingLoadDaily{}, nil
+}
+
+func (m *mockQuerier) ListTrainingLoadRange(ctx context.Context, arg sqlc.ListTrainingLoadRangeParams) ([]sqlc.TrainingLoadDaily, error) {
+	return []sqlc.TrainingLoadDaily{}, nil
+}
+
+func (m *mockQuerier) ListUserIDsForTrainingLoadRecalc(ctx context.Context) ([]pgtype.UUID, error) {
+	return nil, nil
+}
+
+func (m *mockQuerier) UpsertDashboardMetadata(ctx context.Context, arg sqlc.UpsertDashboardMetadataParams) (sqlc.DashboardMetadatum, error) {
+	return sqlc.DashboardMetadatum{}, nil
+}
+
+func (m *mockQuerier) UpsertTrainingLoadDaily(ctx context.Context, arg sqlc.UpsertTrainingLoadDailyParams) (sqlc.TrainingLoadDaily, error) {
+	return sqlc.TrainingLoadDaily{}, nil
+}
+
+func (m *mockQuerier) GetUserByID(ctx context.Context, id pgtype.UUID) (sqlc.User, error) {
+	return sqlc.User{}, nil
+}
