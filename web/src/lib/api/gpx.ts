@@ -48,12 +48,24 @@ export async function listGpxTracks(
  * getGpxTrack devuelve el detalle (con climbs + risk_zones) de un track.
  * @param token Bearer token for authorization
  * @param id Track UUID
+ * @param signal AbortSignal opcional para cancelar la peticion en vuelo
  */
-export async function getGpxTrack(token: string, id: string): Promise<StoredTrackDetail> {
-  const response = await fetch(`${BASE_URL}/${encodeURIComponent(id)}`, {
+export async function getGpxTrack(
+  token: string,
+  id: string,
+  signal?: AbortSignal,
+): Promise<StoredTrackDetail> {
+  // exactOptionalPropertyTypes: signal es AbortSignal|undefined, no
+  // AbortSignal|undefined assignable a RequestInit["signal"]. Construimos
+  // el init sin la prop si no se pasa (mismo patron que uploadGpx).
+  const init: RequestInit = {
     method: 'GET',
     headers: makeAuthHeader(token),
-  });
+  };
+  if (signal) {
+    init.signal = signal;
+  }
+  const response = await fetch(`${BASE_URL}/${encodeURIComponent(id)}`, init);
   return handleResponse<StoredTrackDetail>(response);
 }
 

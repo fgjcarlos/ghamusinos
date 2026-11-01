@@ -29,8 +29,8 @@ describe('RouteMuros', () => {
     render(<RouteMuros data={[makeMuro({ gain_m: 120, distance_m: 900, avg_slope_pct: 13.3 })]} />);
     const card = screen.getByTestId('muro-card');
     expect(card).toBeInTheDocument();
-    // gain_m is the integer 120 (toFixed(0)).
-    expect(within(card).getByText('120')).toBeInTheDocument();
+    // gain_m is the integer 120 (toFixed(0)), rendered next to its unit.
+    expect(within(card).getByText(/120\s*m/)).toBeInTheDocument();
     // distance_m is 900 -> 0.90 km.
     expect(within(card).getByText(/0\.90\s*km/i)).toBeInTheDocument();
     // avg_slope_pct is 13.3 (toFixed(1)).
@@ -41,16 +41,18 @@ describe('RouteMuros', () => {
     render(
       <RouteMuros
         data={[
-          makeMuro({ start_idx: 10 }),
-          makeMuro({ start_idx: 30 }),
-          makeMuro({ start_idx: 50 }),
+          makeMuro({ start_idx: 10, end_idx: 20 }),
+          makeMuro({ start_idx: 30, end_idx: 40 }),
+          makeMuro({ start_idx: 50, end_idx: 60 }),
         ]}
       />,
     );
     const cards = screen.getAllByTestId('muro-card');
     expect(cards).toHaveLength(3);
-    expect(within(cards[0]).getByText('10')).toBeInTheDocument();
-    expect(within(cards[1]).getByText('30')).toBeInTheDocument();
-    expect(within(cards[2]).getByText('50')).toBeInTheDocument();
+    // Each card shows its own index range "start–end" (the index span
+    // holds three text nodes, so we assert on the card textContent).
+    expect(cards[0].textContent).toContain('10–20');
+    expect(cards[1].textContent).toContain('30–40');
+    expect(cards[2].textContent).toContain('50–60');
   });
 });
