@@ -344,6 +344,12 @@ Antes de ejecutar PR2 se confirman estos detalles contra `main`:
 - Resultado esperado: PR mergeado; endpoints disponibles en `main`.
 - Work-unit commit: (merge commit).
 
+- [x] **3.12** — DA-007: `GET /api/v1/dashboard/cardiac-drift` (PR-B, branch `feat/dashboard-cardiac-drift`)
+- Acción: query sqlc `ListHeartRateStreamsInRange` (`internal/db/queries/activity_streams.sql`) sobre `activity_streams` con `stream_type = 'heartrate'` de las actividades del usuario en el rango; handler nuevo `internal/http/handlers/dashboard_drift.go` que parsea el JSONB `data` admitiendo array plano de números y pares `[time, value]`, ignora valores 0/negativos, omite actividades con menos de 2 muestras y calcula el drift con `metrics.CardiacDriftSeries`; ruta montada en el grupo autenticado `/api/v1/dashboard/*`; spec `DA-007` añadida a `specs/dashboard-api/spec.md`. TDD: RED con `httptest` (401 sin auth, 400 rango inválido, 500 error interno, 200 con actividades, 200 con `available=false`, parseo plano y por pares, omisión de actividades con menos de 2 muestras) → GREEN con `metrics.CardiacDriftSeries`.
+- Comando de test: `GOTOOLCHAIN=go1.26.10 go test ./internal/http/... -run 'CardiacDrift|HeartRate' -v`.
+- Resultado esperado: tests verdes; alinea con DA-007 (5 scenarios).
+- Work-unit commit: `feat(http): GET /dashboard/cardiac-drift from heart rate streams (DA-007, #16)`
+
 ---
 
 ## PR4 — `feat/phase-1.4-pr4-web-dashboard` (SPA + ECharts)

@@ -17,6 +17,11 @@ follow the existing pattern from
 `openspec/specs/dashboard-api/spec.md` exists yet; archive
 will copy this file into the canonical location.
 
+PR-B (branch `feat/dashboard-cardiac-drift`) adds one more endpoint
+to this delta: `GET /api/v1/dashboard/cardiac-drift` (`DA-007`), the
+per-activity cardiac drift computed from the stored heart rate
+streams.
+
 ## ADDED Requirements
 
 ### Requirement: `GET /api/v1/dashboard/summary` returns weekly KPIs and trends (`DA-001`)
@@ -255,3 +260,79 @@ be omitted because they depend on DB state.
 - AND `strava`, `last_recalc_at`, `training_load_rows`, and
   `ai` keys are absent (or `null`) because they cannot be
   computed without a working DB
+
+### Requirement: `GET /api/v1/dashboard/cardiac-drift` returns per-activity cardiac drift (`DA-007`)
+
+`internal/http/handlers/dashboard_drift.go`
+`GetCardiacDrift(q sqlc.Querier) http.Handler` SHALL read `from`
+and `to` query params as ISO dates (defaults identical to `DA-002`:
+`to` = today, `from` = `to − 30 days`) and return `200 OK` with
+body
+`{ from, to, available: boolean, activities: [{ activity_id: string, drift_pct: number, sample_count: number }] }`.
+The handler MUST require an authenticated user via `auth.AuthUser`
+and return `401` otherwise, SHALL return `400` when the range is
+invalid or inverted, and SHALL return `500` on internal error.
+
+`drift_pct` SHALL be computed with
+`internal/metrics.CardiacDriftSeries` (mean of the first quartile
+vs mean of the third quartile of the heart rate samples, in
+percent). The data source SHALL be the `activity_streams` rows with
+`stream_type = 'heartrate'` (`data` JSONB) belonging to the
+authenticated user's activities in the range. The JSONB SHALL be
+parsed accepting BOTH the flat array of numbers (current repo model,
+`internal/jobs/streams.go:hrSamplesFromFrame`) and the
+`[time, value]` pairs (real Strava API shape). Samples with a value
+of `0` bpm or a negative value SHALL be ignored. Activities with
+fewer than 2 usable samples SHALL be omitted from `activities`.
+`available` SHALL be `true` when at least one activity in the range
+has a computable drift.
+
+**Project root**: `.`
+**Gating test command**: `make test`
+**Pin point**: `internal/http/handlers/dashboard_drift.go` `GetCardiacDrift`
+
+#### Scenario: range with heart rate streams returns one entry per activity
+
+- GIVEN an authenticated user with two activities in the range, both
+  with `activity_streams` rows where `stream_type = 'heartrate'`
+  and at least two usable samples
+- WHEN `GET /api/v1/dashboard/cardiac-drift?from=2024-01-01&to=2024-01-31` is invoked
+- THEN the response status is `200`
+- AND the body has `from = "2024-01-01"`, `to = "2024-01-31"` and
+  `available = true`
+- AND `activities` has one entry per activity with `activity_id`,
+  `drift_pct` (mean of the first quartile vs the mean of the third
+  quartile of its HR samples) and `sample_count`
+
+#### Scenario: flat array and `[time, value]` pairs produce the same drift
+
+- GIVEN an authenticated user with one activity whose heart rate
+  stream is stored as a flat array of numbers and another one stored
+  as `[time, value]` pairs with equivalent sample values
+- WHEN `GET /api/v1/dashboard/cardiac-drift?from=...&to=...` is invoked
+- THEN both activities appear in `activities` with the same
+  `drift_pct` and the same `sample_count`
+
+#### Scenario: activities with fewer than 2 usable samples are omitted
+
+- GIVEN an authenticated user whose only activity in the range has a
+  single heart rate sample (or only `0` / negative values)
+- WHEN `GET /api/v1/dashboard/cardiac-drift?from=...&to=...` is invoked
+- THEN the response status is `200`
+- AND `activities` does not contain that activity
+- AND `available = false` when no other activity has a computable
+  drift
+
+#### Scenario: anonymous request is rejected with 401
+
+- GIVEN a request with no `Authorization` header
+- WHEN `GET /api/v1/dashboard/cardiac-drift` is invoked
+- THEN the response status is `401`
+- AND the body follows the existing RFC 9457 problem document shape
+  (consistent with the other auth-gated dashboard handlers)
+
+#### Scenario: invalid or inverted range is rejected with 400
+
+- GIVEN an authenticated user
+- WHEN `GET /api/v1/dashboard/cardiac-drift?from=2024-02-01&to=2024-01-01` is invoked
+- THEN the response status is `400`
