@@ -225,10 +225,15 @@ func (s *Server) Router() http.Handler {
 				// El recalc handler necesita un River inserter (DA-004);
 				// si el server no tiene uno configurado, el handler
 				// responde 503 (decisión PR3) en lugar de panic.
+				//
+				// /cardiac-drift (DA-007, PR-B) devuelve el drift por
+				// actividad calculado desde los streams HR almacenados
+				// en `activity_streams`.
 				r.Route("/dashboard", func(r chi.Router) {
 					r.Get("/summary", handlers.GetDashboardSummary(s.queries).ServeHTTP)
 					r.Get("/load", handlers.GetTrainingLoad(s.queries).ServeHTTP)
 					r.Get("/hr-zones", handlers.GetHRZones(s.queries).ServeHTTP)
+					r.Get("/cardiac-drift", handlers.GetCardiacDrift(s.queries).ServeHTTP)
 					r.Post("/recalc", handlers.PostDashboardRecalc(s.queries, s.riverInserter).ServeHTTP)
 				})
 			}

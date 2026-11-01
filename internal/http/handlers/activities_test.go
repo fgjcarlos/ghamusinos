@@ -725,6 +725,12 @@ func (m *activitiesMockQuerier) ListActivitiesInRange(ctx context.Context, arg s
 	return []sqlc.ListActivitiesInRangeRow{}, nil
 }
 
+// Stub añadido con la query de drift (DA-007); el mock de drift real
+// vive en dashboard_drift_test.go.
+func (m *activitiesMockQuerier) ListHeartRateStreamsInRange(ctx context.Context, arg sqlc.ListHeartRateStreamsInRangeParams) ([]sqlc.ListHeartRateStreamsInRangeRow, error) {
+	return []sqlc.ListHeartRateStreamsInRangeRow{}, nil
+}
+
 func (m *activitiesMockQuerier) ListTrainingLoadFromFirstActivity(ctx context.Context, userID pgtype.UUID) ([]sqlc.TrainingLoadDaily, error) {
 	return []sqlc.TrainingLoadDaily{}, nil
 }
