@@ -158,6 +158,22 @@ func HealthPublic(w http.ResponseWriter, _ *http.Request) {
 	Health(nil, nil).ServeHTTP(w, &http.Request{})
 }
 
+// nilableKinds enumerates the reflect.Kind values whose zero value is
+// nil. A HealthDBPinger backed by one of them can hold a "typed nil"
+// (e.g. a nil *pgxpool.Pool stored in the interface) that would panic
+// on the first method call.
+//
+// UnsafePointer is deliberately excluded: reflect.Value.IsNil panics
+// for that kind.
+var nilableKinds = map[reflect.Kind]bool{
+	reflect.Chan:      true,
+	reflect.Func:      true,
+	reflect.Interface: true,
+	reflect.Map:       true,
+	reflect.Pointer:   true,
+	reflect.Slice:     true,
+}
+
 // isPingable uses reflect to safely check whether the underlying value
 // is a non-nil pointer. Without this check, calling Ping() on a
 // typed-nil interface (e.g. *pgxpool.Pool(nil) passed into
@@ -168,10 +184,8 @@ func isPingable(p HealthDBPinger) bool {
 		return false
 	}
 	v := reflect.ValueOf(p)
-	switch v.Kind() {
-	case reflect.Ptr, reflect.Interface, reflect.Map, reflect.Slice, reflect.Chan, reflect.Func:
+	if nilableKinds[v.Kind()] {
 		return !v.IsNil()
-	default:
-		return true
 	}
+	return true
 }

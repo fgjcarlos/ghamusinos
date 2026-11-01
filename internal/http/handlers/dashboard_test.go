@@ -156,7 +156,7 @@ func TestDashboardSummary_OKEmptyData(t *testing.T) {
 }
 
 func TestDashboardSummary_ParseDashboardRange(t *testing.T) {
-	req := httptest.NewRequest("GET", "/x?from=2024-01-01&to=2024-01-31", nil)
+	req := httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/x?from=2024-01-01&to=2024-01-31", nil)
 	from, to, err := parseDashboardRange(req)
 	require.NoError(t, err)
 	require.Equal(t, 2024, from.Year())
@@ -167,18 +167,18 @@ func TestDashboardSummary_ParseDashboardRange(t *testing.T) {
 	require.Equal(t, 31, to.Day())
 
 	// Default (sin params) → 30 días.
-	req2 := httptest.NewRequest("GET", "/x", nil)
+	req2 := httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/x", nil)
 	from, to, err = parseDashboardRange(req2)
 	require.NoError(t, err)
 	require.Equal(t, 30, int(to.Sub(from).Hours()/24))
 
 	// From > to → error.
-	req3 := httptest.NewRequest("GET", "/x?from=2024-02-01&to=2024-01-01", nil)
+	req3 := httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/x?from=2024-02-01&to=2024-01-01", nil)
 	_, _, err = parseDashboardRange(req3)
 	require.Error(t, err)
 
 	// Formato inválido → error.
-	req4 := httptest.NewRequest("GET", "/x?to=hola", nil)
+	req4 := httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/x?to=hola", nil)
 	_, _, err = parseDashboardRange(req4)
 	require.Error(t, err)
 }

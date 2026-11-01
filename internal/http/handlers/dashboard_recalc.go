@@ -21,7 +21,6 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/riverqueue/river"
-	"github.com/riverqueue/river/rivertype"
 
 	"github.com/fgjcarlos/ghamusinos/internal/auth"
 	"github.com/fgjcarlos/ghamusinos/internal/jobs"
@@ -32,21 +31,6 @@ import (
 type FirstActivityQuerier interface {
 	FirstActivityForUser(ctx context.Context, userID pgtype.UUID) (pgtype.Timestamptz, error)
 }
-
-// recalcInsertResult carries enough of River's JobInsertResult to
-// satisfy the 202 response without leaking the full struct.
-type recalcInsertResult interface {
-	JobID() int64
-}
-
-// riverJobInsertResultAdapter wraps rivertype.JobInsertResult to
-// satisfy recalcInsertResult when the real River client returns it.
-// Tests can substitute their own fake returning a fixed JobID.
-type riverJobInsertResultAdapter struct {
-	r *rivertype.JobInsertResult
-}
-
-func (a riverJobInsertResultAdapter) JobID() int64 { return a.r.Job.ID }
 
 // PostDashboardRecalc enqueues a full-history recalc job for the auth user.
 //
