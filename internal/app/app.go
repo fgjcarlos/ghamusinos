@@ -118,7 +118,7 @@ func run(ctx context.Context) error {
 	addr := ":" + cfg.Port
 	srv := &http.Server{
 		Addr:              addr,
-		Handler:           buildRouter(cfg, pool, queries, stravaEnqueuer, webhookStore),
+		Handler:           buildRouter(cfg, pool, queries, stravaEnqueuer, webhookStore, riverClient),
 		ReadHeaderTimeout: 5 * time.Second,
 		ReadTimeout:       15 * time.Second,
 		WriteTimeout:      15 * time.Second,
@@ -167,7 +167,7 @@ func run(ctx context.Context) error {
 // production when cfg.Strava != nil because app.Run wires it before
 // calling buildRouter; in dev (Strava disabled) it is nil and the
 // OAuth callback is not mounted, so the seam stays nil-safe.
-func buildRouter(cfg *config.Config, pool *pgxpool.Pool, queries sqlc.Querier, stravaEnqueuer strava.RiverEnqueuer, webhookStore strava.ActivityEventStore) http.Handler {
+func buildRouter(cfg *config.Config, pool *pgxpool.Pool, queries sqlc.Querier, stravaEnqueuer strava.RiverEnqueuer, webhookStore strava.ActivityEventStore, riverClient *river.Client[pgx.Tx]) http.Handler {
 	server := apphttp.NewServer(pool, queries, cfg)
 	// Wire the transactional invite promoter (issue #168, A1). The promoter
 	// is what commits MarkInviteAccepted + UpdateUserInviteStatus atomically;
@@ -204,6 +204,13 @@ func buildRouter(cfg *config.Config, pool *pgxpool.Pool, queries sqlc.Querier, s
 			}
 			slog.Info("strava: rutas OAuth habilitadas", "redirect", cfg.Strava.RedirectURL)
 		}
+	}
+
+	// Wire the River inserter for POST /dashboard/recalc (DA-004, issue #16 PR3).
+	// nil is acceptable: the handler will respond 503 with a clear message
+	// when the dev stack has no River queue.
+	if riverClient != nil {
+		server.WithRiverInserter(riverClient)
 	}
 
 	return server.Router()
