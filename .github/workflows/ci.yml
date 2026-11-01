@@ -150,6 +150,11 @@ jobs:
       - name: lint
         run: pnpm --dir web lint
 
+      # La suite Vitest se ejecuta en CI desde #16: sin este paso los tests
+      # web pueden pudrirse en silencio (pasó con el desajuste react/react-dom).
+      - name: test
+        run: pnpm --dir web test:run
+
       - name: format check
         run: pnpm --dir web format:check
 
