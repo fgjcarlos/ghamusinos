@@ -124,13 +124,13 @@
 - Resultado esperado: los cuatro comandos exit 0; sin diffs residuales de `gofmt`.
 - Work-unit commit: `chore(metrics): make fmt/vet/test/lint clean (#16)`
 
-- [ ] **1.11** — Commit con conventional commit y push branch
+- [x] **1.11** — Commit con conventional commit y push branch
 - Acción: revisar historial; squash si hay commits de "wip"; push a `origin/feat/phase-1.4-pr1-metrics-pure-go`.
 - Comando de test: `git log --oneline -10` (mensajes conventional), `git push -u origin feat/phase-1.4-pr1-metrics-pure-go`.
 - Resultado esperado: branch remoto actualizado; todos los commits del PR1 forman un narrativa coherente (SPEC → TSSCycling → TSSRunning → IF → GAP → EF → CardiacDrift → CTL/ATL/TSB → FillMissingDays → coverage → fmt/vet).
 - Work-unit commit: (no se crea commit nuevo; es la publicación del conjunto).
 
-- [ ] **1.12** — PR abierto contra `main`, CI verde, merge
+- [x] **1.12** — PR abierto contra `main`, CI verde, merge
 - Acción: `gh pr create --base main --head feat/phase-1.4-pr1-metrics-pure-go --title "feat(metrics): pure-Go training metrics package (PR1/4)" --body-file .github/pr-templates/phase-1-4-pr1.md`. Esperar CI verde. Squash & merge a `main`.
 - Comando de test: `gh pr checks` (todos en verde), `gh pr view --json state` (`MERGED`).
 - Resultado esperado: PR mergeado; `main` contiene `internal/metrics/` con cobertura ≥ 90%.
@@ -158,13 +158,13 @@ Antes de ejecutar PR2 se confirman estos detalles contra `main`:
 
 ### Tareas
 
-- [ ] **2.0** (pre) — Verificar contenedor timescaledb arriba y congelar la rama base
+- [x] **2.0** (pre) — Verificar contenedor timescaledb arriba y congelar la rama base
 - Acción: `docker compose up -d postgres` (imagen timescale/timescaledb:2.27.2-pg16). `git checkout -b feat/phase-1.4-pr2-timescaledb-recalc main`. Snapshot del HEAD antes del primer commit (anotado en `odd/tasks/phase-1-4-performance-dashboard.md`).
 - Comando de test: `docker compose ps` (running) y `git rev-parse HEAD` (registrado).
 - Resultado esperado: rama creada; Postgres+timescales operativo.
 - Work-unit commit: (sin commit, es un setup).
 
-- [ ] **2.1** — Migración `00012_training_load_daily.sql` (hypertable + dashboard_metadata)
+- [x] **2.1** — Migración `00012_training_load_daily.sql` (hypertable + dashboard_metadata)
 - Acción: crear `internal/db/migrations/00012_training_load_daily.sql`. Esquema:
   - `CREATE TABLE training_load_daily (user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE, day DATE NOT NULL, tss DOUBLE PRECISION NOT NULL DEFAULT 0, activity_count INT NOT NULL DEFAULT 0, distance_m DOUBLE PRECISION NOT NULL DEFAULT 0, elevation_gain_m DOUBLE PRECISION NOT NULL DEFAULT 0, computed_at TIMESTAMPTZ NOT NULL DEFAULT now(), PRIMARY KEY (user_id, day));`
   - `CREATE INDEX IF NOT EXISTS training_load_daily_user_day_desc_idx ON training_load_daily (user_id, day DESC);`
@@ -175,19 +175,19 @@ Antes de ejecutar PR2 se confirman estos detalles contra `main`:
 - Resultado esperado: migración forward/backward limpia; tabla existe y la hypertable se crea (o se loggea el notice si la extensión no está).
 - Work-unit commit: `feat(db): migration 00012 training_load_daily hypertable + dashboard_metadata (#16)`
 
-- [ ] **2.2** — Migración `00013_users_running_threshold.sql`
+- [x] **2.2** — Migración `00013_users_running_threshold.sql`
 - Acción: crear `internal/db/migrations/00013_users_running_threshold.sql` con `ALTER TABLE users ADD COLUMN running_threshold_sec_per_km SMALLINT NULL CONSTRAINT users_running_threshold_chk CHECK (running_threshold_sec_per_km IS NULL OR (running_threshold_sec_per_km BETWEEN 120 AND 1800));`. Down: `DROP CONSTRAINT`, `DROP COLUMN`.
 - Comando de test: `make migrate && docker compose exec postgres psql -U ghamusinos -d ghamusinos -c "INSERT INTO users (clerk_user_id, email, running_threshold_sec_per_km) VALUES ('test', 'test@example.com', 100);"` debe fallar con CHECK violation; valor 240 debe pasar.
 - Resultado esperado: constraint 120..1800 activa; UP/DOWN reversibles.
 - Work-unit commit: `feat(db): migration 00013 users.running_threshold_sec_per_km 120..1800 (#16)`
 
-- [ ] **2.3** — Sincronizar `internal/db/schema.sql` con migraciones 00012 + 00013
+- [x] **2.3** — Sincronizar `internal/db/schema.sql` con migraciones 00012 + 00013
 - Acción: añadir a `internal/db/schema.sql` las definiciones equivalentes de `training_load_daily`, `dashboard_metadata` y la columna `users.running_threshold_sec_per_km`. `schema.sql` es la fuente que sqlc lee para generar bindings, por lo que debe coincidir con el estado migrado.
 - Comando de test: `grep -n "training_load_daily\|dashboard_metadata\|running_threshold_sec_per_km" internal/db/schema.sql` lista las 3 ocurrencias.
 - Resultado esperado: sqlc generará los modelos y queries esperados.
 - Work-unit commit: `feat(db): sync schema.sql with 00012/00013 for sqlc (#16)`
 
-- [ ] **2.4** — Queries sqlc: `internal/db/queries/training_load.sql` + `dashboard_metadata.sql` + `activities_ext.sql`
+- [x] **2.4** — Queries sqlc: `internal/db/queries/training_load.sql` + `dashboard_metadata.sql` + `activities_ext.sql`
 - Acción: crear tres archivos de queries:
   - `training_load.sql`: `UpsertTrainingLoadDaily :one`, `ListTrainingLoadRange :many` (user_id, from, to orden ascendente), `ListTrainingLoadFromFirstActivity :many` (user_id; para la primera actividad del usuario hasta hoy), `ListUserIDsForTrainingLoadRecalc :many` (user_id distinto).
   - `dashboard_metadata.sql`: `UpsertDashboardMetadata :one`, `GetDashboardMetadata :one`, `IncrementDashboardMetadataRows :exec` (SUM +1 por recalc), `SetDashboardMetadataRecalcStatus :exec`.
@@ -196,7 +196,7 @@ Antes de ejecutar PR2 se confirman estos detalles contra `main`:
 - Resultado esperado: sqlc genera bindings; tests de sqlc existentes siguen verdes.
 - Work-unit commit: `feat(db): sqlc queries for training_load + dashboard_metadata + activities_ext (#16)`
 
-- [ ] **2.5** — `internal/metrics/training_load.go` (ComputeDailyLoad — orquestador)
+- [x] **2.5** — `internal/metrics/training_load.go` (ComputeDailyLoad — orquestador)
 - Acción: capa de servicio, no pura. Tipo `ComputeDailyLoadDeps { Queries ActivityRangeQuerier; ActivityLoader ...; ... }`. Función `ComputeDailyLoad(ctx context.Context, deps ComputeDailyLoadDeps, userID pgtype.UUID, from, to time.Time) ([]metrics.DailyLoad, error)`:
   1. Carga actividades del usuario en el rango.
   2. Por cada actividad: detecta sport_type (cycling/running/otro); calcula TSS usando `metrics.TSSCycling(ftp, durationSec, np)` o `metrics.TSSRunning(thresholdSecPerKm, durationSec, actualSecPerKm)`. `np` ≈ `avg_power` si existe; si no, `IF = distance/(elapsed/3600)` y se deriva `np ≈ FTP * IF` (fallback documentado). Para running, `actualSecPerKm = elapsedSec / (distanceKm)` si hay distancia; si no, omite la actividad (sin pace no se calcula TSS running).
@@ -212,7 +212,7 @@ Antes de ejecutar PR2 se confirman estos detalles contra `main`:
 - Resultado esperado: 4 tests verdes; cobertura de la rama.
 - Work-unit commit: `feat(metrics): ComputeDailyLoad service aggregator with mocked queries (#16)`
 
-- [ ] **2.6** — `internal/jobs/recalc_training_load.go` (River worker)
+- [x] **2.6** — `internal/jobs/recalc_training_load.go` (River worker)
 - Acción: tipos `RecalcTrainingLoadArgs{UserID string; From *time.Time; To *time.Time}` con `Kind() = "recalc_training_load"`. Worker:
   1. Parsea `userID` a `pgtype.UUID`.
   2. Lee `dashboard_metadata`; si no hay `last_recalc_at`, llama `FirstActivityForUser` y usa esa fecha como `from`. Si tampoco hay primera actividad, termina con status=`ok` (sin filas).
@@ -232,20 +232,20 @@ Antes de ejecutar PR2 se confirman estos detalles contra `main`:
 - Resultado esperado: 4 tests verdes; CTL/ATL/TSB coherentes con PR1.
 - Work-unit commit: `feat(jobs): RecalcTrainingLoad River worker with UniqueOpts (#16)`
 
-- [ ] **2.7** — Registrar worker en `NewRiverWorkers`
+- [x] **2.7** — Registrar worker en `NewRiverWorkers`
 - Acción: en `internal/jobs/workers.go`, instanciar `NewRecalcTrainingLoadWorker` con las deps (queries + config); añadir `river.AddWorker(workers, w)` y pasar la nueva `RiverArgs` al registrar en `cmd/ghamusinos` (la fila "IngestActivityEvent" ya hace lo mismo). Sin Strava-bound: este se registra siempre (no depende de Strava).
 - Comando de test: `GOTOOLCHAIN=local go build ./cmd/ghamusinos` (compila); `grep -n "recalc_training_load\|RecalcTrainingLoad" internal/jobs/workers.go` debe listar el binding.
 - Resultado esperado: worker registrado; startup log lo muestra.
 - Work-unit commit: `feat(jobs): register RecalcTrainingLoad worker in NewRiverWorkers (#16)`
 
-- [ ] **2.8** — Encolar recalc desde post-`UpsertActivity`
+- [x] **2.8** — Encolar recalc desde post-`UpsertActivity`
 - Acción: en `internal/jobs/workers.go` (función `Work` del `BackfillStravaActivitiesWorker` y `IngestActivityEventWorker`), tras un upsert exitoso, encolar `RecalcTrainingLoadArgs{UserID: userID.String()}` con `UniqueOpts{Period: 1 * time.Minute}` para evitar ráfagas (E7). Esto cubre backfill inicial e ingesta por webhook.
 - Tests: añadir a `backfill_test.go` y/o nuevo `strava_test.go` un test que verifique que tras upsert se llama al river inserter con los args correctos. Usar el mock `fakeRiverJobInserter` (ya existe en `river_test.go`) extendido.
 - Comando de test: `GOTOOLCHAIN=local go test ./internal/jobs/... -run TestEnqueuesRecalc -v`.
 - Resultado esperado: 2 tests verdes (uno por worker que upsertea); idempotente bajo ráfaga.
 - Work-unit commit: `feat(jobs): enqueue RecalcTrainingLoad on activity upsert (webhook + backfill) (#16)`
 
-- [ ] **2.9** — Tests integration: idempotencia contra Postgres+timescale
+- [x] **2.9** — Tests integration: idempotencia contra Postgres+timescale
 - Acción: test integration `internal/jobs/recalc_training_load_integration_test.go` con `//go:build integration` (mismo patrón que `webhook_integration_test.go`) que:
   1. Crea user + 2 actividades.
   2. Ejecuta `RecalcTrainingLoad` 2 veces.
@@ -254,19 +254,19 @@ Antes de ejecutar PR2 se confirman estos detalles contra `main`:
 - Resultado esperado: idempotente bajo runs repetidos.
 - Work-unit commit: `test(jobs): recalc_training_load idempotency integration (#16)`
 
-- [ ] **2.10** — Tests del worker (mock DB + job runner, sin Postgres)
+- [x] **2.10** — Tests del worker (mock DB + job runner, sin Postgres)
 - Acción: ya cubiertos por 2.6 (4 tests con mocks). Verificar que `TestWorkerSequence` (mock) cubre la cadena: leer metadata → ComputeDailyLoad → FillMissingDays+CTL/ATL → upsert training_load_daily → upsert dashboard_metadata.
 - Comando de test: `GOTOOLCHAIN=local go test ./internal/jobs/... -run TestWorkerSequence -v`.
 - Resultado esperado: secuencia validada con mocks.
 - Work-unit commit: (parte de 2.6; commit adicional solo si se necesita otro test independiente).
 
-- [ ] **2.11** — `make fmt/vet/test/lint` verde
+- [x] **2.11** — `make fmt/vet/test/lint` verde
 - Acción: ejecutar toolchain completo; resolver warnings.
 - Comando de test: `GOTOOLCHAIN=local make fmt && GOTOOLCHAIN=local make vet && GOTOOLCHAIN=local make test && GOTOOLCHAIN=local make lint`.
 - Resultado esperado: los cuatro exit 0.
 - Work-unit commit: `chore(db): make fmt/vet/test/lint clean (#16)`
 
-- [ ] **2.12** — PR abierto contra `main`, CI verde, merge
+- [x] **2.12** — PR abierto contra `main`, CI verde, merge
 - Acción: `gh pr create --base main --head feat/phase-1.4-pr2-timescaledb-recalc --title "feat(db+jobs): training_load_daily + RecalcTrainingLoad worker (PR2/4)" --body-file .github/pr-templates/phase-1-4-pr2.md`. Esperar CI verde (Postgres+timescale). Squash & merge a `main`.
 - Comando de test: `gh pr checks` (todos en verde), `gh pr view --json state` (`MERGED`).
 - Resultado esperado: PR mergeado; `main` contiene migraciones 00012 y 00013, sqlc bindings, worker y hook.
@@ -280,31 +280,31 @@ Antes de ejecutar PR2 se confirman estos detalles contra `main`:
 - Resultado esperado: compilación verde; esqueleto listo para TDD por endpoint.
 - Work-unit commit: `feat(http): dashboard handlers skeleton (#16)`
 
-- [ ] **3.2** — DA-001: `GET /api/v1/dashboard/summary`
+- [x] **3.2** — DA-001: `GET /api/v1/dashboard/summary`
 - Acción: handler devuelve `{user, kpis:{ctl, atl, tsb, last7_tss, last30_tss}, flags:{has_hr_streams, last_recalc_at}}`. Auth requerida. TDD: RED con `httptest` → 401 sin auth, 200 con shape correcto.
 - Comando de test: `GOTOOLCHAIN=local go test ./internal/http/... -run DashboardSummary -v`.
 - Resultado esperado: dos tests verdes; alineado con DA-001 (3 scenarios).
 - Work-unit commit: `feat(http): GET /dashboard/summary handler with auth (#16)`
 
-- [ ] **3.3** — DA-002: `GET /api/v1/dashboard/load`
+- [x] **3.3** — DA-002: `GET /api/v1/dashboard/load`
 - Acción: handler con query params `with`, `from`, `to` (default with=90); lee `training_load_daily` y aplica `FillMissingDays` + shape `[{day, ctl, atl, tsb, tss}]`. TDD: ventana válida, ventana vacía, rango inválido (400).
 - Comando de test: `GOTOOLCHAIN=local go test ./internal/http/... -run DashboardLoad -v`.
 - Resultado esperado: tres tests verdes; alinea con DA-002.
 - Work-unit commit: `feat(http): GET /dashboard/load with FillMissingDays (#16)`
 
-- [ ] **3.4** — DA-003: `GET /api/v1/dashboard/hr-zones`
+- [x] **3.4** — DA-003: `GET /api/v1/dashboard/hr-zones`
 - Acción: handler que resume tiempo en zonas HR (z1..z5) desde streams HR; fallback a `avg_hr × elapsed` si no hay streams. TDD: con streams → buckets exactos; sin streams → fallback; sin HR → 204.
 - Comando de test: `GOTOOLCHAIN=local go test ./internal/http/... -run DashboardHRZones -v`.
 - Resultado esperado: tres tests verdes; alinea con DA-003.
 - Work-unit commit: `feat(http): GET /dashboard/hr-zones with streams and fallback (#16)`
 
-- [ ] **3.5** — DA-004: `POST /api/v1/dashboard/recalc`
+- [x] **3.5** — DA-004: `POST /api/v1/dashboard/recalc`
 - Acción: handler encola `RecalcTrainingLoadArgs{UserID}` con River; responde 202 con `{job_id, status:"queued"}`. TDD: 202 con job_id, 401 sin auth, 503 si River no disponible.
 - Comando de test: `GOTOOLCHAIN=local go test ./internal/http/... -run DashboardRecalc -v`.
 - Resultado esperado: tres tests verdes; alinea con DA-004.
 - Work-unit commit: `feat(http): POST /dashboard/recalc enqueues River job (#16)`
 
-- [ ] **3.6** — DA-005 + DA-006: `/healthz` extendido (P3)
+- [x] **3.6** — DA-005 + DA-006: `/healthz` extendido (P3)
 - Acción: modificar handler `/healthz`:
   - Sin header `X-Internal-Health: 1`: 200 `{status:"ok"}` salvo DB caída.
   - Con header: 200 con shape completo `{status, db:{ok, latency_ms}, strava:{...}, last_recalc_at, training_load_rows}`.
@@ -314,31 +314,31 @@ Antes de ejecutar PR2 se confirman estos detalles contra `main`:
 - Resultado esperado: cuatro tests verdes; alinea con DA-005, DA-006 y P3.
 - Work-unit commit: `feat(http): extended /healthz with X-Internal-Health header (DA-005, DA-006) (#16)`
 
-- [ ] **3.7** — `internal/http/router.go` (montaje de rutas nuevas)
+- [x] **3.7** — `internal/http/router.go` (montaje de rutas nuevas)
 - Acción: registrar `/api/v1/dashboard/{summary,load,hr-zones,recalc}` con middleware de auth existente. Sin tests nuevos (cubierto en 3.2–3.5).
 - Comando de test: `GOTOOLCHAIN=local go test ./internal/http/... -v` (suite completa).
 - Resultado esperado: todas las rutas registradas; suite verde.
 - Work-unit commit: `feat(http): register dashboard routes in router (#16)`
 
-- [ ] **3.8** — Tests `httptest` por endpoint
+- [x] **3.8** — Tests `httptest` por endpoint
 - Acción: añadir tests de contrato adicionales: validación de content-type (`application/json`), validación de query params (`with` fuera de rango → 400), validación de body en POST `/recalc`.
 - Comando de test: `GOTOOLCHAIN=local go test ./internal/http/... -v -count=1`.
 - Resultado esperado: cobertura de handlers ≥ 85%.
 - Work-unit commit: `test(http): contract tests for dashboard endpoints (#16)`
 
-- [ ] **3.9** — Sanity check: `nilza` `auth/internal/resolver_test.go` (mocks ripplen si cambian interfaces)
+- [x] **3.9** — Sanity check: `nilza` `auth/internal/resolver_test.go` (mocks ripplen si cambian interfaces)
 - Acción: ejecutar `GOTOOLCHAIN=local go test ./... -count=1` completo; si hay fallos en `auth` o `internal/resolver`, reparar mocks (no se cambia la lógica de auth, solo se actualizan los stubs).
 - Comando de test: `GOTOOLCHAIN=local go test ./... -count=1`.
 - Resultado esperado: toda la suite verde; sin tests skipped por error de mock.
 - Work-unit commit: `chore(test): refresh mocks after handler additions (#16)`
 
-- [ ] **3.10** — `make fmt/vet/test/lint` verde
+- [x] **3.10** — `make fmt/vet/test/lint` verde
 - Acción: toolchain completo.
 - Comando de test: `GOTOOLCHAIN=local make fmt && GOTOOLCHAIN=local make vet && GOTOOLCHAIN=local make test && GOTOOLCHAIN=local make lint`.
 - Resultado esperado: exit 0 en los cuatro.
 - Work-unit commit: `chore(http): make fmt/vet/test/lint clean (#16)`
 
-- [ ] **3.11** — PR merge
+- [x] **3.11** — PR merge
 - Acción: `gh pr create --base main --head feat/phase-1.4-pr3-api-dashboard`; CI verde; squash & merge.
 - Comando de test: `gh pr checks`; `gh pr view --json state`.
 - Resultado esperado: PR mergeado; endpoints disponibles en `main`.
@@ -357,67 +357,67 @@ Antes de ejecutar PR2 se confirman estos detalles contra `main`:
 > Budget ~330 LoC. Vitest por componente (render contract). Branch base:
 > `main` (post-PR3). Tree-shaking ECharts para evitar bundle bloat (E1).
 
-- [ ] **4.1** — `pnpm add echarts` + tree-shaking setup (E1)
+- [x] **4.1** — `pnpm add echarts` + tree-shaking setup (E1)
 - Acción: instalar `echarts`; configurar import explícito `import { use } from 'echarts/core'; use(LineChart, BarChart, GridComponent, TooltipComponent, LegendComponent, TitleComponent)`. Verificar bundle size.
 - Comando de test: `pnpm -C web typecheck && pnpm -C web build`; revisar `dist/assets/*.js` < 250KB gzipped para el chunk de dashboard.
 - Resultado esperado: build verde; bundle del dashboard dentro de presupuesto.
 - Work-unit commit: `chore(web): add echarts with tree-shaking (#16)`
 
-- [ ] **4.2** — `web/src/lib/api/dashboard.ts` (tipos espejo de DA-001..DA-004)
+- [x] **4.2** — `web/src/lib/api/dashboard.ts` (tipos espejo de DA-001..DA-004)
 - Acción: definir tipos TypeScript `DashboardSummary`, `TrainingLoadPoint`, `HRZonesSummary` y funciones `fetchDashboardSummary`, `fetchTrainingLoad`, `fetchHRZones`, `postRecalc` usando el cliente HTTP existente.
 - Comando de test: `pnpm -C web typecheck`.
 - Resultado esperado: tipos compilan; sin `any` en el módulo.
 - Work-unit commit: `feat(web): dashboard API client types (#16)`
 
-- [ ] **4.3** — Hooks `useDashboardSummary`, `useTrainingLoad`, `useHRZones`
+- [x] **4.3** — Hooks `useDashboardSummary`, `useTrainingLoad`, `useHRZones`
 - Acción: hooks con SWR o react-query (lo que el repo ya use); manejan loading/error/empty. TDD: tests Vitest con renderHook + mocks de fetch.
 - Comando de test: `pnpm -C web test:run src/lib/api/dashboard.test.ts src/features/dashboard/hooks.test.ts`.
 - Resultado esperado: tres hooks con tests verdes; sin warnings de React.
 - Work-unit commit: `feat(web): dashboard hooks with loading/error states (#16)`
 
-- [ ] **4.4** — `web/src/features/dashboard/DashboardSummaryCard/` (KPIs + sparkline)
+- [x] **4.4** — `web/src/features/dashboard/DashboardSummaryCard/` (KPIs + sparkline)
 - Acción: componente que muestra CTL/ATL/TSB actuales, TSS últimas 7 y 30 días, y sparkline mínimo (reutilizar ECharts ya tree-shaken). Tests: render con datos, render con flags vacíos, render con error.
 - Comando de test: `pnpm -C web test:run src/features/dashboard/DashboardSummaryCard`.
 - Resultado esperado: tres tests verdes; alinea con DW-001..DW-003.
 - Work-unit commit: `feat(web): DashboardSummaryCard with KPIs and sparkline (#16)`
 
-- [ ] **4.5** — `web/src/features/dashboard/TrainingLoadChart/` (línea CTL/ATL/TSB)
+- [x] **4.5** — `web/src/features/dashboard/TrainingLoadChart/` (línea CTL/ATL/TSB)
 - Acción: gráfico de líneas con tres series (CTL, ATL, TSB) usando `LineChart` de ECharts. Tooltip y leyenda. Tests: render con N puntos, render con 0 puntos, leyenda visible.
 - Comando de test: `pnpm -C web test:run src/features/dashboard/TrainingLoadChart`.
 - Resultado esperado: tres tests verdes; alinea con DW-004.
 - Work-unit commit: `feat(web): TrainingLoadChart CTL/ATL/TSB line series (#16)`
 
-- [ ] **4.6** — `web/src/features/dashboard/HRZonesChart/` (barras apiladas)
+- [x] **4.6** — `web/src/features/dashboard/HRZonesChart/` (barras apiladas)
 - Acción: barras apiladas z1..z5 con tiempo en minutos. Tests: render con todas las zonas, render con zonas vacías (z4/z5 a 0), tooltip funcional.
 - Comando de test: `pnpm -C web test:run src/features/dashboard/HRZonesChart`.
 - Resultado esperado: tres tests verdes; alinea con DW-006.
 - Work-unit commit: `feat(web): HRZonesChart stacked bars z1..z5 (#16)`
 
-- [ ] **4.7** — `web/src/features/dashboard/CardiacDriftCard/` (condicional a streams HR + mensaje P4)
+- [x] **4.7** — `web/src/features/dashboard/CardiacDriftCard/` (condicional a streams HR + mensaje P4)
 - Acción: componente que muestra el drift solo si `flags.has_hr_streams === true`; si no, NO renderiza el panel pero el `DashboardSummaryCard` o wrapper muestra un texto "necesita streams HR" (G-ε, P4). Tests: con streams → render, sin streams → card ausente + texto presente.
 - Comando de test: `pnpm -C web test:run src/features/dashboard/CardiacDriftCard`.
 - Resultado esperado: dos tests verdes; alinea con DW-005 y P4.
 - Work-unit commit: `feat(web): CardiacDriftCard conditional with fallback message (#16)`
 
-- [ ] **4.8** — `web/src/pages/Dashboard/` (integración + ruta + nav)
+- [x] **4.8** — `web/src/pages/Dashboard/` (integración + ruta + nav)
 - Acción: página que monta los cuatro componentes en grid responsive; añade ruta `/dashboard` y entrada en el menú principal. Tests: smoke test que verifica que la página monta sin error con datos mock.
 - Comando de test: `pnpm -C web test:run src/pages/Dashboard`.
 - Resultado esperado: test verde; ruta navegable; layout no rompe en mobile.
 - Work-unit commit: `feat(web): Dashboard page integration and route (#16)`
 
-- [ ] **4.9** — Tests Vitest por componente (render contract)
+- [x] **4.9** — Tests Vitest por componente (render contract)
 - Acción: añadir tests de contrato: la página muestra todos los KPIs, el sparkline, la línea CTL/ATL/TSB, las barras HR y (condicionalmente) el drift. Sin tests visuales (estos quedan para QA manual).
 - Comando de test: `pnpm -C web test:run --coverage src/features/dashboard src/pages/Dashboard`.
 - Resultado esperado: cobertura del feature `dashboard` ≥ 75%.
 - Work-unit commit: `test(web): dashboard render contract coverage (#16)`
 
-- [ ] **4.10** — `pnpm typecheck/lint/format:check/test/build` verde
+- [x] **4.10** — `pnpm typecheck/lint/format:check/test/build` verde
 - Acción: ejecutar toolchain web completo; resolver warnings de ESLint y Prettier.
 - Comando de test: `pnpm -C web typecheck && pnpm -C web lint && pnpm -C web test:run && pnpm -C web build && pnpm -C web format:check`.
 - Resultado esperado: los cinco exit 0.
 - Work-unit commit: `chore(web): make typecheck/lint/test/build/format clean (#16)`
 
-- [ ] **4.11** — PR merge
+- [x] **4.11** — PR merge
 - Acción: `gh pr create --base main --head feat/phase-1.4-pr4-web-dashboard`; CI verde; squash & merge.
 - Comando de test: `gh pr checks`; `gh pr view --json state`.
 - Resultado esperado: PR mergeado; dashboard navegable en `main`.
