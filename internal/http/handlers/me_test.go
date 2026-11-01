@@ -13,6 +13,14 @@ import (
 )
 
 // Test 4a.1: GET /api/me returns authenticated user
+
+func (m *mockMeQuerier) SumHRZonesInRange(ctx context.Context, arg sqlc.SumHRZonesInRangeParams) (sqlc.SumHRZonesInRangeRow, error) {
+	return sqlc.SumHRZonesInRangeRow{}, nil
+}
+func (m *mockMeQuerier) SumActivitiesDurationInRange(ctx context.Context, arg sqlc.SumActivitiesDurationInRangeParams) (sqlc.SumActivitiesDurationInRangeRow, error) {
+	return sqlc.SumActivitiesDurationInRangeRow{}, nil
+}
+
 func TestMe_ValidUser(t *testing.T) {
 	mockQ := &mockMeQuerier{}
 	handler := Me(mockQ)
