@@ -9,13 +9,21 @@ import { MemoryRouter } from 'react-router-dom';
 import { AppRoutes } from './AppRoutes';
 
 describe('AppRoutes', () => {
+  // The dashboard route is lazy loaded, so the first render has to
+  // transform the whole dashboard module graph (ECharts included).
+  // Under a parallel test run that can take longer than the default
+  // 1s wait: the assertions below allow 5s.
+  const LAZY_TIMEOUT = { timeout: 5000 };
+
   it('mounts the dashboard page on /dashboard', async () => {
     render(
       <MemoryRouter initialEntries={['/dashboard']}>
         <AppRoutes />
       </MemoryRouter>,
     );
-    expect(await screen.findByTestId('period-selector')).toBeInTheDocument();
+    expect(
+      await screen.findByTestId('period-selector', undefined, LAZY_TIMEOUT),
+    ).toBeInTheDocument();
   });
 
   it('redirects the legacy /rendimiento route to /dashboard', async () => {
@@ -24,7 +32,9 @@ describe('AppRoutes', () => {
         <AppRoutes />
       </MemoryRouter>,
     );
-    expect(await screen.findByTestId('period-selector')).toBeInTheDocument();
+    expect(
+      await screen.findByTestId('period-selector', undefined, LAZY_TIMEOUT),
+    ).toBeInTheDocument();
   });
 
   it('keeps the dashboard inside the AppShell navigation', async () => {
