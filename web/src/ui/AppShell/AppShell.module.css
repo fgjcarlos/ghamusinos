@@ -36,9 +36,3 @@
     gap: var(--gh-s-1);
   }
 }
-
-.placeholder {
-  display: inline-flex;
-  align-items: center;
-  opacity: 0.55;
-}

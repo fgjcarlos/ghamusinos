@@ -1,0 +1,33 @@
+/* PeriodSelector. Fase 1.4 (DW-001). Tokens only. */
+
+.selector {
+  display: inline-flex;
+  gap: var(--gh-s-1);
+  padding: var(--gh-s-1);
+  background: var(--gh-bg-2);
+  border: 1px solid var(--gh-line);
+  border-radius: var(--gh-r-control);
+}
+
+.option,
+.active {
+  padding: var(--gh-s-1) var(--gh-s-3);
+  font-family: var(--gh-font-mono);
+  font-size: 0.8125rem;
+  color: var(--gh-text-2);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--gh-r-chip);
+  cursor: pointer;
+}
+
+.option:hover {
+  color: var(--gh-text);
+  border-color: var(--gh-line-2);
+}
+
+.active {
+  color: var(--gh-accent-ink);
+  background: var(--gh-accent);
+  border-color: var(--gh-accent);
+}

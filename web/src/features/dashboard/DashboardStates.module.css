@@ -1,0 +1,29 @@
+/* Shared loading / error states for the dashboard containers.
+ * Fase 1.4. Tokens only. */
+
+.loading,
+.error {
+  padding: var(--gh-s-4);
+  background: var(--gh-surface);
+  border: 1px solid var(--gh-line);
+  border-radius: var(--gh-r-card);
+  font-size: 0.875rem;
+}
+
+.loading {
+  color: var(--gh-text-2);
+}
+
+.error {
+  color: var(--gh-risk);
+  border-color: var(--gh-risk-deep);
+}
+
+.notice {
+  padding: var(--gh-s-4);
+  background: var(--gh-surface);
+  border: 1px solid var(--gh-line);
+  border-radius: var(--gh-r-card);
+  font-size: 0.875rem;
+  color: var(--gh-text-2);
+}

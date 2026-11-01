@@ -1,0 +1,68 @@
+/* CardiacDriftPanel. Fase 1.4 (DW-006). Tokens only. */
+
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--gh-s-3);
+  padding: var(--gh-s-4);
+  background: var(--gh-surface);
+  border: 1px solid var(--gh-line);
+  border-radius: var(--gh-r-card);
+}
+
+.header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--gh-s-2);
+}
+
+.title {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--gh-text);
+}
+
+.average {
+  font-family: var(--gh-font-mono);
+  font-size: 0.8125rem;
+  color: var(--gh-accent);
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--gh-s-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.row {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  gap: var(--gh-s-3);
+  align-items: baseline;
+  padding: var(--gh-s-1) 0;
+  border-bottom: 1px solid var(--gh-line);
+  font-size: 0.8125rem;
+}
+
+.activity {
+  font-family: var(--gh-font-mono);
+  color: var(--gh-text-2);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.drift {
+  font-family: var(--gh-font-mono);
+  color: var(--gh-text);
+}
+
+.samples {
+  color: var(--gh-text-3);
+}
