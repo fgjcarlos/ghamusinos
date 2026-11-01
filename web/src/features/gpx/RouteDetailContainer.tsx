@@ -34,7 +34,12 @@ export function RouteDetailContainer({ trackId }: RouteDetailContainerProps) {
     let cancelled = false;
     setStatus({ kind: 'loading' });
 
-    getGpxTrack(token, trackId)
+    // AbortController: cancela la peticion en vuelo cuando cambia el
+    // trackId o se desmonta el contenedor (evita respuestas tardias de
+    // una peticion que ya no interesa).
+    const controller = new AbortController();
+
+    getGpxTrack(token, trackId, controller.signal)
       .then((detail: StoredTrackDetail) => {
         if (cancelled) return;
         setStatus({ kind: 'ready', data: normalizeTrackDetail(detail) });
@@ -62,6 +67,7 @@ export function RouteDetailContainer({ trackId }: RouteDetailContainerProps) {
 
     return () => {
       cancelled = true;
+      controller.abort();
     };
   }, [trackId]);
 

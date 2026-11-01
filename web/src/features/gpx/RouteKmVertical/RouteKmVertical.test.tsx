@@ -21,7 +21,7 @@ describe('RouteKmVertical', () => {
   it('renders the populated card when km_vertical is non-null', () => {
     render(<RouteKmVertical data={makeKv({ gain_m: 850, distance_m: 10000 })} />);
     expect(screen.getByTestId('route-km-vertical')).toBeInTheDocument();
-    expect(screen.getByText('850')).toBeInTheDocument();
+    expect(screen.getByText(/850\s*m/)).toBeInTheDocument();
     expect(screen.getByText(/10\.00\s*km/i)).toBeInTheDocument();
     // The empty-state copy must NOT be present.
     expect(
@@ -36,6 +36,6 @@ describe('RouteKmVertical', () => {
       screen.getByText(/este track no tiene un tramo de subida sostenida/i),
     ).toBeInTheDocument();
     // No numerical gain should be present in the empty state.
-    expect(screen.queryByText('850')).not.toBeInTheDocument();
+    expect(screen.queryByText(/850\s*m/)).not.toBeInTheDocument();
   });
 });
