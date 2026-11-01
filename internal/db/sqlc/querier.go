@@ -114,6 +114,25 @@ type Querier interface {
 	// Marca un evento como procesado una vez consumido por el job.
 	MarkActivityEventProcessed(ctx context.Context, id pgtype.UUID) error
 	MarkInviteAccepted(ctx context.Context, id pgtype.UUID) error
+	// Suma `elapsed_seconds` y cuenta actividades del usuario en un rango
+	// (sin filtrar por `hr_zones`). DA-003 fallback: cuando no hay zonas
+	// precomputadas, repartimos `avg_hr × elapsed` por zonas usando
+	// `SumActivitiesDurationInRange` como denominador.
+	//
+	// Mantiene `activities_with_avg_hr` separado para no contar filas
+	// con `avg_hr = NULL` (que aportan 0 al cálculo y son ruido).
+	SumActivitiesDurationInRange(ctx context.Context, arg SumActivitiesDurationInRangeParams) (SumActivitiesDurationInRangeRow, error)
+	// Suma los segundos por zona HR sobre las actividades del usuario que
+	// tienen fila en `hr_zones` y cuyo `started_at` cae dentro del rango.
+	// Devuelve 0 cuando no hay filas (los handlers usan eso para distinguir
+	// "sin datos HR" → fallback a avg_hr × elapsed).
+	//
+	// PR3 DA-003 (issue #16): la fuente primaria es la tabla `hr_zones`
+	// precomputada por StravaStreams worker. La ruta "activity_streams
+	// heartrate JSONB" documentada en el spec se sustituye por `hr_zones`
+	// (decisión de usuario 2026-10-01) por simplicidad y porque ya está
+	// alineada con la arquitectura actual.
+	SumHRZonesInRange(ctx context.Context, arg SumHRZonesInRangeParams) (SumHRZonesInRangeRow, error)
 	// Actualiza los contadores de progreso sin tocar status/finished_at.
 	UpdateSyncSessionProgress(ctx context.Context, arg UpdateSyncSessionProgressParams) (SyncSession, error)
 	// Cambia el estado de la sesión. Si falla el job, se guarda el error.
