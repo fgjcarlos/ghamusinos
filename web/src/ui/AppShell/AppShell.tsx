@@ -53,11 +53,9 @@ export function AppShell({ lastSync, now, avatarInitials }: AppShellProps) {
         <NavLink to="/actividades" icon={ACTIVITIES_ICON}>
           Actividades
         </NavLink>
-        <span className={styles.placeholder}>
-          <NavLink to="/rendimiento" icon={RENDIMIENTO_ICON}>
-            Rendimiento
-          </NavLink>
-        </span>
+        <NavLink to="/dashboard" icon={RENDIMIENTO_ICON}>
+          Rendimiento
+        </NavLink>
       </nav>
     </div>
   );

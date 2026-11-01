@@ -1,0 +1,24 @@
+/* DashboardPage. Fase 1.4. Tokens only. */
+
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--gh-s-4);
+  max-width: 960px;
+  margin: 0 auto;
+}
+
+.header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--gh-s-3);
+}
+
+.title {
+  margin: 0;
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: var(--gh-text);
+}
