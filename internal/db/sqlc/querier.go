@@ -95,6 +95,19 @@ type Querier interface {
 	// COUNT(*) OVER() añade el total real a cada fila para que el handler
 	// pueda devolverlo en `total` sin engañarse con offset+len+1.
 	ListGPXTracksByUser(ctx context.Context, arg ListGPXTracksByUserParams) ([]ListGPXTracksByUserRow, error)
+	// Streams de frecuencia cardíaca (`activity_streams.data` JSONB) de las
+	// actividades del usuario dentro del rango, para el endpoint de cardiac
+	// drift (DA-007, issue #16).
+	//
+	// El rango cubre días completos: `$2` es el inicio (00:00 UTC del día
+	// `from`) y `$3` es el límite EXCLUSIVO (00:00 UTC del día siguiente a
+	// `to`), de forma que la actividad del último día del rango entra
+	// completa (misma semántica inclusiva que `day BETWEEN` de DA-002).
+	//
+	// Solo se devuelven los streams `heartrate`; el handler parsea el JSONB
+	// (array plano de números o pares `[time, value]` de la API de Strava)
+	// y calcula el drift con `internal/metrics.CardiacDriftSeries`.
+	ListHeartRateStreamsInRange(ctx context.Context, arg ListHeartRateStreamsInRangeParams) ([]ListHeartRateStreamsInRangeRow, error)
 	// Lista los eventos pendientes (processed_at IS NULL) para alimentar un
 	// job de procesamiento. LIMIT defensivo para evitar scans descontrolados.
 	ListPendingActivityEvents(ctx context.Context, limit int32) ([]ActivityEvent, error)

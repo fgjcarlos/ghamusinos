@@ -370,6 +370,11 @@ func (m *mockQuerier) ListActivitiesInRange(ctx context.Context, arg sqlc.ListAc
 	return []sqlc.ListActivitiesInRangeRow{}, nil
 }
 
+// Stub añadido con la query de drift (DA-007); estos tests no la usan.
+func (m *mockQuerier) ListHeartRateStreamsInRange(ctx context.Context, arg sqlc.ListHeartRateStreamsInRangeParams) ([]sqlc.ListHeartRateStreamsInRangeRow, error) {
+	return []sqlc.ListHeartRateStreamsInRangeRow{}, nil
+}
+
 func (m *mockQuerier) ListTrainingLoadFromFirstActivity(ctx context.Context, userID pgtype.UUID) ([]sqlc.TrainingLoadDaily, error) {
 	return []sqlc.TrainingLoadDaily{}, nil
 }

@@ -368,6 +368,28 @@ func TestRouterMountsActivitiesRoutesViaChiWalk(t *testing.T) {
 		"missing route GET /api/v1/sync/status — SyncStatus handler not mounted in router.go")
 }
 
+// TestRouterMountsCardiacDriftRouteViaChiWalk comprueba que el endpoint
+// de cardiac drift (DA-007, issue #16) está montado dentro del grupo
+// autenticado /api/v1/dashboard/*.
+func TestRouterMountsCardiacDriftRouteViaChiWalk(t *testing.T) {
+	srv := nuevoServidor(t)
+	require.NotNil(t, srv)
+
+	mux, ok := srv.Config.Handler.(*chi.Mux)
+	require.True(t, ok, "expected *chi.Mux, got %T", srv.Config.Handler)
+
+	var routes []string
+	if err := chi.Walk(mux, func(method, route string, _ http.Handler, _ ...func(http.Handler) http.Handler) error {
+		routes = append(routes, method+" "+route)
+		return nil
+	}); err != nil {
+		t.Fatalf("chi.Walk failed: %v", err)
+	}
+
+	require.Contains(t, routes, "GET /api/v1/dashboard/cardiac-drift",
+		"missing route GET /api/v1/dashboard/cardiac-drift — GetCardiacDrift handler not mounted in router.go")
+}
+
 // TestRouterAPIv1MeBypassAuthDisabled verifica que con cfg.AuthDisabled=true
 // el endpoint /api/v1/me responde 200 SIN Authorization header y devuelve el
 // usuario sintético inyectado por devUserMiddleware. Cubre el bypass completo
@@ -412,6 +434,11 @@ func (m *mockQuerier) GetDashboardMetadata(ctx context.Context, userID pgtype.UU
 
 func (m *mockQuerier) ListActivitiesInRange(ctx context.Context, arg sqlc.ListActivitiesInRangeParams) ([]sqlc.ListActivitiesInRangeRow, error) {
 	return []sqlc.ListActivitiesInRangeRow{}, nil
+}
+
+// Stub añadido con la query de drift (DA-007); estos tests no la usan.
+func (m *mockQuerier) ListHeartRateStreamsInRange(ctx context.Context, arg sqlc.ListHeartRateStreamsInRangeParams) ([]sqlc.ListHeartRateStreamsInRangeRow, error) {
+	return []sqlc.ListHeartRateStreamsInRangeRow{}, nil
 }
 
 func (m *mockQuerier) ListTrainingLoadFromFirstActivity(ctx context.Context, userID pgtype.UUID) ([]sqlc.TrainingLoadDaily, error) {
