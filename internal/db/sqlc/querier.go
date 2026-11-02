@@ -11,6 +11,17 @@ import (
 )
 
 type Querier interface {
+	// Marca el análisis como completado y guarda el payload enviado y la
+	// respuesta validada. Sólo el dueño de la fila (user_id) puede
+	// actualizarla.
+	CompleteAIAnalysis(ctx context.Context, arg CompleteAIAnalysisParams) (AiAnalysis, error)
+	// Crea (o reutiliza) el análisis de un usuario para un objetivo concreto.
+	//
+	// La restricción UNIQUE (user_id, kind, scope) hace que una petición
+	// repetida actualice la misma fila en vez de duplicarla: el ON CONFLICT
+	// devuelve la fila existente, reiniciada a 'pending' y sin resultado
+	// anterior. Es el punto de entrada del job (T5) y de la API (T6).
+	CreateAIAnalysis(ctx context.Context, arg CreateAIAnalysisParams) (AiAnalysis, error)
 	CreateGPXClimb(ctx context.Context, arg CreateGPXClimbParams) (GpxClimb, error)
 	CreateGPXMuro(ctx context.Context, arg CreateGPXMuroParams) (GpxMuro, error)
 	CreateGPXRecoveryZone(ctx context.Context, arg CreateGPXRecoveryZoneParams) (GpxRecoveryZone, error)
@@ -30,10 +41,19 @@ type Querier interface {
 	DeleteStravaTokensByUserID(ctx context.Context, userID pgtype.UUID) error
 	// Return the existing row when Strava retries the same natural event key.
 	EnqueueActivityEvent(ctx context.Context, arg EnqueueActivityEventParams) (ActivityEvent, error)
+	// Marca el análisis como fallido y guarda un error seguro: error_code es
+	// un token en minúsculas y error_message una frase corta escrita por la
+	// aplicación. El cuerpo del proveedor nunca llega aquí. Sólo el dueño de
+	// la fila (user_id) puede actualizarla.
+	FailAIAnalysis(ctx context.Context, arg FailAIAnalysisParams) (AiAnalysis, error)
 	// Fecha de la primera actividad del usuario. RecalcTrainingLoad la usa
 	// cuando dashboard_metadata.last_recalc_at es NULL para acotar la
 	// ventana inicial del recálculo.
 	FirstActivityForUser(ctx context.Context, userID pgtype.UUID) (pgtype.Timestamptz, error)
+	// Devuelve el análisis de un usuario para un objetivo concreto.
+	// El filtro por user_id es la frontera de aislamiento: el análisis de
+	// otro usuario no existe para esta consulta (pgx.ErrNoRows).
+	GetAIAnalysis(ctx context.Context, arg GetAIAnalysisParams) (AiAnalysis, error)
 	// Devuelve la invitación vigente para un email dado.
 	// "Vigente" significa: status pending o accepted, y no expirada
 	// (expires_at es NULL o está en el futuro).
@@ -72,6 +92,9 @@ type Querier interface {
 	// Devuelve las preferencias de entrenamiento e IA del usuario
 	// (issue #159). Sólo lectura — la mutación usa UpdateUserPreferences.
 	GetUserPreferencesByID(ctx context.Context, id pgtype.UUID) (GetUserPreferencesByIDRow, error)
+	// Lista los análisis de un usuario, del más reciente al más antiguo.
+	// El límite ($2) acota la respuesta; el llamante decide el tamaño.
+	ListAIAnalyses(ctx context.Context, arg ListAIAnalysesParams) ([]AiAnalysis, error)
 	// Lista paginada de actividades del usuario, ordenadas de más reciente a
 	// más antigua. El LIMIT es por la query (no cursor) porque el uso esperado
 	// es UI paginada con offset; cuando se necesite cursor, se añadirá en su

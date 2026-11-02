@@ -275,3 +275,44 @@ CREATE TABLE dashboard_metadata (
     training_load_rows   INTEGER      NOT NULL DEFAULT 0,
     updated_at           TIMESTAMPTZ  NOT NULL DEFAULT now()
 );
+
+-- Fase 1.5 (issue #17, T4) — Persistencia de los análisis de IA.
+-- Mirrors migration 00015_ai_analysis.sql (base) for sqlc generation.
+--
+-- Una fila por usuario y objetivo de análisis. UNIQUE (user_id, kind,
+-- scope) hace que una petición repetida actualice la misma fila en vez
+-- de duplicarla.
+--
+-- Privacidad: `payload` guarda el payload agregado que se envió al
+-- proveedor; internal/ai garantiza que sólo lleva métricas numéricas
+-- agregadas (sin identidad, sin nombre, sin GPS, sin streams crudos).
+-- `output` guarda la respuesta validada, que es interpretativa.
+-- `error_code`/`error_message` son seguros por construcción (token en
+-- minúsculas y frase corta de la aplicación): ni el cuerpo del proveedor
+-- ni una credencial pueden caber ahí.
+CREATE TABLE ai_analysis (
+    id             UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id        UUID        NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    kind           TEXT        NOT NULL CONSTRAINT ai_analysis_kind_valido
+                               CHECK (kind IN ('activity', 'weekly', 'load')),
+    scope          TEXT        NOT NULL CONSTRAINT ai_analysis_scope_valido
+                               CHECK (scope <> '' AND length(scope) <= 128),
+    status         TEXT        NOT NULL DEFAULT 'pending'
+                               CONSTRAINT ai_analysis_status_valido
+                               CHECK (status IN ('pending', 'completed', 'failed')),
+    provider       TEXT        CONSTRAINT ai_analysis_provider_valido
+                               CHECK (provider IS NULL OR provider ~ '^[a-z0-9_-]{1,64}$'),
+    model          TEXT        CONSTRAINT ai_analysis_model_valido
+                               CHECK (model IS NULL OR (model <> '' AND length(model) <= 128)),
+    payload        JSONB       NOT NULL DEFAULT '{}'::jsonb,
+    output         JSONB,
+    error_code     TEXT        CONSTRAINT ai_analysis_error_code_valido
+                               CHECK (error_code IS NULL OR error_code ~ '^[a-z0-9_]{1,64}$'),
+    error_message  TEXT        CONSTRAINT ai_analysis_error_message_valido
+                               CHECK (error_message IS NULL OR length(error_message) <= 500),
+    created_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
+    UNIQUE (user_id, kind, scope)
+);
+
+CREATE INDEX idx_ai_analysis_user_created ON ai_analysis (user_id, created_at DESC);

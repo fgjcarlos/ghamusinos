@@ -6,6 +6,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"log/slog"
 	"os"
 	"strconv"
 	"strings"
@@ -67,6 +68,144 @@ type Config struct {
 	// Variable de entorno: AUTH_DISABLED=true|1|yes (cualquier valor
 	// distinto se trata como false). Default: false.
 	AuthDisabled bool
+	// AI contiene la configuración global de la IA opcional (fase 1.5,
+	// issue #17). Nunca es nil: una IA mal configurada no impide el
+	// arranque, deja la IA en estado "unavailable" y un aviso por cada
+	// problema encontrado (S7).
+	AI AIConfig
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// AI config (fase 1.5 · issue #17)
+// ─────────────────────────────────────────────────────────────────────────
+
+// Nombres canónicos de proveedor (ADR 0002). El dominio nunca depende
+// del proveedor concreto: sólo la configuración elige uno.
+const (
+	// AIProviderOpenAI es el primer proveedor soportado (ADR 0002).
+	AIProviderOpenAI = "openai"
+	// AIProviderClaude es el segundo proveedor soportado (ADR 0002).
+	AIProviderClaude = "claude"
+	// AIProviderOpenRouter es el tercer proveedor soportado (ADR 0002).
+	AIProviderOpenRouter = "openrouter"
+)
+
+// Estados de la IA que el resto de la aplicación puede leer.
+const (
+	// AIStatusDisabled: el flag global AI_ENABLED está apagado. No sale
+	// ningún dato del sistema y no hace falta ninguna credencial.
+	AIStatusDisabled = "disabled"
+	// AIStatusUnavailable: el flag está encendido pero la configuración
+	// no permite analizar (proveedor inválido o credencial ausente).
+	AIStatusUnavailable = "unavailable"
+	// AIStatusReady: la IA está habilitada y configurada.
+	AIStatusReady = "ready"
+)
+
+// Valores por defecto y límites de la IA.
+const (
+	// DefaultAITimeout es el timeout por defecto de una llamada al
+	// proveedor (AI_TIMEOUT).
+	DefaultAITimeout = 30 * time.Second
+	// DefaultAIMaxRetries es el número de reintentos por defecto
+	// (AI_MAX_RETRIES).
+	DefaultAIMaxRetries = 3
+	// MaxAIMaxRetries es el tope de reintentos (AI_MAX_RETRIES).
+	MaxAIMaxRetries = 10
+)
+
+// aiProviderKeyEnv mapea cada proveedor a la variable de entorno que
+// guarda su credencial. Cada proveedor tiene la suya y sólo se lee la
+// del proveedor seleccionado: las claves de los demás proveedores no
+// entran nunca en la configuración en memoria.
+var aiProviderKeyEnv = map[string]string{
+	AIProviderOpenAI:     "AI_OPENAI_API_KEY",
+	AIProviderClaude:     "AI_CLAUDE_API_KEY",
+	AIProviderOpenRouter: "AI_OPENROUTER_API_KEY",
+}
+
+// aiProviderNames lista los proveedores admitidos (para los avisos).
+var aiProviderNames = []string{AIProviderOpenAI, AIProviderClaude, AIProviderOpenRouter}
+
+// AIConfig agrupa la configuración global de la IA opcional.
+//
+// La IA es opcional y nunca es crítica: una configuración inválida no
+// impide que la aplicación arranque (S7). Cada problema encontrado deja
+// un aviso y deja la IA en estado "unavailable" (AIStatusUnavailable),
+// de modo que el producto determinista sigue funcionando igual.
+//
+// Variables de entorno:
+//   - AI_ENABLED: feature flag global. Apagado por defecto. Acepta
+//     "1", "true", "yes", "on" (cualquier otro valor se trata como
+//     false).
+//   - AI_PROVIDER: proveedor seleccionado: openai, claude u openrouter.
+//   - AI_MODEL: modelo pedido al proveedor. Vacío significa "el modelo
+//     por defecto del adaptador".
+//   - AI_OPENAI_API_KEY, AI_CLAUDE_API_KEY, AI_OPENROUTER_API_KEY:
+//     credenciales, una por proveedor. Sólo es necesaria la del
+//     proveedor seleccionado, y sólo cuando el flag está encendido.
+//   - AI_TIMEOUT: timeout por llamada (formato Go, p. ej. "30s").
+//   - AI_MAX_RETRIES: reintentos acotados (0..10).
+type AIConfig struct {
+	// Enabled es el feature flag global (AI_ENABLED). Apagado por
+	// defecto: sin él no sale ningún dato del sistema.
+	Enabled bool
+	// Available indica que la IA puede usarse: flag encendido,
+	// proveedor válido y credencial del proveedor presente.
+	Available bool
+	// Provider es el proveedor seleccionado (AI_PROVIDER), normalizado
+	// a minúsculas. Vacío si no hay un proveedor válido configurado.
+	Provider string
+	// Model es el modelo pedido al proveedor (AI_MODEL). Vacío
+	// significa "el modelo por defecto del adaptador".
+	Model string
+	// APIKey es la credencial del proveedor seleccionado. Nunca se
+	// registra ni se devuelve en una respuesta HTTP.
+	APIKey string
+	// Timeout es el timeout de una llamada al proveedor (AI_TIMEOUT).
+	Timeout time.Duration
+	// MaxRetries es el número de reintentos acotados (AI_MAX_RETRIES).
+	MaxRetries int
+	// UnavailableReason explica por qué la IA no está disponible. Vacío
+	// cuando sí lo está. Nunca contiene credenciales.
+	UnavailableReason string
+	// Warnings recoge los avisos de misconfiguración. Nunca contienen
+	// credenciales: sólo nombran variables de entorno.
+	Warnings []string
+}
+
+// Status devuelve el estado de la IA: AIStatusDisabled, AIStatusUnavailable
+// o AIStatusReady.
+func (c AIConfig) Status() string {
+	if !c.Enabled {
+		return AIStatusDisabled
+	}
+	if !c.Available {
+		return AIStatusUnavailable
+	}
+	return AIStatusReady
+}
+
+// LogWarnings registra los avisos de misconfiguración de la IA con el
+// logger dado (slog.Default si es nil). Los avisos sólo nombran
+// variables de entorno, así que nunca filtran una credencial.
+func (c AIConfig) LogWarnings(logger *slog.Logger) {
+	if logger == nil {
+		logger = slog.Default()
+	}
+	for _, w := range c.Warnings {
+		logger.Warn(w)
+	}
+}
+
+// warn añade un aviso de misconfiguración de la IA.
+func (c *AIConfig) warn(msg string) {
+	c.Warnings = append(c.Warnings, "config: "+msg)
+}
+
+// warnf añade un aviso de misconfiguración de la IA con formato.
+func (c *AIConfig) warnf(format string, args ...any) {
+	c.warn(fmt.Sprintf(format, args...))
 }
 
 // StravaConfig agrupa las credenciales de la app Strava global (ADR 0001)
@@ -156,7 +295,96 @@ func Load() (*Config, error) {
 	}
 	cfg.Strava = strava
 
+	// La IA es opcional: su configuración nunca puede impedir el
+	// arranque. loadAIConfig no devuelve error; una IA mal configurada
+	// deja avisos y el estado "unavailable" (S7).
+	cfg.AI = loadAIConfig()
+
 	return cfg, nil
+}
+
+// loadAIConfig lee la configuración global de la IA.
+//
+// No devuelve error nunca: una IA mal configurada no puede impedir que
+// la aplicación arranque (S7). Cada problema encontrado deja un aviso y
+// deja la IA en estado "unavailable" (AIStatusUnavailable), de modo que
+// el producto determinista sigue funcionando igual.
+//
+// Con el flag global apagado no se lee ninguna credencial: no hace
+// falta ninguna y no se envía nada a ninguna parte.
+func loadAIConfig() AIConfig {
+	cfg := AIConfig{
+		Timeout:    DefaultAITimeout,
+		MaxRetries: DefaultAIMaxRetries,
+	}
+
+	// Los límites no llevan secretos: se validan siempre, para que un
+	// error tipográfico se vea ya con la IA apagada.
+	if d, err := getEnvDuration("AI_TIMEOUT", DefaultAITimeout); err != nil {
+		cfg.warnf("AI_TIMEOUT no es una duración válida (espera formato Go, e.g. 30s); se usa el valor por defecto %s", DefaultAITimeout)
+	} else if d <= 0 {
+		cfg.warnf("AI_TIMEOUT debe ser > 0; se usa el valor por defecto %s", DefaultAITimeout)
+	} else {
+		cfg.Timeout = d
+	}
+
+	if n, err := getEnvInt32("AI_MAX_RETRIES", DefaultAIMaxRetries); err != nil {
+		cfg.warnf("AI_MAX_RETRIES no es un entero válido; se usa el valor por defecto %d", DefaultAIMaxRetries)
+	} else if n < 0 {
+		cfg.warnf("AI_MAX_RETRIES debe ser >= 0; se usa el valor por defecto %d", DefaultAIMaxRetries)
+	} else if int(n) > MaxAIMaxRetries {
+		cfg.warnf("AI_MAX_RETRIES=%d fuera de rango (0..%d); se usa %d", n, MaxAIMaxRetries, MaxAIMaxRetries)
+		cfg.MaxRetries = MaxAIMaxRetries
+	} else {
+		cfg.MaxRetries = int(n)
+	}
+
+	cfg.Enabled = parseBool(os.Getenv("AI_ENABLED"))
+	if !cfg.Enabled {
+		cfg.UnavailableReason = "la IA está desactivada por el flag global AI_ENABLED"
+		return cfg
+	}
+
+	provider := strings.ToLower(strings.TrimSpace(os.Getenv("AI_PROVIDER")))
+	switch provider {
+	case AIProviderOpenAI, AIProviderClaude, AIProviderOpenRouter:
+		cfg.Provider = provider
+	case "":
+		cfg.warnf("AI_PROVIDER no está configurado; la IA queda no disponible (proveedores admitidos: %s)", strings.Join(aiProviderNames, ", "))
+	default:
+		cfg.warnf("AI_PROVIDER=%q no es un proveedor admitido (proveedores admitidos: %s); la IA queda no disponible", provider, strings.Join(aiProviderNames, ", "))
+	}
+
+	cfg.Model = strings.TrimSpace(os.Getenv("AI_MODEL"))
+
+	if cfg.Provider == "" {
+		cfg.UnavailableReason = "no hay un proveedor de IA válido configurado"
+		return cfg
+	}
+
+	// El modelo se configura siempre por entorno (ADR 0002). No se asume
+	// ningún modelo por defecto: un nombre inventado fallaría en la
+	// llamada al proveedor, así que la IA queda no disponible y el
+	// producto determinista sigue igual.
+	if cfg.Model == "" {
+		cfg.warn("AI_MODEL no está configurado; la IA queda no disponible (no se asumen modelos por defecto)")
+		cfg.UnavailableReason = "no hay un modelo de IA configurado"
+		return cfg
+	}
+
+	// Sólo se lee la credencial del proveedor seleccionado: las claves de
+	// los demás proveedores no se cargan en memoria.
+	keyEnv := aiProviderKeyEnv[cfg.Provider]
+	key := strings.TrimSpace(os.Getenv(keyEnv))
+	if key == "" {
+		cfg.warnf("falta la credencial %s del proveedor %s; la IA queda no disponible", keyEnv, cfg.Provider)
+		cfg.UnavailableReason = "falta la credencial del proveedor de IA seleccionado"
+		return cfg
+	}
+
+	cfg.APIKey = key
+	cfg.Available = true
+	return cfg
 }
 
 // loadStravaConfig lee las variables de Strava. Devuelve nil si la

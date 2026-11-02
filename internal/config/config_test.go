@@ -803,3 +803,351 @@ func TestLoad_AuthDisabledTruthyValues(t *testing.T) {
 		})
 	}
 }
+
+// ─────────────────────────────────────────────────────────────────────────
+// AI config (fase 1.5 · issue #17, unidad T4)
+// ─────────────────────────────────────────────────────────────────────────
+
+// unsetAIEnv limpia todas las variables de entorno de la IA para que cada
+// test empiece desde un estado conocido (el entorno de CI puede tenerlas
+// pre-seteadas).
+func unsetAIEnv(t *testing.T) {
+	t.Helper()
+	for _, k := range []string{
+		"AI_ENABLED",
+		"AI_PROVIDER",
+		"AI_MODEL",
+		"AI_OPENAI_API_KEY",
+		"AI_CLAUDE_API_KEY",
+		"AI_OPENROUTER_API_KEY",
+		"AI_TIMEOUT",
+		"AI_MAX_RETRIES",
+	} {
+		t.Setenv(k, "")
+	}
+}
+
+// prepareAIEnv deja el entorno con el mínimo obligatorio (DATABASE_URL,
+// Clerk) y sin ninguna variable de IA.
+func prepareAIEnv(t *testing.T) {
+	t.Helper()
+	t.Setenv("DATABASE_URL", "postgres://test:***@localhost/test")
+	t.Setenv("ENV", "production")
+	t.Setenv("CLERK_JWKS_URL", "https://clerk.example.com/jwks")
+	t.Setenv("CLERK_ISSUER", "https://clerk.example.com")
+	unsetPoolEnv(t)
+	unsetStravaEnv(t)
+	unsetAIEnv(t)
+}
+
+// loadConfigWithAI carga la configuración. Falla el test si Load() devuelve
+// error: una misconfiguración de IA nunca puede impedir el arranque (S7).
+func loadConfigWithAI(t *testing.T) *Config {
+	t.Helper()
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("Load() no debería fallar con la configuración de IA de este test: %v", err)
+	}
+	return cfg
+}
+
+// TestLoad_AI_DisabledByDefault comprueba que el flag global de la IA
+// está apagado por defecto y que la IA queda en estado "disabled".
+func TestLoad_AI_DisabledByDefault(t *testing.T) {
+	prepareAIEnv(t)
+
+	cfg := loadConfigWithAI(t)
+
+	if cfg.AI.Enabled {
+		t.Error("AI.Enabled = true sin AI_ENABLED, quería false (flag global apagado por defecto)")
+	}
+	if cfg.AI.Available {
+		t.Error("AI.Available = true con el flag apagado, quería false")
+	}
+	if got := cfg.AI.Status(); got != AIStatusDisabled {
+		t.Errorf("AI.Status() = %q, quería %q", got, AIStatusDisabled)
+	}
+	if cfg.AI.APIKey != "" {
+		t.Errorf("AI.APIKey = %q con el flag apagado, quería vacío", cfg.AI.APIKey)
+	}
+	if cfg.AI.UnavailableReason == "" {
+		t.Error("AI.UnavailableReason vacío: el estado no disponible debe poder explicarse")
+	}
+}
+
+// TestLoad_AI_EnabledWithValidProviderAndKey comprueba la ruta feliz:
+// flag + proveedor válido + credencial => IA disponible con proveedor,
+// modelo y clave cargados.
+func TestLoad_AI_EnabledWithValidProviderAndKey(t *testing.T) {
+	prepareAIEnv(t)
+	t.Setenv("AI_ENABLED", "true")
+	t.Setenv("AI_PROVIDER", "openai")
+	t.Setenv("AI_MODEL", "gpt-test-model")
+	t.Setenv("AI_OPENAI_API_KEY", "sk-test-key")
+
+	cfg := loadConfigWithAI(t)
+	if !cfg.AI.Enabled {
+		t.Error("AI.Enabled = false con AI_ENABLED=true")
+	}
+	if !cfg.AI.Available {
+		t.Errorf("AI.Available = false con configuración válida; avisos: %v", cfg.AI.Warnings)
+	}
+	if got := cfg.AI.Status(); got != AIStatusReady {
+		t.Errorf("AI.Status() = %q, quería %q", got, AIStatusReady)
+	}
+	if cfg.AI.Provider != AIProviderOpenAI {
+		t.Errorf("AI.Provider = %q, quería %q", cfg.AI.Provider, AIProviderOpenAI)
+	}
+	if cfg.AI.Model != "gpt-test-model" {
+		t.Errorf("AI.Model = %q, quería %q", cfg.AI.Model, "gpt-test-model")
+	}
+	if cfg.AI.APIKey != "sk-test-key" {
+		t.Errorf("AI.APIKey = %q, quería %q", cfg.AI.APIKey, "sk-test-key")
+	}
+	if len(cfg.AI.Warnings) != 0 {
+		t.Errorf("AI.Warnings = %v, quería sin avisos con configuración válida", cfg.AI.Warnings)
+	}
+}
+
+// TestLoad_AI_InvalidProviderDoesNotBlockBoot comprueba que un
+// proveedor desconocido degrada la IA a "unavailable" con un aviso
+// explícito, sin impedir el arranque (S7).
+func TestLoad_AI_InvalidProviderDoesNotBlockBoot(t *testing.T) {
+	prepareAIEnv(t)
+	t.Setenv("AI_ENABLED", "true")
+	t.Setenv("AI_PROVIDER", "gemini")
+	t.Setenv("AI_OPENAI_API_KEY", "sk-test-key")
+
+	cfg := loadConfigWithAI(t)
+	if !cfg.AI.Enabled {
+		t.Error("AI.Enabled = false: el flag sigue siendo la fuente de verdad")
+	}
+	if cfg.AI.Available {
+		t.Error("AI.Available = true con un proveedor inválido, quería false")
+	}
+	if got := cfg.AI.Status(); got != AIStatusUnavailable {
+		t.Errorf("AI.Status() = %q, quería %q", got, AIStatusUnavailable)
+	}
+	if cfg.AI.Provider != "" {
+		t.Errorf("AI.Provider = %q, quería vacío con un proveedor inválido", cfg.AI.Provider)
+	}
+	if !containsWarning(cfg.AI.Warnings, "AI_PROVIDER") {
+		t.Errorf("AI.Warnings = %v, quería un aviso que mencione AI_PROVIDER", cfg.AI.Warnings)
+	}
+	if !containsWarning(cfg.AI.Warnings, "gemini") {
+		t.Errorf("AI.Warnings = %v, quería un aviso que nombre el proveedor inválido", cfg.AI.Warnings)
+	}
+}
+
+// TestLoad_AI_MissingProviderWithFlagOnIsUnavailable comprueba que el
+// flag encendido sin proveedor deja la IA no disponible y avisa.
+func TestLoad_AI_MissingProviderWithFlagOnIsUnavailable(t *testing.T) {
+	prepareAIEnv(t)
+	t.Setenv("AI_ENABLED", "true")
+
+	cfg := loadConfigWithAI(t)
+	if cfg.AI.Available {
+		t.Error("AI.Available = true sin proveedor configurado, quería false")
+	}
+	if got := cfg.AI.Status(); got != AIStatusUnavailable {
+		t.Errorf("AI.Status() = %q, quería %q", got, AIStatusUnavailable)
+	}
+	if !containsWarning(cfg.AI.Warnings, "AI_PROVIDER") {
+		t.Errorf("AI.Warnings = %v, quería un aviso que mencione AI_PROVIDER", cfg.AI.Warnings)
+	}
+}
+
+// TestLoad_AI_MissingKeyForSelectedProviderMarksUnavailable comprueba
+// que la falta de credencial del proveedor seleccionado no impide el
+// arranque y marca la IA como no disponible.
+func TestLoad_AI_MissingKeyForSelectedProviderMarksUnavailable(t *testing.T) {
+	prepareAIEnv(t)
+	t.Setenv("AI_ENABLED", "true")
+	t.Setenv("AI_PROVIDER", "claude")
+	t.Setenv("AI_MODEL", "claude-test-model")
+	// Credencial de otro proveedor: no sirve para claude.
+	t.Setenv("AI_OPENAI_API_KEY", "sk-test-key")
+
+	cfg := loadConfigWithAI(t)
+	if cfg.AI.Available {
+		t.Error("AI.Available = true sin la credencial del proveedor seleccionado, quería false")
+	}
+	if got := cfg.AI.Status(); got != AIStatusUnavailable {
+		t.Errorf("AI.Status() = %q, quería %q", got, AIStatusUnavailable)
+	}
+	if cfg.AI.APIKey != "" {
+		t.Errorf("AI.APIKey = %q, quería vacío (la clave de otro proveedor no se usa)", cfg.AI.APIKey)
+	}
+	if !containsWarning(cfg.AI.Warnings, "AI_CLAUDE_API_KEY") {
+		t.Errorf("AI.Warnings = %v, quería un aviso que mencione AI_CLAUDE_API_KEY", cfg.AI.Warnings)
+	}
+}
+
+// TestLoad_AI_IgnoresKeysOfOtherProviders comprueba que sólo se carga la
+// credencial del proveedor seleccionado.
+func TestLoad_AI_IgnoresKeysOfOtherProviders(t *testing.T) {
+	t.Run("openai seleccionado", func(t *testing.T) {
+		prepareAIEnv(t)
+		t.Setenv("AI_ENABLED", "true")
+		t.Setenv("AI_PROVIDER", "openai")
+		t.Setenv("AI_MODEL", "openai-test-model")
+		t.Setenv("AI_OPENAI_API_KEY", "sk-openai")
+		t.Setenv("AI_CLAUDE_API_KEY", "sk-claude")
+		t.Setenv("AI_OPENROUTER_API_KEY", "sk-openrouter")
+
+		cfg := loadConfigWithAI(t)
+		if cfg.AI.APIKey != "sk-openai" {
+			t.Errorf("AI.APIKey = %q, quería %q (sólo la del proveedor seleccionado)", cfg.AI.APIKey, "sk-openai")
+		}
+	})
+
+	t.Run("claude seleccionado", func(t *testing.T) {
+		prepareAIEnv(t)
+		t.Setenv("AI_ENABLED", "true")
+		t.Setenv("AI_PROVIDER", "claude")
+		t.Setenv("AI_MODEL", "claude-test-model")
+		t.Setenv("AI_OPENAI_API_KEY", "sk-openai")
+		t.Setenv("AI_OPENROUTER_API_KEY", "sk-openrouter")
+
+		cfg := loadConfigWithAI(t)
+		if cfg.AI.APIKey != "" {
+			t.Errorf("AI.APIKey = %q, quería vacío (no hay credencial de claude)", cfg.AI.APIKey)
+		}
+		if cfg.AI.Available {
+			t.Error("AI.Available = true sin credencial de claude, quería false")
+		}
+	})
+}
+
+// TestLoad_AI_DisabledDoesNotRequireCredential comprueba que con el flag
+// apagado no hace falta ninguna credencial y que el producto no queda
+// con avisos por la falta de claves.
+func TestLoad_AI_DisabledDoesNotRequireCredential(t *testing.T) {
+	prepareAIEnv(t)
+	t.Setenv("AI_ENABLED", "false")
+	// Ni proveedor ni credenciales: es el estado por defecto de un
+	// despliegue sin IA.
+
+	cfg := loadConfigWithAI(t)
+	if cfg.AI.Available {
+		t.Error("AI.Available = true con el flag apagado, quería false")
+	}
+	if got := cfg.AI.Status(); got != AIStatusDisabled {
+		t.Errorf("AI.Status() = %q, quería %q", got, AIStatusDisabled)
+	}
+	for _, w := range cfg.AI.Warnings {
+		if strings.Contains(w, "API_KEY") {
+			t.Errorf("con la IA apagada no debe haber avisos sobre credenciales: %q", w)
+		}
+	}
+}
+
+// TestLoad_AI_InvalidTimeoutFallsBackToDefault comprueba que una
+// duración inválida degrada al valor por defecto con un aviso, sin
+// impedir el arranque.
+func TestLoad_AI_InvalidTimeoutFallsBackToDefault(t *testing.T) {
+	prepareAIEnv(t)
+	t.Setenv("AI_TIMEOUT", "5 minutos")
+
+	cfg := loadConfigWithAI(t)
+	if cfg.AI.Timeout != DefaultAITimeout {
+		t.Errorf("AI.Timeout = %v, quería el valor por defecto %v", cfg.AI.Timeout, DefaultAITimeout)
+	}
+	if !containsWarning(cfg.AI.Warnings, "AI_TIMEOUT") {
+		t.Errorf("AI.Warnings = %v, quería un aviso que mencione AI_TIMEOUT", cfg.AI.Warnings)
+	}
+}
+
+// TestLoad_AI_TimeoutOverride comprueba que AI_TIMEOUT se lee.
+func TestLoad_AI_TimeoutOverride(t *testing.T) {
+	prepareAIEnv(t)
+	t.Setenv("AI_TIMEOUT", "45s")
+
+	cfg := loadConfigWithAI(t)
+	if cfg.AI.Timeout != 45*time.Second {
+		t.Errorf("AI.Timeout = %v, quería 45s", cfg.AI.Timeout)
+	}
+}
+
+// TestLoad_AI_InvalidMaxRetriesFallsBackToDefault comprueba que un
+// entero inválido degrada al valor por defecto con un aviso.
+func TestLoad_AI_InvalidMaxRetriesFallsBackToDefault(t *testing.T) {
+	prepareAIEnv(t)
+	t.Setenv("AI_MAX_RETRIES", "muchos")
+
+	cfg := loadConfigWithAI(t)
+	if cfg.AI.MaxRetries != DefaultAIMaxRetries {
+		t.Errorf("AI.MaxRetries = %d, quería el valor por defecto %d", cfg.AI.MaxRetries, DefaultAIMaxRetries)
+	}
+	if !containsWarning(cfg.AI.Warnings, "AI_MAX_RETRIES") {
+		t.Errorf("AI.Warnings = %v, quería un aviso que mencione AI_MAX_RETRIES", cfg.AI.Warnings)
+	}
+}
+
+// TestLoad_AI_MaxRetriesClampedToMaximum comprueba que un número de
+// reintentos fuera de rango se acota (nunca es fatal).
+func TestLoad_AI_MaxRetriesClampedToMaximum(t *testing.T) {
+	prepareAIEnv(t)
+	t.Setenv("AI_MAX_RETRIES", "99")
+
+	cfg := loadConfigWithAI(t)
+	if cfg.AI.MaxRetries != MaxAIMaxRetries {
+		t.Errorf("AI.MaxRetries = %d, quería el máximo %d", cfg.AI.MaxRetries, MaxAIMaxRetries)
+	}
+	if !containsWarning(cfg.AI.Warnings, "AI_MAX_RETRIES") {
+		t.Errorf("AI.Warnings = %v, quería un aviso que mencione AI_MAX_RETRIES", cfg.AI.Warnings)
+	}
+}
+
+// TestLoad_AI_WarningsNeverContainCredentials comprueba que ningún aviso
+// puede filtrar la clave del proveedor.
+func TestLoad_AI_WarningsNeverContainCredentials(t *testing.T) {
+	prepareAIEnv(t)
+	t.Setenv("AI_ENABLED", "true")
+	t.Setenv("AI_PROVIDER", "openai")
+	t.Setenv("AI_OPENAI_API_KEY", "sk-secret-value")
+	// Modelos y timeouts inválidos generan avisos junto al de modelo vacío.
+	t.Setenv("AI_TIMEOUT", "no-es-una-duración")
+
+	cfg := loadConfigWithAI(t)
+	if len(cfg.AI.Warnings) == 0 {
+		t.Fatal("se esperaba al menos un aviso con la configuración de este test")
+	}
+	for _, w := range cfg.AI.Warnings {
+		if strings.Contains(w, "sk-secret-value") {
+			t.Errorf("un aviso filtró la credencial: %q", w)
+		}
+	}
+}
+
+// TestLoad_AI_MissingModelWarnsButKeepsUnavailable comprueba que un modelo
+// vacío deja la IA no disponible: no se asume ningún modelo por defecto,
+// porque un nombre inventado fallaría en la llamada al proveedor.
+func TestLoad_AI_MissingModelWarnsButKeepsUnavailable(t *testing.T) {
+	prepareAIEnv(t)
+	t.Setenv("AI_ENABLED", "true")
+	t.Setenv("AI_PROVIDER", "openrouter")
+	t.Setenv("AI_OPENROUTER_API_KEY", "sk-test-key")
+	// AI_MODEL vacío.
+
+	cfg := loadConfigWithAI(t)
+	if cfg.AI.Available {
+		t.Errorf("AI.Available = true sin modelo: no debe asumirse ningún modelo por defecto")
+	}
+	if cfg.AI.Model != "" {
+		t.Errorf("AI.Model = %q, quería vacío", cfg.AI.Model)
+	}
+	if !containsWarning(cfg.AI.Warnings, "AI_MODEL") {
+		t.Errorf("AI.Warnings = %v, quería un aviso que mencione AI_MODEL", cfg.AI.Warnings)
+	}
+}
+
+// containsWarning dice si algún aviso contiene el fragmento dado.
+func containsWarning(warnings []string, fragment string) bool {
+	for _, w := range warnings {
+		if strings.Contains(w, fragment) {
+			return true
+		}
+	}
+	return false
+}

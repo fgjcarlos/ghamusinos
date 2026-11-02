@@ -49,6 +49,22 @@ type ActivityStream struct {
 	Data       []byte      `json:"data"`
 }
 
+type AiAnalysis struct {
+	ID           pgtype.UUID        `json:"id"`
+	UserID       pgtype.UUID        `json:"user_id"`
+	Kind         string             `json:"kind"`
+	Scope        string             `json:"scope"`
+	Status       string             `json:"status"`
+	Provider     pgtype.Text        `json:"provider"`
+	Model        pgtype.Text        `json:"model"`
+	Payload      []byte             `json:"payload"`
+	Output       []byte             `json:"output"`
+	ErrorCode    pgtype.Text        `json:"error_code"`
+	ErrorMessage pgtype.Text        `json:"error_message"`
+	CreatedAt    pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt    pgtype.Timestamptz `json:"updated_at"`
+}
+
 type DashboardMetadatum struct {
 	UserID           pgtype.UUID        `json:"user_id"`
 	LastRecalcAt     pgtype.Timestamptz `json:"last_recalc_at"`
