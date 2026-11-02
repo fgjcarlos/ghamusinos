@@ -1,0 +1,60 @@
+# Phase 1.5 — Optional AI (#17)
+Objective: deliver optional AI without affecting the deterministic product. Base: main@a6adff0; branch: feat/phase-1-5-optional-ai.
+Delivery: auto-chain / feature-branch-chain (local work-unit commits only; no publishing authorized). Forecast: 2500–4000 authored lines; coherent slices may exceed the advisory ~400-line budget. Checks: TZ=UTC go test -race ./...; pnpm -C web test:run; pnpm -C web typecheck; pnpm -C web lint; make build.
+
+## Specs
+S1. User request: "Vamos con la issue #17". Objective: "Enriquecer la interpretación sin hacerla obligatoria."
+S2. "Interfaz IA multi-proveedor: OpenAI → Claude → OpenRouter (ver ADR 0002)".
+S3. "Feature flag global + opt-in por usuario". User choice: "Exigir nueva aceptación a todos (recomendado)" — "IA desactivada hasta aceptar el aviso de transferencia; comprobar consentimiento al encolar y antes de enviar."
+S4. "Análisis por actividad / semanal / de carga". User choice: "Solo bajo demanda (recomendado)" — "El usuario solicita cada análisis; los jobs lo procesan sin bloquear el producto ni generar costes automáticos."
+S5. "Payload builder + schema de salida validado e idéntico entre proveedores". User choice: "Solo métricas agregadas (recomendado)" — "Distancia, duración, desnivel, FC y carga calculada; sin identidad, nombres, GPS ni streams crudos."
+S6. "Reintentos con backoff, ejecución en jobs, persistencia (ai_analysis)".
+S7. "Con IA desactivada o caída, el producto funciona igual."
+S8. Delivery choice: "Cadena sobre rama de la épica (recomendado)" — "Unidades pequeñas sobre una rama integradora; revisión progresiva antes de incorporar la épica a main."
+
+Implementation assumptions (not additional user requirements): keep existing authenticated API, RFC 9457 and River conventions; global flag defaults off; no provider credentials required when off; no provider fallback that transfers data to another provider implicitly. Weekly/load use existing user timezone and deterministic metrics, with documented bounded date windows. Use standard-library HTTP adapters, no new SDK dependencies. Preserve existing Spanish UI/documentation conventions. Tests use fake providers, never paid live requests.
+
+## Tasks
+T1 | S5,S7 | delegated writer (recovered, smaller unit) | done | internal/ai payload builder + common output schema/validator; contract doc; parent verified go test/vet | commit: 99db0a9.
+T2 | S3,S5 | delegated writer (independent parallel consent unit) | done | migration 00014 resets opt-ins to false with safe DOWN, false default, notice in existing profile form, Go+web tests, consent doc; parent verified go test and web profile suite | Risk: item 2 (external-data consent); commit: 49f8585.
+T3 | S2,S7 | delegated writer (depends on T1) | done | OpenAI/Claude/OpenRouter HTTP adapters over T1 contract; wire-contract tests; parent added the documented x-api-key header | commit: 8d823f9.
+T4 | S3,S6,S7 | delegated writer (independent of T3) | done | global AI config (never blocks boot), ai_analysis table, sqlc queries and storage helpers; parent fixed the sqlc.Querier mock ripple and the empty-model rule; full go test -race ./... green | Risk: item 1 (schema change); commit: fc6c54f.
+T5 | S3,S4,S6,S7 | delegated writer (River job unit) | done | River job: consent recheck before send, aggregate-only payload from stored metrics, provider call, persistence, retry classification; scope helpers; parent verified tests/vet | Risk: item 2 (consent and ownership guard before sending); commit: 5cdd64c.
+T6 | S3,S6,S7 | inline (parent) | done | app wiring: River starts without Strava, register the AI worker, buildAIAnalyzer extracted and tested | commit: b8d9360.
+T7 | S3,S4,S5,S6,S7 | delegated writer | done | authenticated request/status API for activity/weekly/load, consent check at enqueue, ownership checks, RFC 9457 errors, TS client; parent verified go test/vet and the web client tests | Risk: item 2 (user isolation); commit: 4de56a5.
+T8 | S3,S4,S7 | delegated writer | done | shared AIAnalysisControl (moved by the parent to web/src/features/ai, out of profile), per-activity trigger, dashboard weekly and load analyses, disabled/not-consented/pending/completed/failed states, tests | commit: 8265703.
+T9 | S1-S8 | independent verifier + parent seam checks + canonical spec | in_progress | privacy and isolation verification of the whole feature, full functional checks, native assessment/review per user consent, OpenSpec canonical spec, closure; no push/PR/merge | Risk: item 2 (external data transfer and user isolation) | commit: pending.
+T10 | S5,S7 | delegated writer (contract fix) | done | window-aware payload bounds via ai.LimitsFor(kind, windowDays): summed aggregates scale with the window days, per-activity ceilings unchanged, average heart rate never scales | commit: 67be97a.
+
+## Log
+L1. Original request verbatim: "Vamos con la issue #17".
+L2. Issue #17 body verbatim:
+### Objetivo
+Enriquecer la interpretación sin hacerla obligatoria.
+
+### Entregables
+- Interfaz IA multi-proveedor: OpenAI → Claude → OpenRouter (ver ADR 0002)
+- Feature flag global + opt-in por usuario
+- Análisis por actividad / semanal / de carga
+- Payload builder + schema de salida validado e idéntico entre proveedores
+- Reintentos con backoff, ejecución en jobs, persistencia (ai_analysis)
+
+### Criterio
+Con IA desactivada o caída, el producto funciona igual.
+
+### Referencias
+- `docs/decisions/0002-ai-provider.md`
+
+L3. User selections verbatim: "Exigir nueva aceptación a todos (recomendado)"; "Solo métricas agregadas (recomendado)"; "Solo bajo demanda (recomendado)"; "Cadena sobre rama de la épica (recomendado)".
+L4. Read-only explorer found existing users.ai_enabled DEFAULT true and preferences UI, no AI implementation, and River startup conditional on Strava. Default branch verified via gh: main. Base a6adff0. Existing untracked .pi/, .codegraph/ and unrelated odd task documents are outside this feature and must remain untouched.
+L5. First writer launch failed canonical reference admission; no worker started. Subsequent runtime context-backstop signal required delegation; canonical Spec reference repaired and admitted. T1 worker mvzra9me-2-xyns and T2 worker mvzra9pg-3-x6qj started on disjoint edit surfaces. T1 subsequently failed: "assistant returned no final report". Observed only internal/ai/payload_test.go; no adapter implementation, contract docs or verification report. No T1 completion claimed; no writer retry. T2 remains independent and running. T3-T6 remain pending.
+L6. User authorized recovery of the failed T1 unit: "Si". T1 split into T1 (payload/output contract) and T3 (provider adapters) to reduce unit size; T3 waits for T1. Task IDs renumbered to numeric form only, since the runtime admits writer launches only for canonical "Spec: <file>, T<n>" references; T2 keeps its ID and running worker.
+L7. T1 verified by parent: TZ=UTC go test -count=1 ./internal/ai ok, go vet clean; committed 99db0a9 (1396 lines incl. 635 test lines; one cohesive unit over the advisory budget). T2 worker reported partial only because pnpm typecheck cannot resolve echarts in this sandbox (web/node_modules lacks it, base commit fails identically): parent verified TZ=UTC go test ./internal/http/handlers ./internal/auth ok and pnpm -C web --config.verify-deps-before-run=false test:run src/features/profile src/lib/api/profile.test.ts 34 tests pass; committed 49f8585. Worker judgment calls kept with rationale: avg_heart_rate 0 is an error (existing RED contract) while an explicit 0 on the other aggregates is emitted (real zero load), and every number in the answer must be one of the numbers sent (PRD: "La IA interpreta datos; no inventa métricas"), rejecting model-side derived percentages.
+L8. T4 ripple handled by the parent: the five new queries grow the shared sqlc.Querier interface (sqlc.yaml emit_interface: true), so the parent added the five zero-value stubs to the full-interface mocks in internal/auth, internal/http and internal/http/handlers (activitiesMockQuerier, dashboardMockQuerier, preferencesMockQuerier, mockMeQuerier, mockQuerier x2). Parent also aligned the model rule with the adapter contract: an empty AI_MODEL now leaves the AI unavailable with a warning instead of assuming a provider default model, so no model name is ever invented; the affected config tests were updated and pass. Full TZ=UTC go test -race -count=1 ./... is green (seam check). Committed fc6c54f.
+L9. T5 verified by the parent (go test ./internal/jobs ./internal/ai ./internal/db/sqlc ok, vet clean) and committed 5cdd64c. Contract defect found by the worker and accepted by the parent: the T1 payload ceilings are calibrated for a single activity (duration 7 days, load 1000), so a weekly or multi-day load window whose totals exceed them fails as invalid_metrics. Fix tracked as T10: the ceilings scale with the declared window instead of being fixed.
+L11. T6 done inline by the parent and committed b8d9360: River now starts with Strava OR AI active, the AI worker registers whenever an analyser exists, and buildAIAnalyzer was extracted so its wiring is covered by tests (off, unavailable, invalid provider, empty model, ready).
+L13. T10 verified by the parent (go test ./internal/ai ./internal/jobs ok, vet clean) and committed 67be97a. New exported contract ai.LimitsFor(kind, windowDays) and the per-day ceiling rule are what the API unit needs to declare a window.
+L15. T7 verified by the parent (go test ./internal/http/... ./internal/app ok, vet clean) and committed 4de56a5. The web typecheck failure in this sandbox is pre-existing (echarts absent from web/node_modules, identical on the base commit). Weekly window is pinned to 7 days because the shared scope key does not encode the length; the load window defaults to 28 days. River insert failure leaves the row pending until the next identical request resets it.
+L17. T8 verified by the parent (web tests for ai/activities/profile 75 passed, eslint clean) and committed 8265703 after moving the shared control from web/src/features/profile/AIAnalysisControl to web/src/features/ai/AIAnalysisControl, because a control shared by activities and dashboard does not belong to the profile feature.
+L19. Verification evidence (parent, T9): the independent verifier (gentle-ai-verify) failed twice with an agent error, so it is reported UNAVAILABLE and was not retried further; the parent ran the verification inline. Probes: TZ=UTC go test -race -count=1 ./... green; go vet clean; golangci-lint clean; pnpm -C web test:run 59 files / 327 tests green; pnpm -C web typecheck, lint and format:check clean; the web build and the Go binary build succeed (make build fails only because this machine's local toolchain is go1.22.0 while go.mod requires 1.26, so the binary was built with GOTOOLCHAIN=auto). The earlier echarts failures were a sandbox gap: installing the declared dependencies (as CI does) makes the whole web suite green. Code-level checks: the provider payload carries only kind, window_days and the five aggregate metrics, with no identity, name, GPS, timestamp, raw stream or free text anywhere in internal/ai, internal/jobs/ai_analysis.go or internal/http/handlers/ai_analysis.go; the consent is read at enqueue (handlers/ai_analysis.go) and again before the provider call (jobs/ai_analysis.go); every ai_analysis query is scoped by user_id; the activity is fetched with ID and UserID so a foreign activity is never analysed; the provider error text carries only provider, reason and HTTP status; redirects are not followed.
+L20. Runtime review mode is on (global); native review remains candidate-consented. The native authority for the untracked feature document was approved and acknowledged-blocked by an inventory change; the native review of the committed range is retried once the untracked inventory is stable (the documentation worker was still writing untracked files). Provider API wire details must be verified against current official docs before adapter implementation; unavailable documentation is a proof gap, not permission to invent a contract.
