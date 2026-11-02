@@ -157,6 +157,12 @@ export function PreferencesForm({
             no aceptes, la IA permanece desactivada. Puedes revocar el consentimiento en cualquier
             momento desmarcando la casilla y guardando los cambios.
           </p>
+          <p className={styles.aiHelp} data-testid="ai-consent-help">
+            Los análisis se piden bajo demanda, uno cada vez: desde cada actividad de la pantalla
+            Mis actividades y desde el panel de Rendimiento (análisis semanal y de carga). Si la IA
+            está desactivada, no está disponible o no has aceptado el envío, esos controles te lo
+            dicen y el resto de la aplicación sigue funcionando igual.
+          </p>
         </div>
       </fieldset>
 

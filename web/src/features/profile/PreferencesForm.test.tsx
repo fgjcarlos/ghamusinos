@@ -175,6 +175,23 @@ describe('PreferencesForm', () => {
     expect(text).toMatch(/streams crudos/i);
   });
 
+  it('explains where the analyses are requested and that the app works without the AI', () => {
+    render(
+      <PreferencesForm
+        values={makeValues()}
+        errors={{}}
+        busy={false}
+        onChange={() => {}}
+        onSubmit={() => {}}
+      />,
+    );
+    const help = screen.getByTestId('ai-consent-help');
+    expect(help.textContent ?? '').toMatch(/bajo demanda/i);
+    expect(help.textContent ?? '').toMatch(/actividades/i);
+    expect(help.textContent ?? '').toMatch(/Rendimiento/i);
+    expect(help.textContent ?? '').toMatch(/sigue funcionando igual/i);
+  });
+
   it('renders the AI consent checkbox unchecked when there is no consent', () => {
     render(
       <PreferencesForm

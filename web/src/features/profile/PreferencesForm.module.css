@@ -88,6 +88,15 @@
   padding: var(--gh-s-3);
 }
 
+/* Ayuda de la IA: dónde se piden los análisis y qué pasa si está apagada. */
+.aiHelp {
+  margin: var(--gh-s-2) 0 0;
+  font-family: var(--gh-font-body);
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--gh-text-3);
+}
+
 .error {
   margin: 0;
   font-family: var(--gh-font-body);

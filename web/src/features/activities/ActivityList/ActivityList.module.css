@@ -39,9 +39,51 @@
   list-style: none;
 }
 
+.rowWrap {
+  display: flex;
+  align-items: center;
+  gap: var(--gh-s-3);
+}
+
+.rowWrap > a {
+  flex: 1;
+  min-width: 0;
+}
+
+.aiTrigger {
+  flex: 0 0 auto;
+  min-height: 36px;
+  padding: var(--gh-s-1) var(--gh-s-3);
+  border: 1px solid var(--gh-line-2);
+  border-radius: var(--gh-r-control);
+  background: var(--gh-surface-2);
+  color: var(--gh-text-2);
+  font-family: var(--gh-font-body);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    background-color 0.15s ease,
+    border-color 0.15s ease;
+}
+
+.aiTrigger:hover {
+  border-color: var(--gh-accent);
+  color: var(--gh-text);
+}
+
+.aiTrigger:focus-visible {
+  outline: 2px solid var(--gh-accent);
+  outline-offset: 2px;
+}
+
 .rowItem:last-child :global(.activity-row),
-.rowItem:last-child > a {
+.rowItem:last-child .rowWrap > a {
   border-bottom: none;
+}
+
+.aiPanel {
+  padding: 0 var(--gh-s-4) var(--gh-s-4);
 }
 
 .empty {

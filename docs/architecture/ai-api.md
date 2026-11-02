@@ -198,6 +198,58 @@ JSON y los fallos como `ApiError` con el `status`, el `detail` del problema
 y el mapa `fields` de los errores por campo. El cuerpo de la petición nunca
 mezcla campos de actividad y de ventana (el backend los rechaza).
 
+## Controles en la web (T8)
+
+Los análisis se piden **bajo demanda** desde las pantallas que ya existen:
+no hay ninguna página nueva para la IA.
+
+| Pantalla | Control | Objetivo |
+|---|---|---|
+| Mis actividades (`/actividades`) | Botón "Analizar con IA" en cada actividad | `kind=activity` con el UUID de la actividad |
+| Rendimiento (`/dashboard`) | "Análisis semanal" y "Análisis de carga" | `kind=weekly` (7 días) y `kind=load` (periodo acotado a 90 días) |
+
+Las dos pantallas reutilizan el mismo control:
+
+| Export | Ruta |
+|---|---|
+| `AIAnalysisControl` | `web/src/features/profile/AIAnalysisControl/AIAnalysisControl.tsx` |
+| `DashboardAIAnalysis` | `web/src/features/dashboard/DashboardAIAnalysis.tsx` |
+| `weeklyWindow` / `loadWindow` | `web/src/features/dashboard/aiWindow.ts` |
+
+Contrato de `AIAnalysisControl`:
+
+| Prop | Para qué sirve |
+|---|---|
+| `kind` | `activity`, `weekly` o `load` |
+| `activityId` | UUID de la actividad (sólo `activity`) |
+| `windowStart`, `windowDays` | Ventana `YYYY-MM-DD` + días (sólo `weekly`/`load`) |
+| `title` | Título del control |
+| `actionLabel` | Texto del botón (por defecto, "Analizar con IA") |
+| `autoStart` | Pide el análisis en cuanto sabe que la IA está disponible |
+| `token` | Token de autenticación (por defecto, `VITE_AUTH_TOKEN`) |
+
+### Estados del control
+
+| Estado | Qué ve el usuario | ¿Se pide algo? |
+|---|---|---|
+| Leyendo el estado | "Comprobando si el análisis con IA está disponible…" | No |
+| IA desactivada o no disponible | Explicación + enlace a `/perfil` | No |
+| Sin consentimiento | Explicación + enlace a `/perfil` | No |
+| Listo | Botón "Analizar con IA" | Al pulsar |
+| En curso | "Analizando con IA…" (sondeo cada 2 s) | Un `POST` y consultas de estado |
+| Terminado | Resumen, observaciones y precauciones | No |
+| Fallido | Mensaje seguro + código de error (`ai_unavailable`, …) | No |
+
+Reglas que el control respeta siempre:
+
+- El estado global se lee **antes** de ofrecer el botón: con la IA apagada,
+  no disponible o sin consentimiento **no sale ninguna petición** (S3/S7).
+- Sólo se pinta la salida validada (`summary`, `observations`, `cautions`) y
+  el código de error seguro. **Nunca** se pintan el payload enviado al
+  proveedor, la credencial, el modelo ni el contenido crudo del proveedor.
+- La ventana semanal es de 7 días y la de carga sigue el periodo del panel,
+  acotada a los 90 días que admite la API (`ai.MaxWindowDays`).
+
 ## Dónde está cada cosa
 
 | Pieza | Ruta |
@@ -209,6 +261,10 @@ mezcla campos de actividad y de ventana (el backend los rechaza).
 | Test de montaje | `internal/http/ai_analysis_mocks_test.go` |
 | Cliente de la API | `web/src/lib/api/ai.ts` |
 | Tests del cliente | `web/src/lib/api/ai.test.ts` |
+| Control de análisis con IA | `web/src/features/profile/AIAnalysisControl/AIAnalysisControl.tsx` |
+| Tests del control | `web/src/features/profile/AIAnalysisControl/AIAnalysisControl.test.tsx` |
+| Controles del panel de rendimiento | `web/src/features/dashboard/DashboardAIAnalysis.tsx` |
+| Ventanas de los análisis | `web/src/features/dashboard/aiWindow.ts` |
 | Job que realiza el análisis | `internal/jobs/ai_analysis.go` |
 | Claves de scope | `internal/ai/scope.go` |
 | Persistencia | `internal/db/sqlc/ai_analysis.sql.go` |
@@ -242,9 +298,10 @@ pnpm -C web typecheck
 - [ ] El listado sólo trae análisis del usuario autenticado y respeta el límite.
 - [ ] Un análisis que no existe: `404`.
 - [ ] Un análisis fallido expone sólo el código y el mensaje seguros.
+- [ ] La UI lee el estado antes de pedir nada: sin IA o sin consentimiento no sale ninguna petición.
+- [ ] La UI nunca pinta el payload, la credencial, el modelo ni el contenido del proveedor.
 
 ## Siguiente paso
 
-T8: los controles en la UI de actividad y de dashboard (pedir el análisis,
-mostrar el resultado y el estado "IA no disponible") reutilizando este
-cliente.
+T9: la verificación independiente de la fase (funcional, seguridad y
+revisión nativa) y el cierre de la épica.

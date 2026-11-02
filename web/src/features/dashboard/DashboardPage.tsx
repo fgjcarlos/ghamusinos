@@ -11,6 +11,7 @@ import { DashboardSummaryCardContainer } from './DashboardSummaryCardContainer';
 import { TrainingLoadChartContainer } from './TrainingLoadChartContainer';
 import { HRZonesChartContainer } from './HRZonesChartContainer';
 import { CardiacDriftPanelContainer } from './CardiacDriftPanelContainer';
+import { DashboardAIAnalysis } from './DashboardAIAnalysis';
 import styles from './DashboardPage.module.css';
 
 export function DashboardPage() {
@@ -44,6 +45,11 @@ export function DashboardPage() {
           <CardiacDriftPanelContainer from={from} to={to} />
         </>
       ) : null}
+
+      {/* Fase 1.5 (T8): los análisis con IA son bajo demanda y viven
+          debajo del panel determinista. Con la IA apagada o sin
+          consentimiento no piden nada (S3/S7). */}
+      <DashboardAIAnalysis period={period} to={to} />
     </section>
   );
 }
