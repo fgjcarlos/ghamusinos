@@ -45,7 +45,7 @@ func TestBuildAcceptsDocumentedKinds(t *testing.T) {
 // elevation gain, heart rate or training load.
 func TestBuildRejectsNegativeMetrics(t *testing.T) {
 	cases := []struct {
-		name string
+		name  string
 		apply func(*Builder) *Builder
 	}{
 		{"distance_meters", func(b *Builder) *Builder { return b.DistanceMeters(-1) }},
@@ -186,11 +186,11 @@ func TestPayloadJSONContainsOnlyAllowlistedKeys(t *testing.T) {
 		t.Fatalf("Unmarshal(metrics) error: %v", err)
 	}
 	allowedMetrics := map[string]bool{
-		"distance_meters":      true,
-		"duration_seconds":     true,
+		"distance_meters":       true,
+		"duration_seconds":      true,
 		"elevation_gain_meters": true,
-		"avg_heart_rate":       true,
-		"training_load":        true,
+		"avg_heart_rate":        true,
+		"training_load":         true,
 	}
 	for key := range metrics {
 		if !allowedMetrics[key] {
