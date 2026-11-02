@@ -521,9 +521,11 @@ type aiAggregates struct {
 // Build construye el payload con los agregados disponibles.
 //
 // Los valores se validan con el contrato de internal/ai: si un agregado no
-// cabe (por ejemplo, una ventana de 90 días con más de 7 días de tiempo
-// total en movimiento), Build devuelve un error y el job falla con un
-// código seguro, en lugar de recortar los datos.
+// cabe, Build devuelve un error y el job falla con un código seguro, en
+// lugar de recortar los datos. Los topes siguen a la ventana declarada:
+// una ventana de N días admite los totales de N días (por ejemplo, la
+// carga acumulada de 28 días), mientras que una actividad conserva sus
+// topes por actividad.
 func (a aiAggregates) Build(kind ai.Kind, windowDays int) (ai.Payload, error) {
 	builder := ai.NewBuilder(kind)
 	if windowDays > 0 {

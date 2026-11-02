@@ -25,23 +25,98 @@ const (
 	KindLoad Kind = "load"
 )
 
-// Sanity bounds for the aggregates that may leave the system. They are
-// deliberately generous so weekly and load windows stay valid, but tight
-// enough to stop a broken upstream computation from reaching a provider.
+// Sanity bounds for the aggregates that may leave the system. They bound
+// ONE DAY of analysis: an activity cannot last a week or weigh 1000 km,
+// and a single day of a window cannot either. A window analysis (weekly,
+// load) sends the TOTALS of its window, so its ceilings scale with the
+// number of days in the window (see LimitsFor).
 const (
-	// MaxDistanceMeters is 1000 km.
+	// MaxDistanceMeters is 1000 km for one day of analysis.
 	MaxDistanceMeters = 1_000_000.0
-	// MaxDurationSeconds is 7 days.
+	// MaxDurationSeconds is 7 days of moving time for one day of analysis.
 	MaxDurationSeconds = 604_800.0
-	// MaxElevationGainMeters is 50 km of accumulated climb.
+	// MaxElevationGainMeters is 50 km of accumulated climb for one day of
+	// analysis.
 	MaxElevationGainMeters = 50_000.0
-	// MaxAvgHeartRate is 240 bpm, above the highest plausible average.
+	// MaxAvgHeartRate is 240 bpm, above the highest plausible average. It
+	// is an average, not a sum, so it never scales with the window.
 	MaxAvgHeartRate = 240.0
-	// MaxTrainingLoad is the top of the calculated load scale.
+	// MaxTrainingLoad is the top of the calculated load scale for one day
+	// of analysis.
 	MaxTrainingLoad = 1_000.0
 	// MaxWindowDays bounds the analysed window (weekly and load analyses).
 	MaxWindowDays = 90
 )
+
+// Limits holds the maximum value that each aggregate may take in one
+// analysis of a given kind and window.
+//
+// The five values are the ceilings that Build() applies: a metric that is
+// present and above its ceiling is rejected.
+type Limits struct {
+	// DistanceMeters is the maximum distance of the analysis.
+	DistanceMeters float64
+	// DurationSeconds is the maximum moving time of the analysis.
+	DurationSeconds float64
+	// ElevationGainMeters is the maximum accumulated climb of the analysis.
+	ElevationGainMeters float64
+	// AvgHeartRate is the maximum average heart rate of the analysis.
+	AvgHeartRate float64
+	// TrainingLoad is the maximum calculated load of the analysis.
+	TrainingLoad float64
+}
+
+// LimitsFor returns the ceilings that apply to an analysis of the given
+// kind over a window of windowDays days.
+//
+// The rule is one rule, applied to the four SUMMED aggregates (distance,
+// moving time, accumulated climb and training load):
+//
+//	ceiling(metric, days) = perDayCeiling(metric) * days
+//
+// The per-day ceilings are the exported constants above: they bound one
+// day of analysis. An activity is exactly one day's event, so kind=activity
+// always uses them as they are, no matter how many window days it declares.
+//
+// kind=weekly and kind=load send the TOTALS of their window, so their
+// ceilings grow with it: a window of N days admits the totals of N days
+// and rejects anything beyond that. Without this the weekly and load
+// analyses were unusable for any window longer than the per-activity
+// ceilings.
+//
+// The average heart rate is an average, not a sum, so it never scales: it
+// stays at MaxAvgHeartRate for every kind and window.
+//
+// windowDays is clamped to 1..MaxWindowDays: an analysis without an
+// explicit window is bounded as a single day, and Build rejects a window
+// longer than MaxWindowDays anyway.
+func LimitsFor(kind Kind, windowDays int) Limits {
+	limits := Limits{
+		DistanceMeters:      MaxDistanceMeters,
+		DurationSeconds:     MaxDurationSeconds,
+		ElevationGainMeters: MaxElevationGainMeters,
+		AvgHeartRate:        MaxAvgHeartRate,
+		TrainingLoad:        MaxTrainingLoad,
+	}
+	if kind != KindWeekly && kind != KindLoad {
+		return limits
+	}
+
+	days := windowDays
+	if days < 1 {
+		days = 1
+	}
+	if days > MaxWindowDays {
+		days = MaxWindowDays
+	}
+
+	factor := float64(days)
+	limits.DistanceMeters *= factor
+	limits.DurationSeconds *= factor
+	limits.ElevationGainMeters *= factor
+	limits.TrainingLoad *= factor
+	return limits
+}
 
 // Metrics holds the numeric aggregates that may be sent to a provider.
 //
@@ -139,7 +214,9 @@ func (b *Builder) TrainingLoad(value float64) *Builder {
 // Build validates the accumulated values and returns the payload.
 //
 // Metrics that were never set are omitted. Values that are not finite,
-// negative or beyond the documented bounds are rejected.
+// negative or beyond the documented bounds are rejected. The bounds follow
+// the analysis: an activity uses the per-activity ceilings, and a window
+// uses the ceilings of its days (see LimitsFor).
 func (b *Builder) Build() (Payload, error) {
 	if !b.kind.valid() {
 		return Payload{}, fmt.Errorf("ai: unknown analysis kind %q", string(b.kind))
@@ -148,17 +225,18 @@ func (b *Builder) Build() (Payload, error) {
 		return Payload{}, fmt.Errorf("ai: window_days %d out of bounds (0..%d)", b.windowDays, MaxWindowDays)
 	}
 
+	limits := LimitsFor(b.kind, b.windowDays)
 	checks := []struct {
 		name     string
 		value    *float64
 		max      float64
 		positive bool
 	}{
-		{"distance_meters", b.metrics.DistanceMeters, MaxDistanceMeters, false},
-		{"duration_seconds", b.metrics.DurationSeconds, MaxDurationSeconds, false},
-		{"elevation_gain_meters", b.metrics.ElevationGainMeters, MaxElevationGainMeters, false},
-		{"avg_heart_rate", b.metrics.AvgHeartRate, MaxAvgHeartRate, true},
-		{"training_load", b.metrics.TrainingLoad, MaxTrainingLoad, false},
+		{"distance_meters", b.metrics.DistanceMeters, limits.DistanceMeters, false},
+		{"duration_seconds", b.metrics.DurationSeconds, limits.DurationSeconds, false},
+		{"elevation_gain_meters", b.metrics.ElevationGainMeters, limits.ElevationGainMeters, false},
+		{"avg_heart_rate", b.metrics.AvgHeartRate, limits.AvgHeartRate, true},
+		{"training_load", b.metrics.TrainingLoad, limits.TrainingLoad, false},
 	}
 	for _, check := range checks {
 		if check.value == nil {

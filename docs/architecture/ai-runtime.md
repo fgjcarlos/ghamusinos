@@ -296,9 +296,10 @@ ni texto libre.
 - **Las ventanas se cuentan en los días locales** del usuario
   (`users.timezone`).
 - Los límites del contrato de payload (`internal/ai`) siguen vigentes: si
-  un agregado no cabe (por ejemplo, más de 7 días de tiempo total en una
-  ventana de 90), el análisis falla con `invalid_metrics` en lugar de
-  recortar los datos.
+  un agregado no cabe, el análisis falla con `invalid_metrics` en lugar de
+  recortar los datos. Los límites **siguen a la ventana**: una ventana de
+  N días admite los totales de N días (`ai.LimitsFor`), mientras que una
+  actividad conserva sus topes por actividad.
 
 ### Claves de scope
 

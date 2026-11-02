@@ -29,11 +29,11 @@ error porque no hay por dónde.
 |---|---|---|---|
 | `kind` | Análisis pedido (`activity`, `weekly`, `load`) | — | nunca |
 | `window_days` | Ventana analizada, en días | `0..90` | `0` (sin ventana) |
-| `distance_meters` | Distancia recorrida | `0..1 000 000` m | sin medir |
-| `duration_seconds` | Tiempo en movimiento | `0..604 800` s | sin medir |
-| `elevation_gain_meters` | Desnivel acumulado | `0..50 000` m | sin medir |
-| `avg_heart_rate` | Frecuencia cardiaca media | `>0..240` bpm | sin medir |
-| `training_load` | Carga calculada | `0..1 000` | sin medir |
+| `distance_meters` | Distancia recorrida | actividad: `0..1 000 000` m · ventana de N días: `0..N×1 000 000` m | sin medir |
+| `duration_seconds` | Tiempo en movimiento | actividad: `0..604 800` s · ventana de N días: `0..N×604 800` s | sin medir |
+| `elevation_gain_meters` | Desnivel acumulado | actividad: `0..50 000` m · ventana de N días: `0..N×50 000` m | sin medir |
+| `avg_heart_rate` | Frecuencia cardiaca media | `>0..240` bpm (no escala) | sin medir |
+| `training_load` | Carga calculada | actividad: `0..1 000` · ventana de N días: `0..N×1 000` | sin medir |
 
 Reglas del payload:
 
@@ -44,8 +44,31 @@ Reglas del payload:
   muestra no vacía nunca da 0, así que el valor no se midió.
 - **Se rechaza** cualquier valor no finito (NaN, ±Inf), negativo o por encima
   del límite de la tabla. El error lo devuelve `Build()`.
-- **La ventana está acotada** a 90 días, para que el análisis semanal y de
-  carga no puedan convertirse en una extracción de histórico.
+- **Los topes siguen a la ventana, no son fijos.** Una actividad describe
+  un evento, así que conserva sus topes por actividad
+  (`MaxDistanceMeters`, `MaxDurationSeconds`, `MaxElevationGainMeters`,
+  `MaxTrainingLoad`, `MaxAvgHeartRate`). Un análisis semanal o de carga
+  envía el **total** de su ventana, así que su tope es el tope por día
+  multiplicado por los días de la ventana:
+
+  ```text
+  tope(métrica, N días) = topePorDía(métrica) × N
+  ```
+
+  que es exactamente lo que devuelve `ai.LimitsFor(kind, days)`. Sin este
+  escalado, una ventana de más de 7 días (o una carga acumulada de más de
+  1000 TSS) se rechazaba como `invalid_metrics` aunque los datos fueran
+  correctos, y el análisis semanal y de carga quedaba inutilizable.
+
+  El tope por día es el mismo que el de una actividad: un día puede
+  contener una o más actividades, así que el tope por día nunca es menor
+  que el de una actividad y ningún dato que vale para una actividad queda
+  fuera de la ventana que lo contiene.
+- **La FC media nunca escala**: es una media, no una suma, así que su tope
+  sigue siendo `MaxAvgHeartRate` en cualquier ventana.
+- **La ventana está acotada** a 90 días (`ai.MaxWindowDays`), para que el
+  análisis semanal y de carga no puedan convertirse en una extracción de
+  histórico. El escalado de los topes no amplía la ventana.
 
 ### Los tres análisis
 
@@ -183,6 +206,7 @@ const (
 )
 
 const (
+    // Topes por un día de análisis (una actividad es un día).
     MaxDistanceMeters      = 1_000_000.0
     MaxDurationSeconds     = 604_800.0
     MaxElevationGainMeters = 50_000.0
@@ -190,6 +214,25 @@ const (
     MaxTrainingLoad        = 1_000.0
     MaxWindowDays          = 90
 )
+
+// Limits son los topes de los cinco agregados para un análisis.
+type Limits struct {
+    DistanceMeters      float64
+    DurationSeconds     float64
+    ElevationGainMeters float64
+    AvgHeartRate        float64
+    TrainingLoad        float64
+}
+
+// LimitsFor devuelve los topes que aplican a un análisis de kind sobre una
+// ventana de windowDays días.
+//
+// Regla: tope(métrica, N días) = topePorDía(métrica) × N, para los cuatro
+// agregados SUMADOS (distancia, tiempo en movimiento, desnivel y carga).
+// kind=activity no escala nunca; kind=weekly y kind=load escalan con los
+// días de la ventana. La FC media nunca escala. windowDays se acota a
+// 1..MaxWindowDays.
+func LimitsFor(kind Kind, windowDays int) Limits
 
 type Metrics struct {
     DistanceMeters      *float64
@@ -349,6 +392,9 @@ proveedor, ni credenciales de verdad, ni costes.
 - [ ] Un agregado sin medir está ausente, nunca en `0`.
 - [ ] Los valores imposibles (negativos, no finitos, fuera de rango) se
       rechazan en `Build()`.
+- [ ] Los topes de una ventana de N días son los topes por día por N, y
+      una actividad conserva siempre los suyos.
+- [ ] Una ventana de más de 90 días se rechaza.
 - [ ] La respuesta se valida con el mismo esquema y el mismo validador para
       todos los proveedores.
 - [ ] Una respuesta con métrica inventada o diagnóstico se descarta.

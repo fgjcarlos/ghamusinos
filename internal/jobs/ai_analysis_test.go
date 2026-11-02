@@ -917,3 +917,78 @@ func TestAIAnalysisArgsKind(t *testing.T) {
 		t.Errorf("Kind() = %q, quiere %q", got, "ai_analysis")
 	}
 }
+
+// ─────────────────────────────────────────────────────────────────────────
+// Regla: los topes del payload escalan con los días de la ventana
+//
+// Una ventana de carga de 28 días envía el TOTAL de la ventana, no una
+// actividad: sus totales legítimos superan los topes por actividad y el
+// análisis no puede fallar con invalid_metrics por eso.
+// ─────────────────────────────────────────────────────────────────────────
+
+func TestAIAnalysisWorker_LoadWindowWithProportionalTotalsIsAnalysed(t *testing.T) {
+	t.Parallel()
+
+	const days = 28
+
+	store := &fakeAIStore{prefs: consentedPreferences()}
+	for day := 0; day < days; day++ {
+		store.activities = append(store.activities, sqlc.ListActivitiesInRangeRow{
+			StartedAt:      pgtype.Timestamptz{Time: time.Date(2026, 3, 2, 7, 0, 0, 0, time.UTC).AddDate(0, 0, day), Valid: true},
+			MovingSeconds:  30000,
+			DistanceMeters: numericFloat(t, "50000.00"),
+			ElevationGainM: numericFloat(t, "2000.00"),
+			AvgHr:          pgtype.Int2{Int16: 150, Valid: true},
+		})
+		store.loads = append(store.loads, sqlc.TrainingLoadDaily{Tss: 50})
+	}
+
+	analyzer := &fakeAIAnalyzer{provider: ai.ProviderOpenAI, out: ai.Output{Summary: "Carga", Observations: []string{}, Cautions: []string{}}}
+	worker := NewAIAnalysisWorker(store, analyzer, aiConfigReady(), nil)
+
+	err := worker.run(context.Background(), AIAnalysisArgs{
+		UserID:       testAIUserID,
+		AnalysisKind: string(ai.KindLoad),
+		Scope:        ai.LoadScope(time.Date(2026, 3, 2, 0, 0, 0, 0, time.UTC), days),
+	})
+	if err != nil {
+		t.Fatalf("run() = %v, quiere nil", err)
+	}
+	if analyzer.calls != 1 {
+		t.Fatalf("llamadas al proveedor = %d, quiere exactamente 1", analyzer.calls)
+	}
+	if len(store.failed) != 0 {
+		t.Fatalf("filas fallidas = %d, quiere 0 (código %q)", len(store.failed), store.failed[0].ErrorCode.String)
+	}
+	if len(store.completed) != 1 {
+		t.Fatalf("filas completadas = %d, quiere 1", len(store.completed))
+	}
+
+	var decoded struct {
+		Kind       string             `json:"kind"`
+		WindowDays int                `json:"window_days"`
+		Metrics    map[string]float64 `json:"metrics"`
+	}
+	if err := json.Unmarshal(analyzer.payloadJSON, &decoded); err != nil {
+		t.Fatalf("el payload no es JSON: %v", err)
+	}
+	if decoded.Kind != string(ai.KindLoad) {
+		t.Errorf("kind = %q, quiere %q", decoded.Kind, ai.KindLoad)
+	}
+	if decoded.WindowDays != days {
+		t.Errorf("window_days = %d, quiere %d", decoded.WindowDays, days)
+	}
+
+	// Los totales de la ventana, que superan los topes por actividad.
+	want := map[string]float64{
+		"distance_meters":       1_400_000,
+		"duration_seconds":      840_000,
+		"elevation_gain_meters": 56_000,
+		"training_load":         1_400,
+	}
+	for key, value := range want {
+		if decoded.Metrics[key] != value {
+			t.Errorf("%s = %v, quiere %v (total de la ventana)", key, decoded.Metrics[key], value)
+		}
+	}
+}
