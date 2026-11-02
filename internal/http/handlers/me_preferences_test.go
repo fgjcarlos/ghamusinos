@@ -8,6 +8,8 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -16,6 +18,35 @@ import (
 	"github.com/fgjcarlos/ghamusinos/internal/auth"
 	"github.com/fgjcarlos/ghamusinos/internal/db/sqlc"
 )
+
+// aiConsentMigration is the migration that makes the AI opt-in explicit
+// for every user (phase 1.5, T2).
+const aiConsentMigration = "00014_ai_explicit_opt_in.sql"
+
+// readRepoFile reads a file relative to this package directory. It is
+// used to assert the on-disk contract of the consent migration and of
+// the sqlc schema, which are the storage half of the same consent
+// guarantee the handlers expose.
+func readRepoFile(t *testing.T, parts ...string) string {
+	t.Helper()
+	path := filepath.Join(append([]string{"..", ".."}, parts...)...)
+	b, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("read %s: %v", path, err)
+	}
+	return string(b)
+}
+
+// gooseSections splits a goose migration into its Up and Down halves.
+// A migration without a Down section yields an empty Down string.
+func gooseSections(t *testing.T, migration string) (up string, down string) {
+	t.Helper()
+	idx := strings.Index(migration, "-- +goose Down")
+	if idx < 0 {
+		return migration, ""
+	}
+	return migration[:idx], migration[idx:]
+}
 
 // newPatchReq builds a PATCH /api/v1/me/preferences request with a
 // minimal user context so the handler reaches validation.
@@ -40,6 +71,12 @@ func newPatchReq(body string) *http.Request {
 type preferencesMockQuerier struct {
 	t                  *testing.T
 	deleteStravaTokens func(userID pgtype.UUID) error
+	// getPreferences overrides the stored preferences returned by
+	// GetUserPreferencesByID. Defaults to the zero value.
+	getPreferences func(userID pgtype.UUID) sqlc.GetUserPreferencesByIDRow
+	// updatePreferences captures the parameters the handler sends to
+	// UpdateUserPreferences. Defaults to a no-op.
+	updatePreferences func(params sqlc.UpdateUserPreferencesParams)
 }
 
 func (m *preferencesMockQuerier) CreateInvite(ctx context.Context, arg sqlc.CreateInviteParams) (sqlc.Invite, error) {
@@ -85,6 +122,9 @@ func (m *preferencesMockQuerier) GetHRZonesByActivity(ctx context.Context, activ
 	return sqlc.HrZone{}, nil
 }
 func (m *preferencesMockQuerier) GetUserPreferencesByID(ctx context.Context, id pgtype.UUID) (sqlc.GetUserPreferencesByIDRow, error) {
+	if m.getPreferences != nil {
+		return m.getPreferences(id), nil
+	}
 	return sqlc.GetUserPreferencesByIDRow{}, nil
 }
 func (m *preferencesMockQuerier) GetInviteByTokenHash(ctx context.Context, tokenHash string) (sqlc.Invite, error) {
@@ -121,6 +161,9 @@ func (m *preferencesMockQuerier) UpdateUserProfile(ctx context.Context, arg sqlc
 	return sqlc.User{}, nil
 }
 func (m *preferencesMockQuerier) UpdateUserPreferences(ctx context.Context, arg sqlc.UpdateUserPreferencesParams) (sqlc.User, error) {
+	if m.updatePreferences != nil {
+		m.updatePreferences(arg)
+	}
 	return sqlc.User{}, nil
 }
 func (m *preferencesMockQuerier) UpsertActivity(ctx context.Context, arg sqlc.UpsertActivityParams) (sqlc.Activity, error) {
@@ -412,4 +455,209 @@ func (m *preferencesMockQuerier) UpsertTrainingLoadDaily(ctx context.Context, ar
 
 func (m *preferencesMockQuerier) GetUserByID(ctx context.Context, id pgtype.UUID) (sqlc.User, error) {
 	return sqlc.User{}, nil
+}
+
+// ---------------------------------------------------------------------------
+// AI consent contract (phase 1.5, T2 — S3/S5)
+//
+// The consent flag (users.ai_enabled) is the only switch that allows the
+// product to send training data to an external AI provider. The rules
+// below pin the whole contract:
+//
+//   - the stored default is false (nobody is opted in by accident),
+//   - an omitted ai_enabled in a PATCH body is stored as false
+//     (omission is never consent),
+//   - an explicit ai_enabled=true is the consent act,
+//   - the rest of the profile is stored unchanged.
+// ---------------------------------------------------------------------------
+
+// TestPatchPreferences_ExplicitTrueStoresConsent proves that an explicit
+// ai_enabled=true is stored as true: that PATCH is the consent act.
+func TestPatchPreferences_ExplicitTrueStoresConsent(t *testing.T) {
+	var captured sqlc.UpdateUserPreferencesParams
+	m := &preferencesMockQuerier{
+		t: t,
+		updatePreferences: func(p sqlc.UpdateUserPreferencesParams) {
+			captured = p
+		},
+	}
+	h := PatchPreferences(m)
+	req := newPatchReq(`{"hr_max":180,"timezone":"Europe/Madrid","ai_enabled":true}`)
+	w := httptest.NewRecorder()
+	h.ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d (body=%s)", w.Code, w.Body.String())
+	}
+	if !captured.AiEnabled {
+		t.Error("expected ai_enabled=true to be stored as the explicit consent")
+	}
+}
+
+// TestPatchPreferences_OmittedConsentIsStoredAsFalse proves that leaving
+// ai_enabled out of the body never grants consent: the omission
+// semantics of the existing PATCH contract stay "false".
+func TestPatchPreferences_OmittedConsentIsStoredAsFalse(t *testing.T) {
+	var captured sqlc.UpdateUserPreferencesParams
+	m := &preferencesMockQuerier{
+		t: t,
+		updatePreferences: func(p sqlc.UpdateUserPreferencesParams) {
+			captured = p
+		},
+	}
+	h := PatchPreferences(m)
+	req := newPatchReq(`{"hr_max":180,"timezone":"Europe/Madrid"}`)
+	w := httptest.NewRecorder()
+	h.ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d (body=%s)", w.Code, w.Body.String())
+	}
+	if captured.AiEnabled {
+		t.Error("expected an omitted ai_enabled to be stored as false, got true")
+	}
+}
+
+// TestPatchPreferences_ExplicitFalseRevokesConsent proves the user can
+// always take the consent back with an explicit false.
+func TestPatchPreferences_ExplicitFalseRevokesConsent(t *testing.T) {
+	var captured sqlc.UpdateUserPreferencesParams
+	m := &preferencesMockQuerier{
+		t: t,
+		updatePreferences: func(p sqlc.UpdateUserPreferencesParams) {
+			captured = p
+		},
+	}
+	h := PatchPreferences(m)
+	req := newPatchReq(`{"timezone":"UTC","ai_enabled":false}`)
+	w := httptest.NewRecorder()
+	h.ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d (body=%s)", w.Code, w.Body.String())
+	}
+	if captured.AiEnabled {
+		t.Error("expected ai_enabled=false to be stored as false, got true")
+	}
+}
+
+// TestPatchPreferences_PreservesUnrelatedPreferences proves that saving
+// the consent does not alter the rest of the profile: the same
+// normalization/validation of #159 is reused for every field.
+func TestPatchPreferences_PreservesUnrelatedPreferences(t *testing.T) {
+	var captured sqlc.UpdateUserPreferencesParams
+	m := &preferencesMockQuerier{
+		t: t,
+		updatePreferences: func(p sqlc.UpdateUserPreferencesParams) {
+			captured = p
+		},
+	}
+	h := PatchPreferences(m)
+	req := newPatchReq(`{"hr_max":180,"lthr":150,"ftp":280,"level":"advanced","timezone":"Europe/Madrid","ai_enabled":true}`)
+	w := httptest.NewRecorder()
+	h.ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d (body=%s)", w.Code, w.Body.String())
+	}
+	if captured.HrMax.Int16 != 180 {
+		t.Errorf("hr_max = %d, wanted 180", captured.HrMax.Int16)
+	}
+	if captured.Lthr.Int16 != 150 {
+		t.Errorf("lthr = %d, wanted 150", captured.Lthr.Int16)
+	}
+	if captured.Ftp.Int16 != 280 {
+		t.Errorf("ftp = %d, wanted 280", captured.Ftp.Int16)
+	}
+	if !captured.Level.Valid || captured.Level.String != "advanced" {
+		t.Errorf("level = %+v, wanted advanced", captured.Level)
+	}
+	if captured.Timezone != "Europe/Madrid" {
+		t.Errorf("timezone = %q, wanted Europe/Madrid", captured.Timezone)
+	}
+}
+
+// TestGetPreferences_ReportsStoredConsent proves the GET contract
+// exposes the stored consent flag verbatim, so the SPA can render the
+// unchecked box and the transfer notice for a user that never accepted.
+func TestGetPreferences_ReportsStoredConsent(t *testing.T) {
+	m := &preferencesMockQuerier{
+		t: t,
+		getPreferences: func(pgtype.UUID) sqlc.GetUserPreferencesByIDRow {
+			return sqlc.GetUserPreferencesByIDRow{
+				Timezone:  "UTC",
+				AiEnabled: false,
+			}
+		},
+	}
+	h := GetPreferences(m)
+	req := httptest.NewRequestWithContext(
+		auth.WithAuthUser(context.Background(), &auth.User{ID: "00000000-0000-0000-0000-000000000001"}),
+		http.MethodGet, "/api/v1/me/preferences", nil)
+	w := httptest.NewRecorder()
+	h.ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", w.Code)
+	}
+	var resp map[string]any
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("expected JSON body: %v", err)
+	}
+	if got, ok := resp["ai_enabled"].(bool); !ok || got {
+		t.Errorf("expected ai_enabled=false in %q", w.Body.String())
+	}
+}
+
+// TestMigration00014_UpResetsConsentAndDefaultsToFalse pins the storage
+// half of the consent contract: the column default becomes false (fresh
+// users are never opted in) and every previously stored true is reset
+// (the old default-true value cannot prove consent).
+func TestMigration00014_UpResetsConsentAndDefaultsToFalse(t *testing.T) {
+	migration := readRepoFile(t, "db", "migrations", aiConsentMigration)
+	up, _ := gooseSections(t, migration)
+
+	if !strings.Contains(up, "SET DEFAULT false") {
+		t.Errorf("expected the migration to set the ai_enabled default to false, got:\n%s", up)
+	}
+	if !strings.Contains(up, "ALTER COLUMN ai_enabled") {
+		t.Errorf("expected the migration to alter the ai_enabled column, got:\n%s", up)
+	}
+	if !strings.Contains(up, "UPDATE users") || !strings.Contains(up, "SET ai_enabled = false") {
+		t.Errorf("expected the migration to reset existing ai_enabled=true rows to false, got:\n%s", up)
+	}
+}
+
+// TestMigration00014_DownNeverConsents proves the rollback path cannot
+// grant consent to anybody: the Down section neither flips a stored
+// value to true nor restores a default that would opt in new users.
+func TestMigration00014_DownNeverConsents(t *testing.T) {
+	migration := readRepoFile(t, "db", "migrations", aiConsentMigration)
+	_, down := gooseSections(t, migration)
+	if down == "" {
+		t.Fatal("expected the migration to declare a Down section")
+	}
+	if strings.Contains(down, "SET DEFAULT true") {
+		t.Errorf("the Down section must not restore a default that consents new users:\n%s", down)
+	}
+	if strings.Contains(down, "ai_enabled = true") {
+		t.Errorf("the Down section must never store ai_enabled=true:\n%s", down)
+	}
+	if strings.Contains(down, "UPDATE users") {
+		t.Errorf("the Down section must not mutate stored consent values:\n%s", down)
+	}
+}
+
+// TestSchemaDeclaresConsentDefaultFalse proves the sqlc schema (the
+// source of truth for the generated queries) agrees with the migration:
+// a row inserted without ai_enabled is not opted in.
+func TestSchemaDeclaresConsentDefaultFalse(t *testing.T) {
+	schema := readRepoFile(t, "db", "schema.sql")
+	for _, line := range strings.Split(schema, "\n") {
+		if !strings.Contains(line, "ai_enabled") {
+			continue
+		}
+		if strings.Contains(line, "DEFAULT true") {
+			t.Errorf("schema.sql must declare ai_enabled with DEFAULT false, got: %s", strings.TrimSpace(line))
+		}
+		if strings.Contains(line, "DEFAULT false") {
+			return
+		}
+	}
+	t.Error("schema.sql does not declare ai_enabled with DEFAULT false")
 }

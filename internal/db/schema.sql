@@ -11,6 +11,13 @@ CREATE TABLE users (
                                 CHECK (invite_status IN ('pending', 'active', 'blocked')),
     -- Preferencias iniciales del usuario (fase 1.1). Métricas fisiológicas
     -- opcionales (consumidas desde la fase 1.4); ai_enabled gobierna la IA.
+    --
+    -- Phase 1.5 (issue #17, T2): ai_enabled is the explicit consent to
+    -- send aggregate training metrics to the external AI provider. The
+    -- default is false and migration 00014 resets the inherited true
+    -- values: a stored TRUE cannot prove that the user ever accepted
+    -- the transfer notice. Only an explicit PATCH with ai_enabled=true
+    -- grants the consent again.
     hr_max          SMALLINT    CONSTRAINT users_hr_max_valido CHECK (hr_max IS NULL OR (hr_max > 0 AND hr_max <= 260)),
     lthr            SMALLINT    CONSTRAINT users_lthr_valido   CHECK (lthr   IS NULL OR (lthr   > 0 AND lthr   <= 260)),
     ftp             SMALLINT    CONSTRAINT users_ftp_valido    CHECK (ftp    IS NULL OR (ftp    > 0 AND ftp    <= 2000)),
@@ -20,7 +27,7 @@ CREATE TABLE users (
     running_threshold_sec_per_km SMALLINT NULL CONSTRAINT users_running_threshold_chk CHECK (running_threshold_sec_per_km IS NULL OR (running_threshold_sec_per_km BETWEEN 120 AND 1800)),
     timezone        TEXT        NOT NULL DEFAULT 'UTC'
                                 CONSTRAINT users_timezone_valido CHECK (timezone <> ''),
-    ai_enabled      BOOLEAN     NOT NULL DEFAULT true,
+    ai_enabled      BOOLEAN     NOT NULL DEFAULT false,
     created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at      TIMESTAMPTZ NOT NULL DEFAULT now()
 );

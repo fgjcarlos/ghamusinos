@@ -5,6 +5,14 @@
 // PATCH /api/v1/me/preferences → actualiza con validación estricta:
 //   valores fuera de rango devuelven 422 con ProblemDetail y
 //   cross-field check (lthr > hr_max) produce un aviso no un error.
+//
+// Phase 1.5 (T2, S3/S5): ai_enabled is the explicit consent that lets
+// the product send aggregate training metrics to the configured
+// external AI provider. The stored default is false, an ai_enabled
+// omitted from the PATCH body is stored as false (omission is never
+// consent) and only an explicit ai_enabled=true grants it. The
+// normalization and validation of #159 are reused as they are: no
+// profile field changes meaning because of the consent.
 
 package handlers
 
@@ -150,6 +158,10 @@ func PatchPreferences(q sqlc.Querier) http.Handler {
 
 // preferencesPatch is the decoded request body. Pointer fields map to
 // nullable int2 columns; non-pointer fields are required.
+//
+// ai_enabled is the AI consent switch (phase 1.5). It is a plain bool:
+// an omitted field decodes to false, so a body that never mentions the
+// consent can never grant it. Only an explicit true does.
 type preferencesPatch struct {
 	HrMax     *pgtype.Int2 `json:"hr_max"`
 	Lthr      *pgtype.Int2 `json:"lthr"`

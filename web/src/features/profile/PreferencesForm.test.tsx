@@ -118,4 +118,103 @@ describe('PreferencesForm', () => {
     );
     expect(screen.getByRole('button', { name: /guardando/i })).toBeDisabled();
   });
+
+  // ─────────────────────────────────────────────────────────────────
+  // Aviso de transferencia a proveedor de IA externo (fase 1.5, T2).
+  // ─────────────────────────────────────────────────────────────────
+
+  it('shows the transfer notice naming the external AI provider', () => {
+    render(
+      <PreferencesForm
+        values={makeValues()}
+        errors={{}}
+        busy={false}
+        onChange={() => {}}
+        onSubmit={() => {}}
+      />,
+    );
+    const notice = screen.getByTestId('ai-consent-notice');
+    expect(notice).toBeInTheDocument();
+    expect(notice.textContent ?? '').toMatch(/proveedor de IA externo/i);
+  });
+
+  it('lists only the aggregate metrics that may leave the system', () => {
+    render(
+      <PreferencesForm
+        values={makeValues()}
+        errors={{}}
+        busy={false}
+        onChange={() => {}}
+        onSubmit={() => {}}
+      />,
+    );
+    const text = screen.getByTestId('ai-consent-notice').textContent ?? '';
+    expect(text).toMatch(/distancia/i);
+    expect(text).toMatch(/duración/i);
+    expect(text).toMatch(/desnivel/i);
+    expect(text).toMatch(/frecuencia cardíaca/i);
+    expect(text).toMatch(/carga calculada/i);
+  });
+
+  it('states that no identifying data, GPS coordinates or raw streams are sent', () => {
+    render(
+      <PreferencesForm
+        values={makeValues()}
+        errors={{}}
+        busy={false}
+        onChange={() => {}}
+        onSubmit={() => {}}
+      />,
+    );
+    const text = screen.getByTestId('ai-consent-notice').textContent ?? '';
+    expect(text).toMatch(/no se env/i);
+    expect(text).toMatch(/identific/i);
+    expect(text).toMatch(/nombre/i);
+    expect(text).toMatch(/correo/i);
+    expect(text).toMatch(/GPS/i);
+    expect(text).toMatch(/streams crudos/i);
+  });
+
+  it('renders the AI consent checkbox unchecked when there is no consent', () => {
+    render(
+      <PreferencesForm
+        values={makeValues({ ai_enabled: false })}
+        errors={{}}
+        busy={false}
+        onChange={() => {}}
+        onSubmit={() => {}}
+      />,
+    );
+    expect(screen.getByRole('checkbox', { name: /proveedor de IA/i })).not.toBeChecked();
+  });
+
+  it('emits onChange with true only when the user checks the consent box', () => {
+    const onChange = vi.fn();
+    render(
+      <PreferencesForm
+        values={makeValues({ ai_enabled: false })}
+        errors={{}}
+        busy={false}
+        onChange={onChange}
+        onSubmit={() => {}}
+      />,
+    );
+    fireEvent.click(screen.getByRole('checkbox', { name: /proveedor de IA/i }));
+    expect(onChange).toHaveBeenCalledWith('ai_enabled', true);
+  });
+
+  it('emits onChange with false when the user revokes the consent', () => {
+    const onChange = vi.fn();
+    render(
+      <PreferencesForm
+        values={makeValues({ ai_enabled: true })}
+        errors={{}}
+        busy={false}
+        onChange={onChange}
+        onSubmit={() => {}}
+      />,
+    );
+    fireEvent.click(screen.getByRole('checkbox', { name: /proveedor de IA/i }));
+    expect(onChange).toHaveBeenCalledWith('ai_enabled', false);
+  });
 });
