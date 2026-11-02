@@ -66,6 +66,14 @@ type Querier interface {
 	GetActivityByExternalID(ctx context.Context, arg GetActivityByExternalIDParams) (Activity, error)
 	// Load an event by the internal UUID passed to IngestActivityEventWorker.
 	GetActivityEventByID(ctx context.Context, id pgtype.UUID) (ActivityEvent, error)
+	// Actividad concreta de un usuario. El filtro por user_id es la frontera
+	// de aislamiento: la actividad de otro usuario no existe para esta
+	// consulta (pgx.ErrNoRows), así que un job nunca puede analizar la
+	// actividad de otro usuario.
+	//
+	// Proyección estrecha: sólo las columnas numéricas deterministas que
+	// necesita el análisis de IA. Sin nombre, sin raw_payload y sin streams.
+	GetActivityForUser(ctx context.Context, arg GetActivityForUserParams) (GetActivityForUserRow, error)
 	// Lee la fila de metadata del usuario. Si nunca se ejecutó un recalc,
 	// la fila no existe; el handler /healthz extendido debe distinguir "sin
 	// metadata" (status=`never`) de "último recalc falló" (status=`error`).

@@ -111,3 +111,23 @@ func (m *mockMeQuerier) CompleteAIAnalysis(ctx context.Context, arg sqlc.Complet
 func (m *mockMeQuerier) FailAIAnalysis(ctx context.Context, arg sqlc.FailAIAnalysisParams) (sqlc.AiAnalysis, error) {
 	return sqlc.AiAnalysis{}, nil
 }
+
+// GetActivityForUser stub para activitiesMockQuerier.
+func (m *activitiesMockQuerier) GetActivityForUser(ctx context.Context, arg sqlc.GetActivityForUserParams) (sqlc.GetActivityForUserRow, error) {
+	return sqlc.GetActivityForUserRow{}, nil
+}
+
+// GetActivityForUser stub para dashboardMockQuerier.
+func (m *dashboardMockQuerier) GetActivityForUser(ctx context.Context, arg sqlc.GetActivityForUserParams) (sqlc.GetActivityForUserRow, error) {
+	return sqlc.GetActivityForUserRow{}, nil
+}
+
+// GetActivityForUser stub para preferencesMockQuerier.
+func (m *preferencesMockQuerier) GetActivityForUser(ctx context.Context, arg sqlc.GetActivityForUserParams) (sqlc.GetActivityForUserRow, error) {
+	return sqlc.GetActivityForUserRow{}, nil
+}
+
+// GetActivityForUser stub para mockMeQuerier.
+func (m *mockMeQuerier) GetActivityForUser(ctx context.Context, arg sqlc.GetActivityForUserParams) (sqlc.GetActivityForUserRow, error) {
+	return sqlc.GetActivityForUserRow{}, nil
+}
