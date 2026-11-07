@@ -18,6 +18,8 @@ import (
 	"github.com/fgjcarlos/ghamusinos/internal/http/handlers"
 	"github.com/fgjcarlos/ghamusinos/internal/jobs"
 	"github.com/fgjcarlos/ghamusinos/internal/strava"
+	"github.com/fgjcarlos/ghamusinos/internal/terrain"
+	"github.com/fgjcarlos/ghamusinos/internal/weather"
 )
 
 // Server agrupa las dependencias inyectadas necesarias para construir el router.
@@ -264,6 +266,13 @@ func (s *Server) Router() http.Handler {
 					r.Post("/upload", handlers.UploadGPX(s.gpxStore, s.gpxParser, s.gpxValidator, s.gpxAnalyzer, s.gpxClimbDetector, s.gpxRiskDetector, s.gpxTypeDetector, s.gpxHasher).ServeHTTP)
 					r.Get("/", handlers.ListGPX(s.gpxStore).ServeHTTP)
 					r.Get("/{id}", handlers.GetGPX(s.gpxStore).ServeHTTP)
+					// Phase 1.6 (issue #18): environmental context is
+					// served by the backend so the SPA keeps its
+					// `connect-src 'self'` CSP. Both handlers derive the
+					// coordinates from the stored track, never from the
+					// client, and degrade independently of the detail page.
+					r.Get("/{id}/weather", handlers.GetGPXWeather(s.gpxStore, weather.NewClient()).ServeHTTP)
+					r.Get("/{id}/terrain", handlers.GetGPXTerrain(s.gpxStore, terrain.NewClient()).ServeHTTP)
 					r.Delete("/{id}", handlers.DeleteGPX(s.gpxStore).ServeHTTP)
 					r.Post("/compare", handlers.CompareGPX(s.gpxStore).ServeHTTP)
 				})
