@@ -27,6 +27,62 @@ func (q *Queries) FirstActivityForUser(ctx context.Context, userID pgtype.UUID) 
 	return first_started_at, err
 }
 
+const getActivityForUser = `-- name: GetActivityForUser :one
+SELECT id,
+       user_id,
+       sport_type,
+       started_at,
+       elapsed_seconds,
+       moving_seconds,
+       distance_meters,
+       elevation_gain_m,
+       avg_hr
+FROM activities
+WHERE id = $1
+  AND user_id = $2
+`
+
+type GetActivityForUserParams struct {
+	ID     pgtype.UUID `json:"id"`
+	UserID pgtype.UUID `json:"user_id"`
+}
+
+type GetActivityForUserRow struct {
+	ID             pgtype.UUID        `json:"id"`
+	UserID         pgtype.UUID        `json:"user_id"`
+	SportType      string             `json:"sport_type"`
+	StartedAt      pgtype.Timestamptz `json:"started_at"`
+	ElapsedSeconds int32              `json:"elapsed_seconds"`
+	MovingSeconds  int32              `json:"moving_seconds"`
+	DistanceMeters pgtype.Numeric     `json:"distance_meters"`
+	ElevationGainM pgtype.Numeric     `json:"elevation_gain_m"`
+	AvgHr          pgtype.Int2        `json:"avg_hr"`
+}
+
+// Actividad concreta de un usuario. El filtro por user_id es la frontera
+// de aislamiento: la actividad de otro usuario no existe para esta
+// consulta (pgx.ErrNoRows), así que un job nunca puede analizar la
+// actividad de otro usuario.
+//
+// Proyección estrecha: sólo las columnas numéricas deterministas que
+// necesita el análisis de IA. Sin nombre, sin raw_payload y sin streams.
+func (q *Queries) GetActivityForUser(ctx context.Context, arg GetActivityForUserParams) (GetActivityForUserRow, error) {
+	row := q.db.QueryRow(ctx, getActivityForUser, arg.ID, arg.UserID)
+	var i GetActivityForUserRow
+	err := row.Scan(
+		&i.ID,
+		&i.UserID,
+		&i.SportType,
+		&i.StartedAt,
+		&i.ElapsedSeconds,
+		&i.MovingSeconds,
+		&i.DistanceMeters,
+		&i.ElevationGainM,
+		&i.AvgHr,
+	)
+	return i, err
+}
+
 const listActivitiesInRange = `-- name: ListActivitiesInRange :many
 SELECT id,
        user_id,

@@ -154,4 +154,79 @@ describe('PreferencesContainer', () => {
       expect(screen.getByTestId('status-saved')).toBeInTheDocument();
     });
   });
+
+  // ─────────────────────────────────────────────────────────────
+  // Consentimiento de IA (fase 1.5, T2): la casilla arranca
+  // desmarcada y sólo viaja activada tras una acción explícita.
+  // ─────────────────────────────────────────────────────────────
+
+  it('keeps the AI consent unchecked when the server reports no consent', async () => {
+    mockedGetPreferences.mockResolvedValue({
+      hr_max: 180,
+      lthr: null,
+      ftp: null,
+      level: null,
+      timezone: 'Europe/Madrid',
+      ai_enabled: false,
+    });
+    mockedPatchPreferences.mockResolvedValue({
+      hr_max: 180,
+      lthr: null,
+      ftp: null,
+      level: null,
+      timezone: 'Europe/Madrid',
+      ai_enabled: false,
+    });
+
+    renderContainer();
+    await waitFor(() => {
+      expect(mockedGetPreferences).toHaveBeenCalled();
+    });
+
+    expect(screen.getByRole('checkbox', { name: /proveedor de IA/i })).not.toBeChecked();
+
+    // Saving without touching the box must not send a consent.
+    fireEvent.click(screen.getByTestId('preferences-submit'));
+    await waitFor(() => {
+      expect(mockedPatchPreferences).toHaveBeenCalled();
+    });
+    expect(mockedPatchPreferences.mock.calls[0][1].ai_enabled).toBe(false);
+  });
+
+  it('sends ai_enabled=true only after the user checks the box and saves, keeping the rest of the profile', async () => {
+    mockedGetPreferences.mockResolvedValue({
+      hr_max: 180,
+      lthr: null,
+      ftp: null,
+      level: 'intermediate',
+      timezone: 'Europe/Madrid',
+      ai_enabled: false,
+    });
+    mockedPatchPreferences.mockResolvedValue({
+      hr_max: 180,
+      lthr: null,
+      ftp: null,
+      level: 'intermediate',
+      timezone: 'Europe/Madrid',
+      ai_enabled: true,
+    });
+
+    renderContainer();
+    await waitFor(() => {
+      expect(mockedGetPreferences).toHaveBeenCalled();
+    });
+
+    fireEvent.click(screen.getByRole('checkbox', { name: /proveedor de IA/i }));
+    fireEvent.click(screen.getByTestId('preferences-submit'));
+
+    await waitFor(() => {
+      expect(mockedPatchPreferences).toHaveBeenCalled();
+    });
+    const payload = mockedPatchPreferences.mock.calls[0][1];
+    expect(payload.ai_enabled).toBe(true);
+    // The rest of the profile survives the consent change.
+    expect(payload.hr_max).toBe(180);
+    expect(payload.level).toBe('intermediate');
+    expect(payload.timezone).toBe('Europe/Madrid');
+  });
 });

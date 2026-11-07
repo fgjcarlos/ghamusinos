@@ -3,6 +3,7 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
 import type {
   CardiacDriftResponse,
   DashboardSummary,
@@ -19,12 +20,23 @@ vi.mock('../../lib/api/dashboard', () => ({
   postRecalc: vi.fn(),
 }));
 
+// Fase 1.5 (T8): la página monta los controles de análisis con IA, que
+// leen el estado global antes de pedir nada.
+vi.mock('../../lib/api/ai', () => ({
+  fetchAIStatus: vi.fn(),
+  createAIAnalysis: vi.fn(),
+  listAIAnalyses: vi.fn(),
+  fetchAIAnalysis: vi.fn(),
+}));
+
 import * as dashboardApi from '../../lib/api/dashboard';
+import * as aiApi from '../../lib/api/ai';
 
 const mockedSummary = vi.mocked(dashboardApi.fetchDashboardSummary);
 const mockedLoad = vi.mocked(dashboardApi.fetchTrainingLoad);
 const mockedZones = vi.mocked(dashboardApi.fetchHRZones);
 const mockedDrift = vi.mocked(dashboardApi.fetchCardiacDrift);
+const mockedAIStatus = vi.mocked(aiApi.fetchAIStatus);
 
 const SUMMARY: DashboardSummary = {
   weekly_volume_m: 1000,
@@ -68,6 +80,15 @@ function daysBetween(from: string, to: string): number {
   );
 }
 
+/** The page lives inside the router (the AI controls link to the profile). */
+function renderPage() {
+  return render(
+    <MemoryRouter>
+      <DashboardPage />
+    </MemoryRouter>,
+  );
+}
+
 describe('DashboardPage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -76,16 +97,23 @@ describe('DashboardPage', () => {
     mockedLoad.mockResolvedValue(LOAD);
     mockedZones.mockResolvedValue(ZONES);
     mockedDrift.mockResolvedValue(DRIFT);
+    mockedAIStatus.mockResolvedValue({
+      enabled: false,
+      available: false,
+      status: 'disabled',
+      provider: null,
+      consented: false,
+    });
   });
 
   it('renders the period selector with 30d selected by default', () => {
-    render(<DashboardPage />);
+    renderPage();
     expect(screen.getByTestId('period-selector')).toBeInTheDocument();
     expect(screen.getByTestId('period-option-30d')).toHaveAttribute('aria-pressed', 'true');
   });
 
   it('composes the summary card, the load chart, the HR zones chart and the drift panel in order', async () => {
-    render(<DashboardPage />);
+    renderPage();
     await screen.findByTestId('cardiac-drift-panel');
 
     const order = [
@@ -102,7 +130,7 @@ describe('DashboardPage', () => {
   });
 
   it('re-queries the charts with the new range when the period changes', async () => {
-    render(<DashboardPage />);
+    renderPage();
     await screen.findByTestId('training-load-chart');
 
     const initialCall = mockedLoad.mock.calls[0];
@@ -121,7 +149,7 @@ describe('DashboardPage', () => {
 
   it('renders the global empty state and no charts when there are no activities', async () => {
     mockedSummary.mockResolvedValue({ ...SUMMARY, weekly_activities_count: 0 });
-    render(<DashboardPage />);
+    renderPage();
 
     const empty = await screen.findByTestId('dashboard-empty-state');
     expect(empty).toHaveTextContent('Sincroniza tus actividades de Strava para empezar');
@@ -137,7 +165,7 @@ describe('DashboardPage', () => {
       available: false,
       activities: [],
     });
-    render(<DashboardPage />);
+    renderPage();
     const notice = await screen.findByTestId('cardiac-drift-empty');
     expect(notice).toHaveTextContent('necesita streams HR para calcular');
     expect(screen.queryByTestId('cardiac-drift-panel')).not.toBeInTheDocument();

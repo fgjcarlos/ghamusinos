@@ -1,0 +1,124 @@
+/* AIAnalysisControl. Fase 1.5 (issue #17, T8).
+ * Colores y medidas de tokens.css: nunca un color literal aquí. */
+
+.control {
+  display: flex;
+  flex-direction: column;
+  gap: var(--gh-s-2);
+  padding: var(--gh-s-4);
+  background: var(--gh-surface);
+  border: 1px solid var(--gh-line);
+  border-radius: var(--gh-r-card);
+}
+
+.title {
+  margin: 0;
+  font-family: var(--gh-font-display);
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--gh-text);
+}
+
+.subtitle {
+  margin: var(--gh-s-2) 0 0;
+  font-family: var(--gh-font-body);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--gh-text-3);
+}
+
+.notice {
+  margin: 0;
+  font-family: var(--gh-font-body);
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--gh-text-2);
+}
+
+.link {
+  align-self: flex-start;
+  font-family: var(--gh-font-body);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--gh-accent);
+  text-decoration: none;
+}
+
+.link:hover {
+  text-decoration: underline;
+}
+
+.link:focus-visible {
+  outline: 2px solid var(--gh-accent);
+  outline-offset: 2px;
+}
+
+.request {
+  align-self: flex-start;
+  min-height: 40px;
+  padding: var(--gh-s-2) var(--gh-s-4);
+  border: 1px solid var(--gh-accent-deep);
+  border-radius: var(--gh-r-control);
+  background: var(--gh-accent);
+  color: var(--gh-accent-ink);
+  font-family: var(--gh-font-body);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+
+.request:hover {
+  background: var(--gh-accent-dim);
+}
+
+.request:focus-visible {
+  outline: 2px solid var(--gh-accent);
+  outline-offset: 2px;
+}
+
+.result {
+  display: flex;
+  flex-direction: column;
+  gap: var(--gh-s-2);
+}
+
+.summary {
+  margin: 0;
+  font-family: var(--gh-font-body);
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--gh-text);
+}
+
+.list {
+  margin: 0;
+  padding-left: var(--gh-s-4);
+  font-family: var(--gh-font-body);
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--gh-text-2);
+}
+
+.failed {
+  display: flex;
+  flex-direction: column;
+  gap: var(--gh-s-2);
+  margin: 0;
+  font-family: var(--gh-font-body);
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--gh-risk);
+}
+
+.failed p {
+  margin: 0;
+}
+
+.code {
+  font-family: var(--gh-font-mono);
+  font-size: 12px;
+  color: var(--gh-text-3);
+}

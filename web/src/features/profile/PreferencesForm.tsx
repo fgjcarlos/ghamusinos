@@ -2,6 +2,12 @@
 // Issue 159. Pure render — the container owns fetch + PATCH + saving
 // state. Errors from the backend land next to the field that failed,
 // not in a generic banner.
+//
+// Phase 1.5 (T2): the AI checkbox is an explicit consent switch for
+// sending aggregate training metrics to the configured external AI
+// provider. The transfer notice is rendered next to the checkbox so
+// the user always reads it before checking the box; the consent is
+// only granted when the user checks the box and saves the form.
 
 import { useId } from 'react';
 import styles from './PreferencesForm.module.css';
@@ -56,6 +62,7 @@ export function PreferencesForm({
     level: useId(),
     timezone: useId(),
     ai: useId(),
+    aiNotice: useId(),
   };
 
   return (
@@ -136,10 +143,26 @@ export function PreferencesForm({
               id={ids.ai}
               type="checkbox"
               checked={values.ai_enabled}
+              aria-describedby={ids.aiNotice}
               onChange={(e) => onChange('ai_enabled', e.target.checked)}
             />
-            <span>Permitir recomendaciones de IA</span>
+            <span>Autorizar el envío de mis métricas al proveedor de IA</span>
           </label>
+          <p className={styles.notice} id={ids.aiNotice} data-testid="ai-consent-notice">
+            Al marcar esta casilla y guardar, autorizas el envío de tus datos de entrenamiento al
+            proveedor de IA externo configurado (OpenAI, Claude u OpenRouter). Solo se envían
+            métricas agregadas: distancia, duración, desnivel, frecuencia cardíaca y carga
+            calculada. No se envía ningún dato de identificación: ni tu nombre, ni tu correo
+            electrónico, ni tus coordenadas GPS, ni los streams crudos de las actividades. Mientras
+            no aceptes, la IA permanece desactivada. Puedes revocar el consentimiento en cualquier
+            momento desmarcando la casilla y guardando los cambios.
+          </p>
+          <p className={styles.aiHelp} data-testid="ai-consent-help">
+            Los análisis se piden bajo demanda, uno cada vez: desde cada actividad de la pantalla
+            Mis actividades y desde el panel de Rendimiento (análisis semanal y de carga). Si la IA
+            está desactivada, no está disponible o no has aceptado el envío, esos controles te lo
+            dicen y el resto de la aplicación sigue funcionando igual.
+          </p>
         </div>
       </fieldset>
 

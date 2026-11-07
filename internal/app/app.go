@@ -14,6 +14,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/riverqueue/river"
 
+	"github.com/fgjcarlos/ghamusinos/internal/ai"
 	"github.com/fgjcarlos/ghamusinos/internal/auth"
 	"github.com/fgjcarlos/ghamusinos/internal/config"
 	"github.com/fgjcarlos/ghamusinos/internal/db"
@@ -70,28 +71,41 @@ func run(ctx context.Context) error {
 	var riverClient *river.Client[pgx.Tx]
 	var stravaEnqueuer *jobs.RiverEnqueuerAdapter
 	var webhookStore strava.ActivityEventStore
-	if cfg.Strava != nil {
+
+	// La IA opcional (fase 1.5) necesita su propio analizador. Se
+	// construye solo cuando la configuración global de IA está activa y
+	// disponible; si falta la credencial o el modelo, la IA queda no
+	// disponible y el producto determinista sigue igual (S7).
+	aiAnalyzer := buildAIAnalyzer(cfg)
+
+	// River es opcional: hace falta con Strava configurado o con la IA
+	// activa. Sin ninguno de los dos, la API sigue arrancable en modo
+	// API-only y no hay cola de jobs que ejecutar (S7).
+	if cfg.Strava != nil || aiAnalyzer != nil {
 		var stravaForWorkers *strava.Client
 		var cipherForWorkers []byte
 		// Build the same Strava client buildRouter uses, so both the HTTP
 		// handlers and the workers share one instance.
-		sc, scErr := strava.NewClient(strava.Config{
-			ClientID:     cfg.Strava.ClientID,
-			ClientSecret: cfg.Strava.ClientSecret,
-			RedirectURL:  cfg.Strava.RedirectURL,
-			Scopes:       cfg.Strava.Scopes,
-		})
-		if scErr != nil {
-			slog.Warn("strava: cliente no inicializado, workers Strava deshabilitados", "err", scErr)
-		} else {
-			stravaForWorkers = sc
-			cipherForWorkers = cfg.Strava.CipherKey
+		if cfg.Strava != nil {
+			sc, scErr := strava.NewClient(strava.Config{
+				ClientID:     cfg.Strava.ClientID,
+				ClientSecret: cfg.Strava.ClientSecret,
+				RedirectURL:  cfg.Strava.RedirectURL,
+				Scopes:       cfg.Strava.Scopes,
+			})
+			if scErr != nil {
+				slog.Warn("strava: cliente no inicializado, workers Strava deshabilitados", "err", scErr)
+			} else {
+				stravaForWorkers = sc
+				cipherForWorkers = cfg.Strava.CipherKey
+			}
 		}
 		client, err := jobs.NewClient(ctx, pool, jobs.Deps{
 			Pool:      pool,
 			Config:    cfg,
 			Strava:    stravaForWorkers,
 			CipherKey: cipherForWorkers,
+			AI:        aiAnalyzer,
 		}, stravaForWorkers != nil)
 		if err != nil {
 			return err
@@ -100,8 +114,10 @@ func run(ctx context.Context) error {
 		// AUD-04 AC: el callback OAuth encola el backfill con este adapter.
 		// Se construye aquí (no en buildRouter) porque necesita el *river.Client
 		// que acabamos de crear; buildRouter solo recibe la Server.
-		stravaEnqueuer = &jobs.RiverEnqueuerAdapter{Client: riverClient}
-		webhookStore = jobs.NewActivityEventStoreAdapter(queries, riverClient)
+		if stravaForWorkers != nil {
+			stravaEnqueuer = &jobs.RiverEnqueuerAdapter{Client: riverClient}
+			webhookStore = jobs.NewActivityEventStoreAdapter(queries, riverClient)
+		}
 		defer func() {
 			shutdownCtx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
 			defer cancel()
@@ -112,7 +128,7 @@ func run(ctx context.Context) error {
 		}
 		slog.Info("River job queue workers iniciados")
 	} else {
-		slog.Info("River job queue deshabilitado (sin STRAVA_CLIENT_ID/SECRET); API-only mode")
+		slog.Info("River job queue deshabilitado (sin Strava ni IA activa); API-only mode")
 	}
 
 	addr := ":" + cfg.Port
@@ -151,6 +167,34 @@ func run(ctx context.Context) error {
 		<-errCh
 		return nil
 	}
+}
+
+// buildAIAnalyzer construye el analizador de IA a partir de la
+// configuración global. Devuelve nil cuando la IA está desactivada, no
+// disponible o mal configurada: en ese caso el producto determinista
+// sigue funcionando igual y la función de IA se reporta como no
+// disponible (S7). Nunca devuelve un error: una IA mal configurada no
+// puede impedir que la aplicación arranque.
+func buildAIAnalyzer(cfg *config.Config) ai.Analyzer {
+	if cfg == nil || !cfg.AI.Available {
+		return nil
+	}
+	provider, err := ai.ParseProvider(cfg.AI.Provider)
+	if err != nil {
+		slog.Warn("ai: proveedor no válido, análisis IA deshabilitado", "err", err)
+		return nil
+	}
+	analyzer, err := ai.NewAnalyzer(ai.ProviderConfig{
+		Provider: provider,
+		Model:    cfg.AI.Model,
+		APIKey:   cfg.AI.APIKey,
+	})
+	if err != nil {
+		slog.Warn("ai: analizador no inicializado, análisis IA deshabilitado", "err", err)
+		return nil
+	}
+	slog.Info("ai: analizador listo", "provider", string(provider), "model", cfg.AI.Model)
+	return analyzer
 }
 
 // buildRouter monta el router con todas las dependencias cableadas.

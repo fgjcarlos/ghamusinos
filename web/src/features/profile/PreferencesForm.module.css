@@ -75,6 +75,28 @@
   color: var(--gh-text-3);
 }
 
+/* Aviso de transferencia al proveedor de IA externo (fase 1.5). */
+.notice {
+  margin: 0;
+  font-family: var(--gh-font-body);
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--gh-text-2);
+  background: var(--gh-bg-2);
+  border: 1px solid var(--gh-line-2);
+  border-radius: var(--gh-r-control);
+  padding: var(--gh-s-3);
+}
+
+/* Ayuda de la IA: dónde se piden los análisis y qué pasa si está apagada. */
+.aiHelp {
+  margin: var(--gh-s-2) 0 0;
+  font-family: var(--gh-font-body);
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--gh-text-3);
+}
+
 .error {
   margin: 0;
   font-family: var(--gh-font-body);

@@ -75,6 +75,13 @@ export async function getPreferences(token: string): Promise<PreferencesApiRespo
  * PatchPreferences validates + updates the authenticated user's
  * preferences. 200 → updated PreferencesApiResponse. 422 → ApiError
  * with field-level message.
+ *
+ * Phase 1.5 (T2): `ai_enabled` is the explicit consent that allows the
+ * product to send aggregate training metrics (distance, duration,
+ * elevation, heart rate and calculated load) to the configured
+ * external AI provider. An omitted flag is sent as `false` — omission
+ * is never consent — and only an explicit `true` (the user checked the
+ * box in the preferences screen and saved) grants it.
  */
 export async function patchPreferences(
   token: string,
@@ -84,6 +91,7 @@ export async function patchPreferences(
     ftp?: number | null;
     level?: 'beginner' | 'intermediate' | 'advanced' | null;
     timezone?: string;
+    /** Explicit AI consent. Omitted means "not consented". */
     ai_enabled?: boolean;
   },
 ): Promise<PreferencesApiResponse & { warning?: string }> {

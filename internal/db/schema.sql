@@ -11,6 +11,13 @@ CREATE TABLE users (
                                 CHECK (invite_status IN ('pending', 'active', 'blocked')),
     -- Preferencias iniciales del usuario (fase 1.1). Métricas fisiológicas
     -- opcionales (consumidas desde la fase 1.4); ai_enabled gobierna la IA.
+    --
+    -- Phase 1.5 (issue #17, T2): ai_enabled is the explicit consent to
+    -- send aggregate training metrics to the external AI provider. The
+    -- default is false and migration 00014 resets the inherited true
+    -- values: a stored TRUE cannot prove that the user ever accepted
+    -- the transfer notice. Only an explicit PATCH with ai_enabled=true
+    -- grants the consent again.
     hr_max          SMALLINT    CONSTRAINT users_hr_max_valido CHECK (hr_max IS NULL OR (hr_max > 0 AND hr_max <= 260)),
     lthr            SMALLINT    CONSTRAINT users_lthr_valido   CHECK (lthr   IS NULL OR (lthr   > 0 AND lthr   <= 260)),
     ftp             SMALLINT    CONSTRAINT users_ftp_valido    CHECK (ftp    IS NULL OR (ftp    > 0 AND ftp    <= 2000)),
@@ -20,7 +27,7 @@ CREATE TABLE users (
     running_threshold_sec_per_km SMALLINT NULL CONSTRAINT users_running_threshold_chk CHECK (running_threshold_sec_per_km IS NULL OR (running_threshold_sec_per_km BETWEEN 120 AND 1800)),
     timezone        TEXT        NOT NULL DEFAULT 'UTC'
                                 CONSTRAINT users_timezone_valido CHECK (timezone <> ''),
-    ai_enabled      BOOLEAN     NOT NULL DEFAULT true,
+    ai_enabled      BOOLEAN     NOT NULL DEFAULT false,
     created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at      TIMESTAMPTZ NOT NULL DEFAULT now()
 );
@@ -268,3 +275,44 @@ CREATE TABLE dashboard_metadata (
     training_load_rows   INTEGER      NOT NULL DEFAULT 0,
     updated_at           TIMESTAMPTZ  NOT NULL DEFAULT now()
 );
+
+-- Fase 1.5 (issue #17, T4) — Persistencia de los análisis de IA.
+-- Mirrors migration 00015_ai_analysis.sql (base) for sqlc generation.
+--
+-- Una fila por usuario y objetivo de análisis. UNIQUE (user_id, kind,
+-- scope) hace que una petición repetida actualice la misma fila en vez
+-- de duplicarla.
+--
+-- Privacidad: `payload` guarda el payload agregado que se envió al
+-- proveedor; internal/ai garantiza que sólo lleva métricas numéricas
+-- agregadas (sin identidad, sin nombre, sin GPS, sin streams crudos).
+-- `output` guarda la respuesta validada, que es interpretativa.
+-- `error_code`/`error_message` son seguros por construcción (token en
+-- minúsculas y frase corta de la aplicación): ni el cuerpo del proveedor
+-- ni una credencial pueden caber ahí.
+CREATE TABLE ai_analysis (
+    id             UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id        UUID        NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    kind           TEXT        NOT NULL CONSTRAINT ai_analysis_kind_valido
+                               CHECK (kind IN ('activity', 'weekly', 'load')),
+    scope          TEXT        NOT NULL CONSTRAINT ai_analysis_scope_valido
+                               CHECK (scope <> '' AND length(scope) <= 128),
+    status         TEXT        NOT NULL DEFAULT 'pending'
+                               CONSTRAINT ai_analysis_status_valido
+                               CHECK (status IN ('pending', 'completed', 'failed')),
+    provider       TEXT        CONSTRAINT ai_analysis_provider_valido
+                               CHECK (provider IS NULL OR provider ~ '^[a-z0-9_-]{1,64}$'),
+    model          TEXT        CONSTRAINT ai_analysis_model_valido
+                               CHECK (model IS NULL OR (model <> '' AND length(model) <= 128)),
+    payload        JSONB       NOT NULL DEFAULT '{}'::jsonb,
+    output         JSONB,
+    error_code     TEXT        CONSTRAINT ai_analysis_error_code_valido
+                               CHECK (error_code IS NULL OR error_code ~ '^[a-z0-9_]{1,64}$'),
+    error_message  TEXT        CONSTRAINT ai_analysis_error_message_valido
+                               CHECK (error_message IS NULL OR length(error_message) <= 500),
+    created_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
+    UNIQUE (user_id, kind, scope)
+);
+
+CREATE INDEX idx_ai_analysis_user_created ON ai_analysis (user_id, created_at DESC);

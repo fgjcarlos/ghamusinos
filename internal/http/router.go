@@ -236,6 +236,21 @@ func (s *Server) Router() http.Handler {
 					r.Get("/cardiac-drift", handlers.GetCardiacDrift(s.queries).ServeHTTP)
 					r.Post("/recalc", handlers.PostDashboardRecalc(s.queries, s.riverInserter).ServeHTTP)
 				})
+
+				// Fase 1.5 (issue #17, T7): API de los análisis de IA
+				// opcionales. Las tres rutas viven en el grupo
+				// autenticado y funcionan con la IA apagada: el estado
+				// se puede consultar siempre y el POST responde 503
+				// cuando la IA no está disponible.
+				//
+				// El encolador de River es el mismo que usa
+				// /dashboard/recalc: si no hay cola de jobs, el POST
+				// responde 503 sin crear la fila.
+				r.Route("/ai", func(r chi.Router) {
+					r.Get("/status", handlers.GetAIStatus(s.queries, s.cfg.AI).ServeHTTP)
+					r.Get("/analyses", handlers.ListAIAnalyses(s.queries).ServeHTTP)
+					r.Post("/analyses", handlers.PostAIAnalysis(s.queries, s.riverInserter, s.cfg.AI).ServeHTTP)
+				})
 			}
 
 			if s.gpxStore != nil {

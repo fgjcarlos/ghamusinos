@@ -13,6 +13,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/riverqueue/river"
 
+	"github.com/fgjcarlos/ghamusinos/internal/ai"
 	"github.com/fgjcarlos/ghamusinos/internal/config"
 	"github.com/fgjcarlos/ghamusinos/internal/db/sqlc"
 	"github.com/fgjcarlos/ghamusinos/internal/strava"
@@ -57,6 +58,11 @@ type Deps struct {
 	// when nil, the workers register but skip enqueue. Production wires it;
 	// dev / tests that don't run River may leave it nil.
 	RiverClient RiverJobInserter
+	// AI is the provider-agnostic analyser used by the AI analysis worker
+	// (fase 1.5). It is optional: when nil, the AI worker is not registered
+	// and the AI feature reports itself unavailable, while the rest of the
+	// product keeps working (S7).
+	AI ai.Analyzer
 }
 
 // validate returns a non-nil error if a required dependency is missing.
@@ -162,6 +168,18 @@ func NewRiverWorkers(d Deps, registerStravaWorkers bool) (*river.Workers, error)
 		// NewClient is retained as a usable test seam when Strava is disabled.
 		// Production skips River entirely in this mode.
 		river.AddWorker(workers, &StubWorker{})
+	}
+
+	// El worker de análisis IA (fase 1.5) no depende de Strava: se
+	// registra siempre que haya un analizador configurado, para que la IA
+	// funcione en una instancia sin credenciales de Strava.
+	if d.AI != nil {
+		river.AddWorker(workers, NewAIAnalysisWorker(
+			queries,
+			d.AI,
+			d.Config.AI,
+			slog.Default(),
+		))
 	}
 	return workers, nil
 }

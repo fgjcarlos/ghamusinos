@@ -1,0 +1,40 @@
+/* DashboardAIAnalysis. Fase 1.5 (issue #17, T8).
+ * Colores y medidas de tokens.css: nunca un color literal aquí. */
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--gh-s-3);
+  max-width: 960px;
+  margin: 0 auto;
+  padding: var(--gh-s-4);
+}
+
+.header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--gh-s-2);
+}
+
+.title {
+  margin: 0;
+  font-family: var(--gh-font-display);
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--gh-text);
+}
+
+.note {
+  margin: 0;
+  font-family: var(--gh-font-body);
+  font-size: 13px;
+  color: var(--gh-text-3);
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: var(--gh-s-4);
+}
