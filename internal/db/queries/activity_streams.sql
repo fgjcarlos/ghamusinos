@@ -20,3 +20,16 @@ WHERE a.user_id = $1
   AND a.started_at >= $2
   AND a.started_at < $3
 ORDER BY a.started_at ASC, s.activity_id ASC;
+
+-- name: GetActivityStreams :many
+-- Todos los streams almacenados de una actividad concreta (phase 1.6,
+-- issue #18). El handler de `GET /api/v1/activities/{id}/streams` usa
+-- esta query después de comprobar que la actividad pertenece al usuario
+-- autenticado. `data` es JSONB: un array plano de números (`time`,
+-- `altitude`, ...) o de pares `[lat, lon]` para `latlng`.
+SELECT activity_id,
+       stream_type,
+       data
+FROM activity_streams
+WHERE activity_id = $1
+ORDER BY stream_type ASC;

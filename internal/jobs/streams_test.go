@@ -102,6 +102,11 @@ func TestImportStravaStreamsWorker_FetchesAndUpsertsStreams(t *testing.T) {
 	// Verify UpsertActivityStream was called for each stream
 	require.Equal(t, 2, mockInserter.callCount)
 	require.Equal(t, "watts", mockInserter.lastStreamType)
+
+	// Phase 1.6 (issue #18): Post-Activity needs per-sample time offsets.
+	require.Contains(t, mockFetcher.types, "time")
+	require.Contains(t, mockFetcher.types, "latlng")
+	require.Contains(t, mockFetcher.types, "altitude")
 }
 
 // TestImportStravaStreamsWorker_CalculatesHRZones_WhenUserHRMaxSet tests HR zone calculation.
@@ -333,9 +338,11 @@ func TestCalcHRZones_Pure_Function(t *testing.T) {
 
 type testStreamFetcher struct {
 	streams []strava.StreamFrame
+	types   []string
 }
 
 func (m *testStreamFetcher) GetStreams(ctx context.Context, accessToken string, activityID int64, types []string) ([]strava.StreamFrame, error) {
+	m.types = types
 	return m.streams, nil
 }
 

@@ -18,6 +18,8 @@ import (
 	"github.com/fgjcarlos/ghamusinos/internal/http/handlers"
 	"github.com/fgjcarlos/ghamusinos/internal/jobs"
 	"github.com/fgjcarlos/ghamusinos/internal/strava"
+	"github.com/fgjcarlos/ghamusinos/internal/terrain"
+	"github.com/fgjcarlos/ghamusinos/internal/weather"
 )
 
 // Server agrupa las dependencias inyectadas necesarias para construir el router.
@@ -216,6 +218,12 @@ func (s *Server) Router() http.Handler {
 			if s.queries != nil {
 				r.Get("/activities", handlers.ListActivities(s.queries).ServeHTTP)
 				r.Get("/activities/{id}", handlers.GetActivity(s.queries).ServeHTTP)
+				// Phase 1.6 (issue #18): Post-Activity needs per-point
+				// `time` + `latlng`. The read endpoint returns every stored
+				// stream; the refresh endpoint re-imports them for
+				// activities created before `time` was requested.
+				r.Get("/activities/{id}/streams", handlers.GetActivityStreams(s.queries).ServeHTTP)
+				r.Post("/activities/{id}/streams/refresh", handlers.PostActivityStreamsRefresh(s.queries, s.riverInserter).ServeHTTP)
 				r.Get("/sync/status", handlers.SyncStatus(s.queries).ServeHTTP)
 				r.Get("/me/preferences", handlers.GetPreferences(s.queries).ServeHTTP)
 				r.Patch("/me/preferences", handlers.PatchPreferences(s.queries).ServeHTTP)
@@ -258,6 +266,13 @@ func (s *Server) Router() http.Handler {
 					r.Post("/upload", handlers.UploadGPX(s.gpxStore, s.gpxParser, s.gpxValidator, s.gpxAnalyzer, s.gpxClimbDetector, s.gpxRiskDetector, s.gpxTypeDetector, s.gpxHasher).ServeHTTP)
 					r.Get("/", handlers.ListGPX(s.gpxStore).ServeHTTP)
 					r.Get("/{id}", handlers.GetGPX(s.gpxStore).ServeHTTP)
+					// Phase 1.6 (issue #18): environmental context is
+					// served by the backend so the SPA keeps its
+					// `connect-src 'self'` CSP. Both handlers derive the
+					// coordinates from the stored track, never from the
+					// client, and degrade independently of the detail page.
+					r.Get("/{id}/weather", handlers.GetGPXWeather(s.gpxStore, weather.NewClient()).ServeHTTP)
+					r.Get("/{id}/terrain", handlers.GetGPXTerrain(s.gpxStore, terrain.NewClient()).ServeHTTP)
 					r.Delete("/{id}", handlers.DeleteGPX(s.gpxStore).ServeHTTP)
 					r.Post("/compare", handlers.CompareGPX(s.gpxStore).ServeHTTP)
 				})

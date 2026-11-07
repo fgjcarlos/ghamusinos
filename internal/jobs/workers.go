@@ -392,6 +392,28 @@ func (w *ImportStravaWorker) Work(ctx context.Context, job *river.Job[ImportStra
 					)
 				}
 			}
+
+			// Phase 1.6 (issue #18): enqueue the streams import for the
+			// activity that was just upserted. Before this change the worker
+			// existed but nothing enqueued it, so `activity_streams` stayed
+			// empty. `ByArgs` collapses duplicate pending jobs; once the job
+			// completes the refresh endpoint can enqueue it again.
+			if w.riverEnqueuer != nil {
+				if _, enqErr := w.riverEnqueuer.Insert(ctx,
+					&ImportStravaStreamsArgs{
+						UserID:             userID.String(),
+						ActivityExternalID: fmt.Sprintf("%d", activity.ID),
+						StravaActivityID:   activity.ID,
+					},
+					&river.InsertOpts{UniqueOpts: river.UniqueOpts{ByArgs: true}},
+				); enqErr != nil {
+					slog.Warn("import_strava_activities: enqueue import_strava_streams failed",
+						slog.String("user_id", userID.String()),
+						slog.Int64("activity_id", activity.ID),
+						slog.String("err", enqErr.Error()),
+					)
+				}
+			}
 		}
 
 		// AUD-05 AC: total_activities reflects the cumulative total after
@@ -588,6 +610,27 @@ func (w *IngestActivityEventWorker) Work(ctx context.Context, job *river.Job[Ing
 			// Log + continue: the upsert already succeeded. A follow-up
 			// /dashboard/recalc (or the next activity webhook) will catch up.
 			slog.Warn("ingest_activity_event: enqueue recalc_training_load failed",
+				slog.String("user_id", activityEvent.UserID.String()),
+				slog.Int64("activity_id", activity.ID),
+				slog.String("err", enqErr.Error()),
+			)
+		}
+	}
+
+	// Phase 1.6 (issue #18): enqueue the streams import for the activity
+	// that was just upserted. Same rationale as the backfill path: without
+	// this, the registered worker never runs and `activity_streams` stays
+	// empty for every new activity.
+	if w.riverEnqueuer != nil {
+		if _, enqErr := w.riverEnqueuer.Insert(ctx,
+			&ImportStravaStreamsArgs{
+				UserID:             activityEvent.UserID.String(),
+				ActivityExternalID: fmt.Sprintf("%d", activity.ID),
+				StravaActivityID:   activity.ID,
+			},
+			&river.InsertOpts{UniqueOpts: river.UniqueOpts{ByArgs: true}},
+		); enqErr != nil {
+			slog.Warn("ingest_activity_event: enqueue import_strava_streams failed",
 				slog.String("user_id", activityEvent.UserID.String()),
 				slog.Int64("activity_id", activity.ID),
 				slog.String("err", enqErr.Error()),

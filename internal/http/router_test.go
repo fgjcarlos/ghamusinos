@@ -23,6 +23,10 @@ import (
 // devuelven valores cero porque estos tests no ejercitan Strava.
 type mockQuerier struct{}
 
+func (m *mockQuerier) GetActivityStreams(context.Context, pgtype.UUID) ([]sqlc.ActivityStream, error) {
+	return nil, nil
+}
+
 func (m *mockQuerier) CreateInvite(ctx context.Context, arg sqlc.CreateInviteParams) (sqlc.Invite, error) {
 	return sqlc.Invite{}, nil
 }

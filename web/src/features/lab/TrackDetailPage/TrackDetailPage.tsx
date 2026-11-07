@@ -5,6 +5,7 @@
 import { useMemo } from 'react';
 import { MapView, type LngLat } from '../MapView/MapView';
 import { RouteDetail } from '../../gpx/RouteDetail/RouteDetail';
+import { RacePlanSection } from '../RacePlanning/RacePlanSection/RacePlanSection';
 import type { NormalizedTrackDetail } from '../../gpx/normalize';
 import styles from './TrackDetailPage.module.css';
 
@@ -58,6 +59,11 @@ export function TrackDetailPage({ data, mapHeight = 360 }: TrackDetailPageProps)
         )}
       </div>
       <RouteDetail data={data} />
+      <RacePlanSection
+        trackId={data.track.id}
+        points={data.track.points}
+        token={import.meta.env.VITE_AUTH_TOKEN || ''}
+      />
     </main>
   );
 }

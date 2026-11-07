@@ -28,6 +28,10 @@ type driftMockQuerier struct {
 	lastParams sqlc.ListHeartRateStreamsInRangeParams
 }
 
+func (m *driftMockQuerier) GetActivityStreams(_ context.Context, _ pgtype.UUID) ([]sqlc.ActivityStream, error) {
+	return nil, nil
+}
+
 func (m *driftMockQuerier) ListHeartRateStreamsInRange(_ context.Context, arg sqlc.ListHeartRateStreamsInRangeParams) ([]sqlc.ListHeartRateStreamsInRangeRow, error) {
 	m.lastParams = arg
 	if m.err != nil {

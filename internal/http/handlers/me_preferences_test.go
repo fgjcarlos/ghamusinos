@@ -79,6 +79,10 @@ type preferencesMockQuerier struct {
 	updatePreferences func(params sqlc.UpdateUserPreferencesParams)
 }
 
+func (m *preferencesMockQuerier) GetActivityStreams(_ context.Context, _ pgtype.UUID) ([]sqlc.ActivityStream, error) {
+	return nil, nil
+}
+
 func (m *preferencesMockQuerier) CreateInvite(ctx context.Context, arg sqlc.CreateInviteParams) (sqlc.Invite, error) {
 	return sqlc.Invite{}, nil
 }

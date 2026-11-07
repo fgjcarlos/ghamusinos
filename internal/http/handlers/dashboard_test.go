@@ -32,6 +32,10 @@ type dashboardMockQuerier struct {
 	ListTrainingLoadRangeFunc func(ctx context.Context, arg sqlc.ListTrainingLoadRangeParams) ([]sqlc.TrainingLoadDaily, error)
 }
 
+func (m *dashboardMockQuerier) GetActivityStreams(_ context.Context, _ pgtype.UUID) ([]sqlc.ActivityStream, error) {
+	return nil, nil
+}
+
 func (m *dashboardMockQuerier) SumHRZonesInRange(ctx context.Context, arg sqlc.SumHRZonesInRangeParams) (sqlc.SumHRZonesInRangeRow, error) {
 	if m.SumHRZonesInRangeErr != nil {
 		return sqlc.SumHRZonesInRangeRow{}, m.SumHRZonesInRangeErr
