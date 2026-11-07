@@ -50,8 +50,8 @@ S12. Closure: canonical OpenSpec specs under `openspec/specs/`, the change archi
 | ID | Linked | Route | Slice | Status | Evidence |
 |---|---|---|---|---|---|
 | T1 | S5, S11 | parent inline | 1 — backend streams | done | `time` added to stream ingestion; the previously orphaned streams job is now enqueued from both backfill and webhook paths; `GET /activities/{id}/streams` (409 + missing types) and `POST .../streams/refresh` (202) with tests; full Go race suite, vet and golangci-lint green. Commit: `c7144f8`. |
-| T2 | S3, S7, S8, S9, S10, S11 | parent inline | 2 — backend weather | pending | Track-scoped Open-Meteo endpoint, 4 strategic points, 1 h cache; tests. |
-| T3 | S3, S7, S8, S9, S10, S11 | parent inline | 2 — backend terrain | pending | Track-scoped Overpass endpoint, surface/technicality mapping, cache; tests. |
+| T2 | S3, S7, S8, S9, S10, S11 | delegated (parallel writers) | 2 — backend weather | done | `internal/weather` Open-Meteo client + `GET /gpx/{id}/weather?at=RFC3339`; four deduped roles, UTC hour selection, 1 h cache after the ownership check, 422/503 degradation; tests. Commit: `1fad7d7`. |
+| T3 | S3, S7, S8, S9, S10, S11 | delegated (parallel writers) | 3 — backend terrain | done | `internal/terrain` Overpass client + `GET /gpx/{id}/terrain`; `around:50` query, point-to-segment attribution, surface/technicality mapping, 24 h cache; tests. Commit: `572833a`, routes wired in `6bff217`. |
 | T4 | S7, S8 | parent inline | 3 — web model | pending | Coordinate adapter, haversine/cumulative distance, D+, adjusted speed, total time; tests. |
 | T5 | S3, S8 | parent inline | 3 — web model | pending | Strategic splits + cutoff calculator; tests. |
 | T6 | S3, S8 | parent inline | 3 — web model | pending | KM markers, nutrition points, race-day presets; tests. |
@@ -94,3 +94,20 @@ L7. T1 delivered on 2026-11-07 (commit `c7144f8`). Two findings while implementi
 Endpoints: `GET /api/v1/activities/{id}/streams` returns every stored stream as raw JSON and `409 Streams Unavailable` when `time` or `latlng` is missing/empty; `POST /api/v1/activities/{id}/streams/refresh` enqueues the import for one owned activity and returns `202`. Both resolve the activity by external id and user, reusing the `GetActivityByExternalID` ownership filter.
 
 Verification observed: `TZ=UTC GOTOOLCHAIN=go1.26.10 go test -race -count=1 ./...` green; `go vet ./...` clean; `golangci-lint run ./...` reports `0 issues`. The commit is 635 added lines (handler 223 + handler tests 218 + enqueue fix 43 + generated/mocks the rest), above the advisory 400-line heuristic but one cohesive deliverable; no cosmetic reduction applied.
+
+L8. T2 and T3 delivered on 2026-11-07 by two parallel `gentle-ai-worker` writers with disjoint edit surfaces (`internal/weather/**` + `lab_weather*`; `internal/terrain/**` + `lab_terrain*`), then integrated by the parent.
+- Weather: `internal/weather` (Open-Meteo client, UTC hourly selection, `ErrOutOfRange`, Spanish WMO labels) and `GET /api/v1/gpx/{id}/weather?at=RFC3339`. Four deduped roles (start, highest, midpoint, end), 1 h cache keyed by track+hour, cache consulted only after `GetDetail` so ownership is always enforced. Commit `1fad7d7`.
+- Terrain: `internal/terrain` (Overpass `around:50` query over an 80-point decimation, point-to-segment attribution with a 50 m cutoff, `MapSurface`/`MapSegments`) and `GET /api/v1/gpx/{id}/terrain`. 24 h cache keyed by track id, consulted after `GetDetail`. Commit `572833a`.
+- Integration: routes wired in `6bff217`; both are track-scoped and derive coordinates from the stored track, never from a client-supplied URL (no SSRF).
+- Parent lint fixes: errcheck on `resp.Body.Close` and test `fmt.Fprint`, staticcheck S1016/QF1012 in the Overpass client, and the two route lists in `internal/app/routes_test.go`.
+- Verification observed: `TZ=UTC GOTOOLCHAIN=go1.26.10 go test -race -count=1 ./...` green; `go vet ./...` clean; `golangci-lint run ./...` reports `0 issues`.
+- Deliberate deviations recorded by the writers: terrain `MapSurface` returns the kind labels `paved/gravel/trail/technical/unknown` (the web layer maps them to display text); `start_km`/`end_km` are rounded to 2 decimals; the Overpass query is sent as a form-encoded `data=` POST.
+
+L9. Chain boundaries revised after measuring the units (additions+deletions):
+- PR 1 streams: `f755e17..106b8d7` (~650 lines).
+- PR 2 weather: `106b8d7..1fad7d7` (~930 lines).
+- PR 3 terrain: `1fad7d7..6bff217` (~1120 lines).
+- PR 4 web pure model (T4-T8): pending; split again if it exceeds ~1200 lines.
+- PR 5 web client + UI (T9-T10): pending.
+- PR 6 Post-Activity + docs (T11-T12): pending.
+Branch choreography is deferred until delivery: the tracker `feat/phase-1-6-gpx-lab` will be reset to the feature-doc commit `f755e17`; each child branch is created at its boundary commit and targets the previous child branch. Push and PR creation still require explicit user authorization.
