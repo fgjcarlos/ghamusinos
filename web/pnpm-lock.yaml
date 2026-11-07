@@ -23,6 +23,9 @@ importers:
       react-router-dom:
         specifier: ^7.18.4
         version: 7.18.4(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
+      suncalc:
+        specifier: ^2.1.2
+        version: 2.1.2
     devDependencies:
       '@eslint/js':
         specifier: ^10.0.1
@@ -1140,6 +1143,9 @@ packages:
   strip-indent@3.0.0:
     resolution: {integrity: sha512-laJTa3Jb+VQpaC6DseHhF7dXVqHTfJPCRDaEbid/drOhgitgYku/letMUqOXFoWV0zIIUbjpdH2t+tYj4bQMRQ==}
     engines: {node: '>=8'}
+
+  suncalc@2.1.2:
+    resolution: {integrity: sha512-ynVGhi3CUcgrfbhQNqe1k53uKLe1FUfZq0czOVA84ASwdB5HUrlZX6gQ9akcItor92CJB69Yg8F6VoUWqrTkiw==}
 
   tinybench@6.2.3:
     resolution: {integrity: sha512-Al01C2JIBnO2CXCAPbpAl6sUiOZHeThGtHYNTa51JRw9PyWOCdr+9Ong05R4qg/Sk3+H645E8ov1h2c58ityNw==}
@@ -2319,6 +2325,8 @@ snapshots:
   strip-indent@3.0.0:
     dependencies:
       min-indent: 1.0.1
+
+  suncalc@2.1.2: {}
 
   tinybench@6.2.3: {}
 

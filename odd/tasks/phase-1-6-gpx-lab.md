@@ -52,11 +52,11 @@ S12. Closure: canonical OpenSpec specs under `openspec/specs/`, the change archi
 | T1 | S5, S11 | parent inline | 1 — backend streams | done | `time` added to stream ingestion; the previously orphaned streams job is now enqueued from both backfill and webhook paths; `GET /activities/{id}/streams` (409 + missing types) and `POST .../streams/refresh` (202) with tests; full Go race suite, vet and golangci-lint green. Commit: `c7144f8`. |
 | T2 | S3, S7, S8, S9, S10, S11 | delegated (parallel writers) | 2 — backend weather | done | `internal/weather` Open-Meteo client + `GET /gpx/{id}/weather?at=RFC3339`; four deduped roles, UTC hour selection, 1 h cache after the ownership check, 422/503 degradation; tests. Commit: `1fad7d7`. |
 | T3 | S3, S7, S8, S9, S10, S11 | delegated (parallel writers) | 3 — backend terrain | done | `internal/terrain` Overpass client + `GET /gpx/{id}/terrain`; `around:50` query, point-to-segment attribution, surface/technicality mapping, 24 h cache; tests. Commit: `572833a`, routes wired in `6bff217`. |
-| T4 | S7, S8 | parent inline | 3 — web model | pending | Coordinate adapter, haversine/cumulative distance, D+, adjusted speed, total time; tests. |
-| T5 | S3, S8 | parent inline | 3 — web model | pending | Strategic splits + cutoff calculator; tests. |
-| T6 | S3, S8 | parent inline | 3 — web model | pending | KM markers, nutrition points, race-day presets; tests. |
-| T7 | S3, S8 | parent inline | 3 — web model | pending | Solar exposure with `suncalc`, explicit date/timezone; tests. |
-| T8 | S3, S8 | parent inline | 3 — web model | pending | Gear checklist rules from duration/D+/altitude/weather; tests. |
+| T4 | S7, S8 | parent inline | 4 — web model | done | `types.ts` + `trackCoords.ts`: wire adapter, haversine, cumulative distance, D+, slope, slope-adjusted speed, total time, km index, bearing; 26 tests. Commit: `ce4b2bb`. |
+| T5 | S3, S8 | delegated (parallel writers) | 4 — web model | done | `splits.ts`: per-km fatigue-adjusted splits and cutoff evaluation; 11 tests. Commit: `825ee6d`. |
+| T6 | S3, S8 | delegated (parallel writers) | 4 — web model | done | `raceDay.ts`: km markers, nutrition points with ±500 m flattest selection, pace presets and defaults; 14 tests. Commit: `9cafe97`. |
+| T7 | S3, S8 | delegated (parallel writers) | 4 — web model | done | `solar.ts`: per-segment SunCalc position at the arrival instant, sun/shade/night classification and merging; 8 tests. `suncalc@2.1.2` returns degrees (v2), so `@types/suncalc` was removed. Commit: `21b0aa9`. |
+| T8 | S3, S8 | delegated (parallel writers) | 4 — web model | done | `gear.ts`: duration/D+/altitude/weather rules with mandatory precedence and dedupe; 18 tests. Commit: `6e7c06d`. |
 | T9 | S3, S7, S9, S10 | parent inline | 4 — web client/UI | pending | TS API client + hooks for weather, terrain, activity streams; tests. |
 | T10 | S3, S8, S9 | parent inline | 4 — web client/UI | pending | `RacePlanSection` tabs mounted in `TrackDetailPage`; component tests. |
 | T11 | S3, S5, S8 | parent inline | 5 — post-activity + docs | pending | Plan-vs-real model + UI, re-sync flow; tests. |
@@ -111,3 +111,10 @@ L9. Chain boundaries revised after measuring the units (additions+deletions):
 - PR 5 web client + UI (T9-T10): pending.
 - PR 6 Post-Activity + docs (T11-T12): pending.
 Branch choreography is deferred until delivery: the tracker `feat/phase-1-6-gpx-lab` will be reset to the feature-doc commit `f755e17`; each child branch is created at its boundary commit and targets the previous child branch. Push and PR creation still require explicit user authorization.
+
+L10. T4-T8 delivered on 2026-11-07. T4 (geometry foundation) was written inline; T5-T8 ran as four parallel `gentle-ai-worker` writers with disjoint file surfaces after `types.ts`/`trackCoords.ts` were frozen.
+- Foundation: `web/src/features/lab/RacePlanning/model/types.ts` and `trackCoords.ts` (wire adapter, haversine, cumulative distance, D+, slope, slope-adjusted speed, total time, km index, bearing), 26 tests. Commit `ce4b2bb`.
+- `splits.ts` (commit `825ee6d`), `raceDay.ts` (`9cafe97`), `solar.ts` (`21b0aa9`), `gear.ts` (`6e7c06d`), each with its colocated tests.
+- The solar worker found that the installed `suncalc@2.1.2` is a v2 ESM rewrite that returns `altitude` and north-based clockwise `azimuth` already in **degrees** and ships its own typings. Applying the legacy v1 radians conversion would have made noon altitude ~3921° and disabled the `night` branch. The implementation uses the v2 values directly; `@types/suncalc` was removed because the package types it.
+- Verification observed: `pnpm -C web test:run` → 64 files / 404 tests passed; `pnpm -C web typecheck`, `pnpm -C web lint`, `pnpm -C web format:check` all clean.
+- Deliberate simplifications recorded: splits use one row per whole kilometre with the prototype's fatigue model (+5% pace per 10 km); cutoffs use a flat `timeLimit / km` required pace (elevation-aware arrival, flat required-pace estimate); solar `shade` is an aspect/intensity heuristic with no cast-shadow terrain model; nutrition prefers the flattest point within ±500 m and labels `recovery` when the chosen slope is <= 0.
