@@ -1,0 +1,340 @@
+/* RacePlanSection. Phase 1.6 (issue #18, T10).
+ * Colours and spacing come from tokens.css; no colour literals here. */
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--gh-s-4);
+  padding: var(--gh-s-4);
+  background: var(--gh-surface);
+  border: 1px solid var(--gh-line);
+  border-radius: var(--gh-r-card);
+}
+
+.title {
+  margin: 0;
+  font-family: var(--gh-font-display);
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--gh-text);
+}
+
+.empty {
+  margin: 0;
+  padding: var(--gh-s-4);
+  background: var(--gh-bg-2);
+  border: 1px dashed var(--gh-line-2);
+  border-radius: var(--gh-r-control);
+  font-family: var(--gh-font-body);
+  font-size: 13px;
+  color: var(--gh-text-2);
+  text-align: center;
+}
+
+.tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--gh-s-1);
+  padding-bottom: var(--gh-s-2);
+  border-bottom: 1px solid var(--gh-line);
+}
+
+.tab {
+  padding: var(--gh-s-2) var(--gh-s-3);
+  border: 1px solid transparent;
+  border-radius: var(--gh-r-chip);
+  background: transparent;
+  color: var(--gh-text-2);
+  font-family: var(--gh-font-body);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.tab:hover {
+  background: var(--gh-surface-2);
+  color: var(--gh-text);
+}
+
+.tab:focus-visible {
+  outline: 2px solid var(--gh-accent);
+  outline-offset: 2px;
+}
+
+.tabActive {
+  color: var(--gh-text);
+  background: var(--gh-surface-2);
+  border-color: var(--gh-line-2);
+}
+
+.panels {
+  display: flex;
+  flex-direction: column;
+}
+
+.panel {
+  display: flex;
+  flex-direction: column;
+  overflow-x: auto;
+}
+
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--gh-s-3);
+}
+
+.heading {
+  margin: 0;
+  font-family: var(--gh-font-display);
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--gh-text);
+}
+
+.subheading {
+  margin: 0 0 var(--gh-s-2);
+  font-family: var(--gh-font-body);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--gh-text-3);
+}
+
+.meta {
+  margin: 0;
+  font-family: var(--gh-font-body);
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--gh-text-2);
+}
+
+.mono {
+  font-family: var(--gh-font-mono);
+  font-size: 12px;
+  color: var(--gh-text-3);
+}
+
+.paceGroup {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--gh-s-2);
+}
+
+.chip {
+  padding: var(--gh-s-2) var(--gh-s-3);
+  border: 1px solid var(--gh-line-2);
+  border-radius: var(--gh-r-chip);
+  background: var(--gh-surface-2);
+  color: var(--gh-text-2);
+  font-family: var(--gh-font-body);
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.chip:hover {
+  border-color: var(--gh-accent-deep);
+  color: var(--gh-text);
+}
+
+.chip:focus-visible {
+  outline: 2px solid var(--gh-accent);
+  outline-offset: 2px;
+}
+
+.chipActive {
+  border-color: var(--gh-accent);
+  color: var(--gh-accent-ink);
+  background: var(--gh-accent);
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: var(--gh-font-body);
+  font-size: 13px;
+  color: var(--gh-text-2);
+}
+
+.caption {
+  padding-bottom: var(--gh-s-2);
+  font-family: var(--gh-font-body);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--gh-text-3);
+  text-align: left;
+}
+
+.table th,
+.table td {
+  padding: var(--gh-s-2);
+  border-bottom: 1px solid var(--gh-line);
+  text-align: left;
+  white-space: nowrap;
+}
+
+.table th {
+  color: var(--gh-text);
+  font-weight: 600;
+}
+
+.list {
+  margin: 0;
+  padding-left: var(--gh-s-4);
+  font-family: var(--gh-font-body);
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--gh-text-2);
+}
+
+.inlineFields {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--gh-s-2);
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--gh-s-1);
+}
+
+.label {
+  font-family: var(--gh-font-body);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--gh-text-2);
+}
+
+.input {
+  min-height: 38px;
+  padding: var(--gh-s-1) var(--gh-s-2);
+  border: 1px solid var(--gh-line-2);
+  border-radius: var(--gh-r-control);
+  background: var(--gh-bg-2);
+  color: var(--gh-text);
+  font-family: var(--gh-font-body);
+  font-size: 13px;
+}
+
+.input:focus-visible {
+  outline: 2px solid var(--gh-accent);
+  outline-offset: 2px;
+}
+
+.action {
+  align-self: flex-start;
+  min-height: 38px;
+  padding: var(--gh-s-2) var(--gh-s-4);
+  border: 1px solid var(--gh-accent-deep);
+  border-radius: var(--gh-r-control);
+  background: var(--gh-accent);
+  color: var(--gh-accent-ink);
+  font-family: var(--gh-font-body);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.action:hover {
+  background: var(--gh-accent-dim);
+}
+
+.action:focus-visible {
+  outline: 2px solid var(--gh-accent);
+  outline-offset: 2px;
+}
+
+.failed {
+  margin: 0;
+  font-family: var(--gh-font-body);
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--gh-risk);
+}
+
+.safe {
+  color: var(--gh-accent);
+  font-weight: 600;
+}
+
+.unsafe {
+  color: var(--gh-risk);
+  font-weight: 600;
+}
+
+.segmentList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--gh-s-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.segmentItem {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--gh-s-2);
+  padding: var(--gh-s-2);
+  border: 1px solid var(--gh-line);
+  border-radius: var(--gh-r-control);
+  font-family: var(--gh-font-body);
+  font-size: 13px;
+  color: var(--gh-text-2);
+}
+
+.badge {
+  padding: var(--gh-s-1) var(--gh-s-2);
+  border-radius: var(--gh-r-chip);
+  background: var(--gh-surface-2);
+  color: var(--gh-text);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.checklist {
+  display: flex;
+  flex-direction: column;
+  gap: var(--gh-s-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.checkItem {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--gh-s-2);
+  font-family: var(--gh-font-body);
+  font-size: 13px;
+  color: var(--gh-text-2);
+  cursor: pointer;
+}
+
+.checkName {
+  color: var(--gh-text);
+  font-weight: 600;
+}
+
+.checkReason {
+  color: var(--gh-text-3);
+  font-size: 12px;
+}
+
+@media (max-width: 767px) {
+  .section {
+    padding: var(--gh-s-3);
+  }
+
+  .inlineFields {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}
