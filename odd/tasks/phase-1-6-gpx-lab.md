@@ -57,10 +57,10 @@ S12. Closure: canonical OpenSpec specs under `openspec/specs/`, the change archi
 | T6 | S3, S8 | delegated (parallel writers) | 4 — web model | done | `raceDay.ts`: km markers, nutrition points with ±500 m flattest selection, pace presets and defaults; 14 tests. Commit: `9cafe97`. |
 | T7 | S3, S8 | delegated (parallel writers) | 4 — web model | done | `solar.ts`: per-segment SunCalc position at the arrival instant, sun/shade/night classification and merging; 8 tests. `suncalc@2.1.2` returns degrees (v2), so `@types/suncalc` was removed. Commit: `21b0aa9`. |
 | T8 | S3, S8 | delegated (parallel writers) | 4 — web model | done | `gear.ts`: duration/D+/altitude/weather rules with mandatory precedence and dedupe; 18 tests. Commit: `6e7c06d`. |
-| T9 | S3, S7, S9, S10 | parent inline | 4 — web client/UI | pending | TS API client + hooks for weather, terrain, activity streams; tests. |
-| T10 | S3, S8, S9 | parent inline | 4 — web client/UI | pending | `RacePlanSection` tabs mounted in `TrackDetailPage`; component tests. |
-| T11 | S3, S5, S8 | parent inline | 5 — post-activity + docs | pending | Plan-vs-real model + UI, re-sync flow; tests. |
-| T12 | S4, S12 | parent inline | 5 — post-activity + docs | pending | OpenSpec change, canonical specs, archive, ODD closure. |
+| T9 | S3, S7, S9, S10 | parent inline | 5 — web client/UI | done | `web/src/lib/api/lab.ts` (weather/terrain/streams/refresh) + `useTrackWeather`, `useTrackTerrain`, `useActivityStreams` with 409 mapping; 13 tests. Commit: `93e07dd`. |
+| T10 | S3, S8, S9 | delegated (writer) | 5 — web client/UI | done | `RacePlanSection` with 7 tabs (Carrera, Splits, Cortes, Terreno, Meteo, Solar, Equipo), on-demand environment calls, per-panel degradation, mounted in `TrackDetailPage`; 9 component tests. Commit: `2dd47a0`. |
+| T11 | S3, S5, S8 | delegated (writer) | 6 — post-activity + docs | done | `postActivity.ts` per-km comparison + `PostActivityPanel` with 409 re-sync flow and 8th tab; 7 model tests + 2 panel tests. Commit: `aa41061`. |
+| T12 | S4, S12 | parent inline | 6 — post-activity + docs | in_progress | OpenSpec change, canonical specs, archive, ODD closure. |
 
 Route note: every task starts inline under the parent. A writer is delegated only if the context backstop fires or two independent units with disjoint edit surfaces are launched together; the trigger and surface are recorded here at that moment.
 
@@ -118,3 +118,11 @@ L10. T4-T8 delivered on 2026-11-07. T4 (geometry foundation) was written inline;
 - The solar worker found that the installed `suncalc@2.1.2` is a v2 ESM rewrite that returns `altitude` and north-based clockwise `azimuth` already in **degrees** and ships its own typings. Applying the legacy v1 radians conversion would have made noon altitude ~3921° and disabled the `night` branch. The implementation uses the v2 values directly; `@types/suncalc` was removed because the package types it.
 - Verification observed: `pnpm -C web test:run` → 64 files / 404 tests passed; `pnpm -C web typecheck`, `pnpm -C web lint`, `pnpm -C web format:check` all clean.
 - Deliberate simplifications recorded: splits use one row per whole kilometre with the prototype's fatigue model (+5% pace per 10 km); cutoffs use a flat `timeLimit / km` required pace (elevation-aware arrival, flat required-pace estimate); solar `shade` is an aspect/intensity heuristic with no cast-shadow terrain model; nutrition prefers the flattest point within ±500 m and labels `recovery` when the chosen slope is <= 0.
+
+L11. T9-T11 delivered on 2026-11-07.
+- T9 (commit `93e07dd`): `web/src/lib/api/lab.ts` with the four race-planning calls, plus `useTrackWeather`, `useTrackTerrain` and `useActivityStreams`. The streams hook maps the backend 409 to `needs-refresh` and exposes `refresh()`. 13 tests cover URL/header contracts, problem+json details and the 409 flow.
+- T10 (commit `2dd47a0`): `RacePlanSection` with seven tabs (Carrera, Splits, Cortes, Terreno, Meteo, Solar, Equipo), accessible tab wiring, on-demand weather/terrain buttons (no request on mount), per-panel error degradation, and the section mounted after `RouteDetail` in `TrackDetailPage`. 9 component tests.
+- T11 (commit `aa41061`): `postActivity.ts` compares per-km planned splits against the activity's own cumulative `latlng` distance and `time` offsets, and `PostActivityPanel` adds the eighth tab with the 409 re-sync flow. 7 model tests + 2 panel tests.
+- Verification observed after T11: `pnpm -C web test:run` → 68 files / 435 tests passed; `pnpm -C web typecheck`, `pnpm -C web lint` and `pnpm -C web format:check` clean. The earlier Go suite, vet and golangci-lint remain green from T3.
+- T10's writer reported ESLint as "partial" because a directory-scoped `eslint <dir>` invocation is ignored by this repo's flat config; the repository's real gate (`pnpm -C web lint`, i.e. `eslint .`) passes, so the report was a tooling artifact, not a defect.
+- Post-Activity UX note: the activity is entered by its Strava external id (copied from the activity URL). A recent-activity picker is a deliberate follow-up, not part of S5.
