@@ -14,6 +14,10 @@ import (
 
 // Test 4a.1: GET /api/me returns authenticated user
 
+func (m *mockMeQuerier) GetActivityStreams(_ context.Context, _ pgtype.UUID) ([]sqlc.ActivityStream, error) {
+	return nil, nil
+}
+
 func (m *mockMeQuerier) SumHRZonesInRange(ctx context.Context, arg sqlc.SumHRZonesInRangeParams) (sqlc.SumHRZonesInRangeRow, error) {
 	return sqlc.SumHRZonesInRangeRow{}, nil
 }

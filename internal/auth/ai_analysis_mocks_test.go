@@ -3,6 +3,8 @@ package auth
 import (
 	"context"
 
+	"github.com/jackc/pgx/v5/pgtype"
+
 	"github.com/fgjcarlos/ghamusinos/internal/db/sqlc"
 )
 
@@ -12,6 +14,10 @@ import (
 // stubs para seguir satisfaciéndola.
 
 // CreateAIAnalysis stub para mockQuerier.
+func (m *mockQuerier) GetActivityStreams(context.Context, pgtype.UUID) ([]sqlc.ActivityStream, error) {
+	return nil, nil
+}
+
 func (m *mockQuerier) CreateAIAnalysis(ctx context.Context, arg sqlc.CreateAIAnalysisParams) (sqlc.AiAnalysis, error) {
 	return sqlc.AiAnalysis{}, nil
 }

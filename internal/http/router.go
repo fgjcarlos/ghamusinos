@@ -216,6 +216,12 @@ func (s *Server) Router() http.Handler {
 			if s.queries != nil {
 				r.Get("/activities", handlers.ListActivities(s.queries).ServeHTTP)
 				r.Get("/activities/{id}", handlers.GetActivity(s.queries).ServeHTTP)
+				// Phase 1.6 (issue #18): Post-Activity needs per-point
+				// `time` + `latlng`. The read endpoint returns every stored
+				// stream; the refresh endpoint re-imports them for
+				// activities created before `time` was requested.
+				r.Get("/activities/{id}/streams", handlers.GetActivityStreams(s.queries).ServeHTTP)
+				r.Post("/activities/{id}/streams/refresh", handlers.PostActivityStreamsRefresh(s.queries, s.riverInserter).ServeHTTP)
 				r.Get("/sync/status", handlers.SyncStatus(s.queries).ServeHTTP)
 				r.Get("/me/preferences", handlers.GetPreferences(s.queries).ServeHTTP)
 				r.Patch("/me/preferences", handlers.PatchPreferences(s.queries).ServeHTTP)

@@ -11,6 +11,40 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const getActivityStreams = `-- name: GetActivityStreams :many
+SELECT activity_id,
+       stream_type,
+       data
+FROM activity_streams
+WHERE activity_id = $1
+ORDER BY stream_type ASC
+`
+
+// Todos los streams almacenados de una actividad concreta (phase 1.6,
+// issue #18). El handler de `GET /api/v1/activities/{id}/streams` usa
+// esta query después de comprobar que la actividad pertenece al usuario
+// autenticado. `data` es JSONB: un array plano de números (`time`,
+// `altitude`, ...) o de pares `[lat, lon]` para `latlng`.
+func (q *Queries) GetActivityStreams(ctx context.Context, activityID pgtype.UUID) ([]ActivityStream, error) {
+	rows, err := q.db.Query(ctx, getActivityStreams, activityID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ActivityStream
+	for rows.Next() {
+		var i ActivityStream
+		if err := rows.Scan(&i.ActivityID, &i.StreamType, &i.Data); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listHeartRateStreamsInRange = `-- name: ListHeartRateStreamsInRange :many
 SELECT s.activity_id,
        s.data

@@ -460,6 +460,10 @@ func (m *activitiesMockQuerier) GetActivityByExternalID(ctx context.Context, arg
 	return sqlc.Activity{}, nil
 }
 
+func (m *activitiesMockQuerier) GetActivityStreams(ctx context.Context, activityID pgtype.UUID) ([]sqlc.ActivityStream, error) {
+	return nil, nil
+}
+
 func (m *activitiesMockQuerier) GetActivityEventByID(ctx context.Context, id pgtype.UUID) (sqlc.ActivityEvent, error) {
 	return sqlc.ActivityEvent{}, nil
 }

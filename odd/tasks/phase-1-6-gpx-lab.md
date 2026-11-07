@@ -49,7 +49,7 @@ S12. Closure: canonical OpenSpec specs under `openspec/specs/`, the change archi
 
 | ID | Linked | Route | Slice | Status | Evidence |
 |---|---|---|---|---|---|
-| T1 | S5, S11 | parent inline | 1 — backend streams | pending | Streams `time` ingestion + authenticated read/refresh endpoints; tests. |
+| T1 | S5, S11 | parent inline | 1 — backend streams | done | `time` added to stream ingestion; the previously orphaned streams job is now enqueued from both backfill and webhook paths; `GET /activities/{id}/streams` (409 + missing types) and `POST .../streams/refresh` (202) with tests; full Go race suite, vet and golangci-lint green. Commit: `c7144f8`. |
 | T2 | S3, S7, S8, S9, S10, S11 | parent inline | 2 — backend weather | pending | Track-scoped Open-Meteo endpoint, 4 strategic points, 1 h cache; tests. |
 | T3 | S3, S7, S8, S9, S10, S11 | parent inline | 2 — backend terrain | pending | Track-scoped Overpass endpoint, surface/technicality mapping, cache; tests. |
 | T4 | S7, S8 | parent inline | 3 — web model | pending | Coordinate adapter, haversine/cumulative distance, D+, adjusted speed, total time; tests. |
@@ -86,3 +86,11 @@ L6. Known limitations to carry into the specs and PR bodies:
 - Overpass is rate-limited and may be slow; the endpoint must time out and cache.
 - OSM surface data is incomplete by nature; "unknown" technicality is a valid result, not an error.
 - Existing Strava activities will not have the `time` stream until a refresh is queued; this is an explicit UX state, not a silent failure.
+
+L7. T1 delivered on 2026-11-07 (commit `c7144f8`). Two findings while implementing:
+- The `ImportStravaStreamsWorker` was registered but **nothing enqueued it** in production. Only the tests referenced `ImportStravaStreamsArgs`. As a result `activity_streams` stayed empty for real users, which also silently broke HR zones and cardiac drift. Fixed by enqueueing the job after every successful activity upsert in both the backfill loop and the webhook ingest worker, with `UniqueOpts{ByArgs: true}`.
+- `time` is now requested from Strava alongside `heartrate`, `watts`, `cadence`, `altitude` and `latlng`.
+
+Endpoints: `GET /api/v1/activities/{id}/streams` returns every stored stream as raw JSON and `409 Streams Unavailable` when `time` or `latlng` is missing/empty; `POST /api/v1/activities/{id}/streams/refresh` enqueues the import for one owned activity and returns `202`. Both resolve the activity by external id and user, reusing the `GetActivityByExternalID` ownership filter.
+
+Verification observed: `TZ=UTC GOTOOLCHAIN=go1.26.10 go test -race -count=1 ./...` green; `go vet ./...` clean; `golangci-lint run ./...` reports `0 issues`. The commit is 635 added lines (handler 223 + handler tests 218 + enqueue fix 43 + generated/mocks the rest), above the advisory 400-line heuristic but one cohesive deliverable; no cosmetic reduction applied.
