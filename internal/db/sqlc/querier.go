@@ -74,6 +74,12 @@ type Querier interface {
 	// Proyección estrecha: sólo las columnas numéricas deterministas que
 	// necesita el análisis de IA. Sin nombre, sin raw_payload y sin streams.
 	GetActivityForUser(ctx context.Context, arg GetActivityForUserParams) (GetActivityForUserRow, error)
+	// Todos los streams almacenados de una actividad concreta (phase 1.6,
+	// issue #18). El handler de `GET /api/v1/activities/{id}/streams` usa
+	// esta query después de comprobar que la actividad pertenece al usuario
+	// autenticado. `data` es JSONB: un array plano de números (`time`,
+	// `altitude`, ...) o de pares `[lat, lon]` para `latlng`.
+	GetActivityStreams(ctx context.Context, activityID pgtype.UUID) ([]ActivityStream, error)
 	// Lee la fila de metadata del usuario. Si nunca se ejecutó un recalc,
 	// la fila no existe; el handler /healthz extendido debe distinguir "sin
 	// metadata" (status=`never`) de "último recalc falló" (status=`error`).

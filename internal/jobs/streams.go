@@ -74,7 +74,11 @@ func (w *ImportStravaStreamsWorker) Work(ctx context.Context, job *river.Job[Imp
 	// streams; the API returns them with Resolution = seconds per sample.
 	// With Resolution = 1 each sample is 1s; with higher values the data
 	// has been downsampled (rare for HR, common for latlng).
-	streamTypes := []string{"heartrate", "watts", "cadence", "altitude", "latlng"}
+	// `time` is required by Post-Activity (phase 1.6): it carries the
+	// per-sample offsets from activity start, which combined with
+	// `latlng` gives plan-vs-real splits. Keep it first so the request
+	// documents the dependency order.
+	streamTypes := []string{"time", "heartrate", "watts", "cadence", "altitude", "latlng"}
 	streams, err := w.fetcher.GetStreams(ctx, accessToken, args.StravaActivityID, streamTypes)
 	if err != nil {
 		return fmt.Errorf("fetch streams: %w", err)

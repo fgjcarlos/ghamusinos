@@ -823,8 +823,8 @@ func TestIngestActivityEventWorker_EnqueuesRecalcAfterUpsert(t *testing.T) {
 	err := worker.Work(context.Background(), job)
 	require.NoError(t, err)
 
-	if len(capt.Args) != 1 {
-		t.Fatalf("expected 1 enqueued job, got %d", len(capt.Args))
+	if len(capt.Args) != 2 {
+		t.Fatalf("expected 2 enqueued jobs (recalc + streams), got %d", len(capt.Args))
 	}
 	got, ok := capt.Args[0].(*RecalcTrainingLoadArgs)
 	if !ok {
@@ -842,6 +842,54 @@ func TestIngestActivityEventWorker_EnqueuesRecalcAfterUpsert(t *testing.T) {
 	if capt.Opts[0].UniqueOpts.ByPeriod != time.Minute {
 		t.Errorf("expected ByPeriod=1m, got %v", capt.Opts[0].UniqueOpts.ByPeriod)
 	}
+
+	// Phase 1.6 (issue #18): the ingest path must also enqueue the streams
+	// import, otherwise the registered worker never runs and Post-Activity
+	// has no per-point `time`/`latlng`.
+	streamsArgs, ok := capt.Args[1].(*ImportStravaStreamsArgs)
+	if !ok {
+		t.Fatalf("expected *ImportStravaStreamsArgs, got %T", capt.Args[1])
+	}
+	if streamsArgs.UserID == "" {
+		t.Errorf("expected non-empty UserID for streams job, got empty")
+	}
+	if streamsArgs.StravaActivityID == 0 {
+		t.Errorf("expected StravaActivityID, got 0")
+	}
+	if capt.Opts[1] == nil || !capt.Opts[1].UniqueOpts.ByArgs {
+		t.Errorf("expected streams job UniqueOpts.ByArgs=true")
+	}
+}
+
+func TestImportStravaWorker_EnqueuesRecalcAndStreamsPerActivity(t *testing.T) {
+	cipherKey := key32()
+	capt := &enqueueCapturingInserter{}
+	worker := newImportStravaWorkerForTest(
+		&mockActivityFetcher{activities: []strava.ActivitySummary{{ID: 7, Name: "Run", Type: "Run", Distance: 1000}}},
+		&mockSyncSessionStoreTracker{},
+		&mockActivityInserter{},
+		newMockTokenQuerierForBackfill(cipherKey),
+		cipherKey,
+		42,
+	)
+	worker.riverEnqueuer = capt
+
+	userID := pgtype.UUID{Bytes: [16]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16}, Valid: true}
+	job := &river.Job[ImportStravaArgs]{Args: ImportStravaArgs{UserID: userID.String()}}
+	require.NoError(t, worker.Work(context.Background(), job))
+
+	var sawRecalc, sawStreams bool
+	for _, arg := range capt.Args {
+		switch a := arg.(type) {
+		case *RecalcTrainingLoadArgs:
+			sawRecalc = true
+		case *ImportStravaStreamsArgs:
+			sawStreams = true
+			require.EqualValues(t, 7, a.StravaActivityID)
+		}
+	}
+	require.True(t, sawRecalc, "backfill must still enqueue the training-load recalc")
+	require.True(t, sawStreams, "phase 1.6: backfill must enqueue the streams import")
 }
 
 func TestIngestActivityEventWorker_NoEnqueueWhenRiverClientNil(t *testing.T) {
