@@ -1,11 +1,10 @@
 # Archive Report: phase-1-5-optional-ai
 
-> **Status: not archived yet.** This report describes the delivered
-> change while the deltas still live under
-> `openspec/changes/phase-1-5-optional-ai/`. The promotion of the three
-> deltas into `openspec/specs/` is the final step of the epic and is
-> performed by the parent; this unit deliberately does **not** touch
-> `openspec/specs/`.
+> **Status: archived on 2026-11-07.** The three deltas were promoted to
+> `openspec/specs/ai-analysis-backend/spec.md`,
+> `openspec/specs/ai-analysis-api/spec.md` and
+> `openspec/specs/ai-analysis-web/spec.md`, and this change was moved to
+> `openspec/changes/archive/2026-11-07-phase-1-5-optional-ai/`.
 
 ## Summary
 
@@ -96,10 +95,10 @@ fit the budget are the smallest ones (the wiring and the contract fix).
 
 ## Canonical specs
 
-The three deltas of this change are ready to be promoted; the promotion
-itself is the final step of the epic and belongs to the parent.
+The three deltas of this change were promoted to their canonical
+locations on 2026-11-07:
 
-| Delta | Target canonical spec | Requirements |
+| Delta | Canonical spec | Requirements |
 |---|---|---|
 | `specs/ai-analysis-backend/spec.md` | `openspec/specs/ai-analysis-backend/spec.md` | AB-001..AB-014 |
 | `specs/ai-analysis-api/spec.md` | `openspec/specs/ai-analysis-api/spec.md` | AA-001..AA-008 |
@@ -191,11 +190,9 @@ Known environmental failures (not caused by this change):
   twice), but the user can see a "pending" analysis that no job will
   ever pick up. A follow-up could mark the row `failed` with a safe
   code when the insert fails.
-- **W5 — the task row of T3 in the feature document is stale.** The
-  row of T3 in `odd/tasks/phase-1-5-optional-ai.md` still says
-  `pending` / `commit: none`, but the provider adapters **were**
-  delivered, in `8d823f9`. The parent should update that row so the
-  feature document matches the delivered state.
+- **W5 — RESOLVED: the task row of T3 in the feature document now
+  reads `done` with `commit: 8d823f9`, matching the delivered
+  adapters.** **Severity: none (closed).**
 - **W6 — the wire details of the providers are not verified against the
   live documentation.** The adapters were written against the contract
   recorded in `docs/architecture/ai-contract.md` (endpoints, headers,
