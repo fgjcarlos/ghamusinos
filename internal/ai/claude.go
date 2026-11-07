@@ -102,7 +102,7 @@ func (a *ClaudeAnalyzer) Analyze(ctx context.Context, payload Payload) (Output, 
 		// una clave de API (cabecera "x-api-key" y token bearer en
 		// "Authorization"). Se envían ambas para que la cuenta
 		// configurada acepte la llamada sin depender de una variante.
-		"x-api-key":        a.apiKey,
+		"x-api-key":         a.apiKey,
 		"Authorization":     "Bearer " + a.apiKey,
 		"anthropic-version": ClaudeAPIVersion,
 	})

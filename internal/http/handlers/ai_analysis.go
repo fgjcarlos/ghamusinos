@@ -120,15 +120,15 @@ type AIAnalysisResponse struct {
 	// ErrorCode y ErrorMessage sólo están cuando el análisis falló.
 	ErrorCode    *string `json:"error_code"`
 	ErrorMessage *string `json:"error_message"`
-	CreatedAt    string `json:"created_at"`
-	UpdatedAt    string `json:"updated_at"`
+	CreatedAt    string  `json:"created_at"`
+	UpdatedAt    string  `json:"updated_at"`
 }
 
 // AIAnalysisListResponse es el cuerpo del listado de GET
 // /api/v1/ai/analyses.
 type AIAnalysisListResponse struct {
 	Data  []AIAnalysisResponse `json:"data"`
-	Limit int                 `json:"limit"`
+	Limit int                  `json:"limit"`
 }
 
 // aiAnalysisRequest es el cuerpo de POST /api/v1/ai/analyses.

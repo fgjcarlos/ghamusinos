@@ -52,13 +52,13 @@ const (
 // aiReadyConfig is the global configuration of an AI that can be used.
 func aiReadyConfig() config.AIConfig {
 	return config.AIConfig{
-		Enabled:     true,
-		Available:   true,
-		Provider:    "openai",
-		Model:       "gpt-4o-mini",
-		APIKey:      "sk-secret-do-not-leak",
-		MaxRetries:  3,
-		Timeout:     30 * time.Second,
+		Enabled:    true,
+		Available:  true,
+		Provider:   "openai",
+		Model:      "gpt-4o-mini",
+		APIKey:     "sk-secret-do-not-leak",
+		MaxRetries: 3,
+		Timeout:    30 * time.Second,
 	}
 }
 
