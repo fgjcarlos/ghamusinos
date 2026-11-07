@@ -12,6 +12,7 @@ import { estimateTotalTimeMin, toTrackPoints, totalDistanceKm } from '../model/t
 import { useTrackWeather } from '../hooks/useTrackWeather';
 import { CutoffsPanel } from './CutoffsPanel';
 import { GearPanel } from './GearPanel';
+import { PostActivityPanel } from './PostActivityPanel';
 import { RaceDayPanel } from './RaceDayPanel';
 import { SolarPanel } from './SolarPanel';
 import { SplitsPanel } from './SplitsPanel';
@@ -33,6 +34,7 @@ const TABS = [
   { id: 'meteo', label: 'Meteo' },
   { id: 'solar', label: 'Solar' },
   { id: 'equipo', label: 'Equipo' },
+  { id: 'post', label: 'Post-actividad' },
 ] as const;
 
 type TabId = (typeof TABS)[number]['id'];
@@ -204,6 +206,16 @@ export function RacePlanSection({ trackId, points, token }: RacePlanSectionProps
               estimatedTimeMin={estimatedTimeMin}
               weather={weather.data}
             />
+          )}
+        </TabPanel>
+
+        <TabPanel
+          id={`${baseId}-panel-post`}
+          labelledBy={`${baseId}-tab-post`}
+          active={activeTab === 'post'}
+        >
+          {visited('post') && (
+            <PostActivityPanel token={token} plannedPoints={trackPoints} pace={pace} />
           )}
         </TabPanel>
       </div>

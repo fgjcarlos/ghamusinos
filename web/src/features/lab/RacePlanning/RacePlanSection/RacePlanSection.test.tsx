@@ -2,16 +2,20 @@
 //
 // The section is the race-planning surface mounted under TrackDetailPage:
 //
-//   1. It renders the seven planning tabs and the Carrera panel by default.
+//   1. It renders the eight planning tabs and the Carrera panel by default.
 //   2. Splits, cutoffs, solar and gear are computed locally from the track.
-//   3. Weather and terrain are on-demand: nothing reaches the network until
-//      the user presses the button in that tab (S10).
+//   3. Weather, terrain and activity streams are on-demand: nothing reaches
+//      the network until the user presses the button in that tab (S10).
 //   4. A failed weather or terrain request only degrades its own panel (S9).
 //   5. An empty track never crashes.
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, within } from '@testing-library/react';
-import type { TrackTerrainResponse, TrackWeatherResponse } from '../../../../lib/api/lab';
+import type {
+  ActivityStreamsResponse,
+  TrackTerrainResponse,
+  TrackWeatherResponse,
+} from '../../../../lib/api/lab';
 import { ApiError } from '../../../../lib/api/types';
 import { RacePlanSection } from './RacePlanSection';
 
@@ -26,6 +30,11 @@ import * as labApi from '../../../../lib/api/lab';
 
 const fetchWeather = vi.mocked(labApi.fetchTrackWeather);
 const fetchTerrain = vi.mocked(labApi.fetchTrackTerrain);
+const fetchStreams = vi.mocked(labApi.fetchActivityStreams);
+const refreshStreams = vi.mocked(labApi.refreshActivityStreams);
+
+/** One kilometre of longitude at the equator, in degrees. */
+const DEG_PER_KM = 180 / (Math.PI * 6371.0088);
 
 // ~3.3 km with 120 m of gain, valid coordinates in Spain.
 const POINTS = [
@@ -112,6 +121,20 @@ const WEATHER: TrackWeatherResponse = {
   ],
 };
 
+const STREAMS: ActivityStreamsResponse = {
+  activity_id: '123456',
+  started_at: '2026-05-01T08:00:00Z',
+  streams: {
+    time: [0, 360, 720, 1080],
+    latlng: [
+      [0, 0],
+      [0, DEG_PER_KM],
+      [0, 2 * DEG_PER_KM],
+      [0, 3 * DEG_PER_KM],
+    ],
+  },
+};
+
 function renderSection(points: unknown[] = POINTS) {
   return render(<RacePlanSection trackId="track-1" points={points} token="tok" />);
 }
@@ -125,15 +148,23 @@ beforeEach(() => {
 });
 
 describe('RacePlanSection', () => {
-  it('renders the seven tabs and the default Carrera content without network calls', () => {
+  it('renders the eight tabs and the default Carrera content without network calls', () => {
     renderSection();
 
     const tabs = screen.getAllByRole('tab');
-    expect(tabs).toHaveLength(7);
-    for (const label of ['Carrera', 'Splits', 'Cortes', 'Terreno', 'Meteo', 'Solar', 'Equipo']) {
+    expect(tabs).toHaveLength(8);
+    for (const label of [
+      'Carrera',
+      'Splits',
+      'Cortes',
+      'Terreno',
+      'Meteo',
+      'Solar',
+      'Equipo',
+      'Post-actividad',
+    ]) {
       expect(screen.getByRole('tab', { name: label })).toBeInTheDocument();
     }
-    expect(screen.queryByRole('tab', { name: 'Post-Activity' })).toBeNull();
 
     const selected = screen.getByRole('tab', { name: 'Carrera' });
     expect(selected).toHaveAttribute('aria-selected', 'true');
@@ -254,6 +285,52 @@ describe('RacePlanSection', () => {
     expect(within(panel).getByText(/Marcados:/)).toBeInTheDocument();
     expect(within(panel).getByText('Silbato')).toBeInTheDocument();
     expect(within(panel).getByText('Bastones de trail')).toBeInTheDocument();
+  });
+
+  it('loads activity streams on demand and renders plan vs real rows', async () => {
+    fetchStreams.mockResolvedValue(STREAMS);
+    renderSection();
+
+    expect(fetchStreams).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole('tab', { name: 'Post-actividad' }));
+    const panel = activePanel();
+    fireEvent.change(within(panel).getByLabelText('ID de actividad de Strava'), {
+      target: { value: '123456' },
+    });
+    fireEvent.click(within(panel).getByRole('button', { name: 'Cargar streams' }));
+
+    expect(fetchStreams).toHaveBeenCalledWith('tok', '123456');
+    const table = await within(activePanel()).findByRole('table');
+    expect(within(table).getAllByRole('row').length).toBeGreaterThan(1);
+  });
+
+  it('offers a re-sync action when the streams need a refresh', async () => {
+    fetchStreams.mockRejectedValueOnce(
+      new ApiError(409, 'activity streams unavailable: missing time'),
+    );
+    refreshStreams.mockResolvedValue({
+      status: 'queued',
+      job_id: 'job-1',
+      queued_at: '2026-05-01T08:00:00Z',
+    });
+    renderSection();
+
+    fireEvent.click(screen.getByRole('tab', { name: 'Post-actividad' }));
+    const panel = activePanel();
+    fireEvent.change(within(panel).getByLabelText('ID de actividad de Strava'), {
+      target: { value: '123456' },
+    });
+    fireEvent.click(within(panel).getByRole('button', { name: 'Cargar streams' }));
+
+    expect(
+      await within(activePanel()).findByText('activity streams unavailable: missing time'),
+    ).toBeInTheDocument();
+
+    fireEvent.click(within(activePanel()).getByRole('button', { name: 'Re-sincronizar' }));
+
+    expect(refreshStreams).toHaveBeenCalledWith('tok', '123456');
+    expect(await within(activePanel()).findByText(/en curso/)).toBeInTheDocument();
   });
 
   it('guards an empty track', () => {
