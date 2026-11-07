@@ -1,6 +1,6 @@
 # Phase 1.6 — GPX advanced lab (#18)
 
-Objective: deliver race planning and environmental context on top of a stored GPX track, without changing the deterministic core. Base: `main@2725d2e`; branch: `feat/phase-1-6-gpx-lab` (tracker/final integration). Delivery: feature-branch-chain, 5 child PRs + draft tracker PR. Forecast: 6000–8000 authored lines. Checks: `TZ=UTC GOTOOLCHAIN=go1.26.10 go test -race ./...`; `go vet ./...`; `golangci-lint run`; `pnpm -C web test:run`; `pnpm -C web typecheck`; `pnpm -C web lint`; `pnpm -C web format:check`; `make build`.
+Objective: deliver race planning and environmental context on top of a stored GPX track, without changing the deterministic core. Base: `main@2725d2e`; branch: `feat/phase-1-6-gpx-lab` (tracker/final integration). Delivery: feature-branch-chain, 6 child PRs + draft tracker PR. Forecast: 6000–8000 authored lines. Checks: `TZ=UTC GOTOOLCHAIN=go1.26.10 go test -race ./...`; `go vet ./...`; `golangci-lint run`; `pnpm -C web test:run`; `pnpm -C web typecheck`; `pnpm -C web lint`; `pnpm -C web format:check`; `make build`.
 
 ## Specs
 
@@ -60,7 +60,7 @@ S12. Closure: canonical OpenSpec specs under `openspec/specs/`, the change archi
 | T9 | S3, S7, S9, S10 | parent inline | 5 — web client/UI | done | `web/src/lib/api/lab.ts` (weather/terrain/streams/refresh) + `useTrackWeather`, `useTrackTerrain`, `useActivityStreams` with 409 mapping; 13 tests. Commit: `93e07dd`. |
 | T10 | S3, S8, S9 | delegated (writer) | 5 — web client/UI | done | `RacePlanSection` with 7 tabs (Carrera, Splits, Cortes, Terreno, Meteo, Solar, Equipo), on-demand environment calls, per-panel degradation, mounted in `TrackDetailPage`; 9 component tests. Commit: `2dd47a0`. |
 | T11 | S3, S5, S8 | delegated (writer) | 6 — post-activity + docs | done | `postActivity.ts` per-km comparison + `PostActivityPanel` with 409 re-sync flow and 8th tab; 7 model tests + 2 panel tests. Commit: `aa41061`. |
-| T12 | S4, S12 | parent inline | 6 — post-activity + docs | in_progress | OpenSpec change, canonical specs, archive, ODD closure. |
+| T12 | S4, S12 | parent inline | 6 — post-activity + docs | done | OpenSpec change archived at `openspec/changes/archive/2026-11-07-phase-1-6-gpx-advanced-lab/`; GB-001..GB-006 appended to `openspec/specs/gpx-backend/spec.md` (15 requirements total) and GL-001..GL-008 to `openspec/specs/gpx-lab/spec.md` (22 total). Commit: `a9b53a8`. |
 
 Route note: every task starts inline under the parent. A writer is delegated only if the context backstop fires or two independent units with disjoint edit surfaces are launched together; the trigger and surface are recorded here at that moment.
 
@@ -126,3 +126,17 @@ L11. T9-T11 delivered on 2026-11-07.
 - Verification observed after T11: `pnpm -C web test:run` → 68 files / 435 tests passed; `pnpm -C web typecheck`, `pnpm -C web lint` and `pnpm -C web format:check` clean. The earlier Go suite, vet and golangci-lint remain green from T3.
 - T10's writer reported ESLint as "partial" because a directory-scoped `eslint <dir>` invocation is ignored by this repo's flat config; the repository's real gate (`pnpm -C web lint`, i.e. `eslint .`) passes, so the report was a tooling artifact, not a defect.
 - Post-Activity UX note: the activity is entered by its Strava external id (copied from the activity URL). A recent-activity picker is a deliberate follow-up, not part of S5.
+
+L12. T12 completed on 2026-11-07 (commit `a9b53a8`). Created the OpenSpec change with `proposal.md`, `design.md`, `tasks.md`, the two delta specs and the archive report. Promoted the requirements into the canonical files as an append, not an overwrite:
+- `openspec/specs/gpx-backend/spec.md` gained GB-001..GB-006 (activity streams ingestion/read/refresh, weather proxy, terrain proxy, authenticated track-scoped mounting); total 15 requirements.
+- `openspec/specs/gpx-lab/spec.md` gained GL-001..GL-008 (geometry, splits/cutoffs, race day, solar, gear, client/hooks, section, Post-Activity); total 22 requirements.
+Then moved the change to `openspec/changes/archive/2026-11-07-phase-1-6-gpx-advanced-lab/` and updated the archive report to archived. Structural readback: requirement counts 15 and 22, no stale non-archive references outside the archived source lines, and the canonical headers record the phase 1.6 provenance.
+
+L13. Final delivery boundaries for the feature-branch chain (measured from the linear local history; additions+deletions):
+- PR 1 streams: `f755e17..106b8d7`.
+- PR 2 weather: `106b8d7..1fad7d7`.
+- PR 3 terrain: `1fad7d7..effd3d6` (includes the route wiring and the T2/T3 docs).
+- PR 4 web model: `effd3d6..0df11ae` (T4-T8 plus their docs).
+- PR 5 client + UI: `0df11ae..2dd47a0` (T9 + T10).
+- PR 6 Post-Activity + docs: `2dd47a0..HEAD` (T11, the OpenSpec archive and this closure).
+Choreography at delivery: create the six child branches at those boundary commits first, then reset the tracker `feat/phase-1-6-gpx-lab` to `f755e17`. Child #1 targets the tracker; each later child targets the previous child branch; the tracker PR targets `main` and stays draft until the chain is integrated. Push and PR creation are not performed yet; they require explicit user authorization.
