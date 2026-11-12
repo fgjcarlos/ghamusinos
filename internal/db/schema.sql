@@ -316,3 +316,38 @@ CREATE TABLE ai_analysis (
 );
 
 CREATE INDEX idx_ai_analysis_user_created ON ai_analysis (user_id, created_at DESC);
+
+-- Fase 2.1 (issue #298) -- sesiones de entrenamiento planificadas.
+-- Mirrors migration 00016_planned_sessions.sql for sqlc generation.
+--
+-- `scheduled_on` es un DATE (día civil, sin hora ni offset): el día se
+-- resuelve en la zona horaria del usuario antes de escribir, así que el
+-- valor guardado no depende de la zona horaria de quien lo lea después.
+--
+-- Los CHECK son la última línea de defensa: la validación de dominio en
+-- internal/workouts da el mensaje útil, pero la base rechaza el dato
+-- inválido aunque alguien escriba saltándose esa capa.
+CREATE TABLE planned_sessions (
+    id                      UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id                 UUID        NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    scheduled_on            DATE        NOT NULL,
+    title                   TEXT        NOT NULL CONSTRAINT planned_sessions_title_valido
+                                      CHECK (title <> '' AND length(title) <= 200),
+    notes                   TEXT        CONSTRAINT planned_sessions_notes_valido
+                                      CHECK (notes IS NULL OR length(notes) <= 2000),
+    workout_type            TEXT        NOT NULL CONSTRAINT planned_sessions_workout_type_valido
+                                      CHECK (workout_type IN ('rodaje', 'tirada_larga', 'series', 'cuestas',
+                                                             'tempo', 'fartlek', 'fuerza', 'recuperacion', 'otro')),
+    target_duration_sec     INTEGER     CONSTRAINT planned_sessions_target_duration_no_negativo
+                                      CHECK (target_duration_sec IS NULL OR target_duration_sec >= 0),
+    target_distance_m       INTEGER     CONSTRAINT planned_sessions_target_distance_no_negativo
+                                      CHECK (target_distance_m IS NULL OR target_distance_m >= 0),
+    target_elevation_gain_m INTEGER     CONSTRAINT planned_sessions_target_elevation_no_negativo
+                                      CHECK (target_elevation_gain_m IS NULL OR target_elevation_gain_m >= 0),
+    target_intensity        TEXT        CONSTRAINT planned_sessions_target_intensity_valido
+                                      CHECK (target_intensity IS NULL OR target_intensity IN ('z1', 'z2', 'z3', 'z4', 'z5')),
+    created_at              TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at              TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX idx_planned_sessions_user_scheduled ON planned_sessions (user_id, scheduled_on);
