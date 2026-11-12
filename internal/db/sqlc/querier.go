@@ -32,11 +32,17 @@ type Querier interface {
 	// frontend. NULL d+/d- con elevation_coverage conocido es el contrato.
 	CreateGPXTrack(ctx context.Context, arg CreateGPXTrackParams) (GpxTrack, error)
 	CreateInvite(ctx context.Context, arg CreateInviteParams) (Invite, error)
+	// Crea una sesion planificada para el usuario. El `user_id` viene del
+	// token, nunca del cuerpo de la peticion.
+	CreatePlannedSession(ctx context.Context, arg CreatePlannedSessionParams) (PlannedSession, error)
 	// Crea una nueva sesión de sincronización en estado 'pending'. El caller la
 	// transita a 'running' con UpdateSyncSessionStatus cuando empieza a procesar.
 	CreateSyncSession(ctx context.Context, arg CreateSyncSessionParams) (SyncSession, error)
 	CreateUser(ctx context.Context, arg CreateUserParams) (User, error)
 	DeleteGPXTrack(ctx context.Context, arg DeleteGPXTrackParams) error
+	// Borra una sesion del usuario. Devuelve el numero de filas afectadas: 0
+	// significa que no existia o que era de otro usuario (misma respuesta).
+	DeletePlannedSession(ctx context.Context, arg DeletePlannedSessionParams) (int64, error)
 	// Limpia los tokens del usuario (logout / desvinculación).
 	DeleteStravaTokensByUserID(ctx context.Context, userID pgtype.UUID) error
 	// Return the existing row when Strava retries the same natural event key.
@@ -91,6 +97,10 @@ type Querier interface {
 	GetInviteByTokenHash(ctx context.Context, tokenHash string) (Invite, error)
 	// Obtiene la sesión de sincronización más reciente del usuario.
 	GetLatestSyncSession(ctx context.Context, userID pgtype.UUID) (SyncSession, error)
+	// Devuelve una sesion del usuario. El filtro por user_id es la frontera
+	// de aislamiento: la sesion de otro usuario no existe para esta consulta
+	// (pgx.ErrNoRows).
+	GetPlannedSession(ctx context.Context, arg GetPlannedSessionParams) (PlannedSession, error)
 	// Recupera los tokens OAuth de Strava de un usuario (cifrados).
 	GetStravaTokensByUserID(ctx context.Context, userID pgtype.UUID) (StravaToken, error)
 	GetUserByClerkID(ctx context.Context, clerkUserID string) (User, error)
@@ -148,6 +158,14 @@ type Querier interface {
 	// Lista los eventos pendientes (processed_at IS NULL) para alimentar un
 	// job de procesamiento. LIMIT defensivo para evitar scans descontrolados.
 	ListPendingActivityEvents(ctx context.Context, limit int32) ([]ActivityEvent, error)
+	// Lista las sesiones del usuario en una ventana de fechas (inclusiva).
+	//
+	// COUNT(*) OVER() da el total real de filas que cumplen el WHERE (no el
+	// LIMIT), igual que en ListActivitiesByUser (issue #172, M6).
+	//
+	// Los parametros de fecha van nombrados: con $2/$3 posicionales sobre dos
+	// columnas DATE, SQLC no puede inferir los tipos y la generacion falla.
+	ListPlannedSessionsByRange(ctx context.Context, arg ListPlannedSessionsByRangeParams) ([]ListPlannedSessionsByRangeRow, error)
 	// Lista las sesiones de sincronización del usuario, más recientes primero.
 	ListSyncSessionsByUser(ctx context.Context, arg ListSyncSessionsByUserParams) ([]SyncSession, error)
 	// Serie completa desde la primera actividad hasta hoy. Usada por el job
@@ -183,6 +201,9 @@ type Querier interface {
 	// (decisión de usuario 2026-10-01) por simplicidad y porque ya está
 	// alineada con la arquitectura actual.
 	SumHRZonesInRange(ctx context.Context, arg SumHRZonesInRangeParams) (SumHRZonesInRangeRow, error)
+	// Actualiza una sesion del usuario. Solo el dueno de la fila (user_id)
+	// puede modificarla; si no existe o es de otro usuario, pgx.ErrNoRows.
+	UpdatePlannedSession(ctx context.Context, arg UpdatePlannedSessionParams) (PlannedSession, error)
 	// Actualiza los contadores de progreso sin tocar status/finished_at.
 	UpdateSyncSessionProgress(ctx context.Context, arg UpdateSyncSessionProgressParams) (SyncSession, error)
 	// Cambia el estado de la sesión. Si falla el job, se guarda el error.

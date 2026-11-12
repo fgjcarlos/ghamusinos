@@ -169,6 +169,21 @@ type Invite struct {
 	CreatedAt  pgtype.Timestamptz `json:"created_at"`
 }
 
+type PlannedSession struct {
+	ID                   pgtype.UUID        `json:"id"`
+	UserID               pgtype.UUID        `json:"user_id"`
+	ScheduledOn          pgtype.Date        `json:"scheduled_on"`
+	Title                string             `json:"title"`
+	Notes                pgtype.Text        `json:"notes"`
+	WorkoutType          string             `json:"workout_type"`
+	TargetDurationSec    pgtype.Int4        `json:"target_duration_sec"`
+	TargetDistanceM      pgtype.Int4        `json:"target_distance_m"`
+	TargetElevationGainM pgtype.Int4        `json:"target_elevation_gain_m"`
+	TargetIntensity      pgtype.Text        `json:"target_intensity"`
+	CreatedAt            pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt            pgtype.Timestamptz `json:"updated_at"`
+}
+
 type StravaToken struct {
 	UserID        pgtype.UUID        `json:"user_id"`
 	AccessCipher  string             `json:"access_cipher"`
