@@ -22,7 +22,7 @@
 
 ~640 lines (including the generated `planned_sessions.sql.go`).
 
-- [ ] **1.1** — Migration `00016_planned_sessions.sql`
+- [x] **1.1** — Migration `00016_planned_sessions.sql`
   - New file `internal/db/migrations/00016_planned_sessions.sql`.
   - `CREATE TABLE planned_sessions` with the columns, the `CHECK`
     constraints and the index of `design.md`; goose `Up` and `Down`
@@ -31,22 +31,22 @@
     each constraint exists).
   - Verify: `make migrate` applies it; `go run ./cmd/migrate
     --allow-destructive down` reverts it; `make migrate` re-applies it.
-- [ ] **1.2** — Mirror the table into `internal/db/schema.sql`
+- [x] **1.2** — Mirror the table into `internal/db/schema.sql`
   - The SQLC schema is the source of truth for the generated code, so the
     table has to exist in both places. Same DDL, same constraints.
-- [ ] **1.3** — `internal/db/queries/planned_sessions.sql`
+- [x] **1.3** — `internal/db/queries/planned_sessions.sql`
   - The five queries of `design.md`, each with the ownership filter and a
     comment that says so.
   - `ListPlannedSessionsByRange` uses `sqlc.arg('from_date')` /
     `sqlc.arg('to_date')` (positional `$2`/`$3` on two `DATE` columns
     fails SQLC type inference).
   - `DeletePlannedSession` is `:execrows`, not `:exec`.
-- [ ] **1.4** — `make generate` and commit the generated code
+- [x] **1.4** — `make generate` and commit the generated code
   - `internal/db/sqlc/planned_sessions.sql.go` (new),
   - `internal/db/sqlc/models.go` (adds `PlannedSession`),
   - `internal/db/sqlc/querier.go` (the interface grows by five methods).
   - Verify: run `make generate` a second time, `git diff` must be empty.
-- [ ] **1.5** — Fix the five `sqlc.Querier` mocks
+- [x] **1.5** — Fix the five `sqlc.Querier` mocks
   - Add the five stubs to `mockQuerier` (`internal/http/router_test.go`),
     `activitiesMockQuerier` (`internal/http/handlers/activities_test.go`),
     `mockMeQuerier` (`internal/http/handlers/me_test.go`),
@@ -56,7 +56,7 @@
   - The stubs return zero values, exactly like the existing ones.
   - Verify: `go vet ./...` is clean (this is what reports the missing
     methods).
-- [ ] **1.6** — Static contract test
+- [x] **1.6** — Static contract test
   - New file `internal/db/sqlc/planned_sessions_contract_test.go`,
     following `ai_analysis_contract_test.go`: reads the migration and
     `schema.sql` from disk, asserts the table, the columns, the cascade
@@ -73,17 +73,17 @@ re-applies against a real PostgreSQL.
 
 ~707 lines.
 
-- [ ] **2.1** — Domain types (`internal/workouts/types.go`)
+- [x] **2.1** — Domain types (`internal/workouts/types.go`)
   - `Session` with plain Go types: `uuid.UUID`, `time.Time`, `string`,
     `*int`, `*Intensity`. JSON tags, no `pgtype`.
   - `WorkoutType` and `Intensity` string types with their constants.
-- [ ] **2.2** — Domain validation (`internal/workouts/validation.go`)
+- [x] **2.2** — Domain validation (`internal/workouts/validation.go`)
   - `ErrValidation` sentinel; `Validate(Session) error` returning an error
     that wraps it and names the offending field.
   - Rules: title required and <= 200 chars, notes <= 2000 chars, known
     workout type, known intensity, non-negative objectives, non-zero
     date.
-- [ ] **2.3** — `Store` (`internal/workouts/store.go`)
+- [x] **2.3** — `Store` (`internal/workouts/store.go`)
   - The five-method `Querier` interface (design D5) and `NewStore`.
   - `Create`, `Get`, `ListRange`, `Update`, `Delete`. Each takes the
     caller's `user_id` and forwards it (design D4).
@@ -91,7 +91,7 @@ re-applies against a real PostgreSQL.
     zero row count to `ErrNotFound`.
   - The `pgtype` <-> domain conversions live here and nowhere else
     (design D3).
-- [ ] **2.4** — Tests
+- [x] **2.4** — Tests
   - `internal/workouts/validation_test.go`: table-driven, one case per
     rule plus the happy paths (minimal session, fully populated
     session).
@@ -108,7 +108,7 @@ production code of the package touches `pgtype` in exactly one file
 
 ~253 lines.
 
-- [ ] **3.1** — `internal/db/sqlc/planned_sessions_integration_test.go`
+- [x] **3.1** — `internal/db/sqlc/planned_sessions_integration_test.go`
   - Build tag `integration`, package `sqlc_test`, reusing the existing
     `openTestDB` helper from `queries_integration_test.go` (do not open a
     second pool).
@@ -138,3 +138,54 @@ set.
 - `race_id` -> phase 2.3.
 - A `sqlc.yaml` type override for `workout_type`: it creates an import
   cycle (verified). The domain package converts the string itself.
+
+## Verification evidence
+
+All three units were verified against a live PostgreSQL
+(`timescale/timescaledb:2.27.2-pg16`, the same image as the CI service)
+and against the real migration, not against a mock.
+
+**Migration**
+
+- `go run ./cmd/migrate up` applies `00016_planned_sessions.sql`.
+- `go run ./cmd/migrate --allow-destructive down` reverts it; the table
+  is gone (`Did not find any relation named "planned_sessions"`).
+- `go run ./cmd/migrate up` re-applies it with the same shape.
+
+**SQLC**
+
+- `make generate` succeeds. Running it a second time leaves the
+  generated files byte-identical (md5 of `internal/db/sqlc/*.go` unchanged),
+  so the committed code is in sync with the queries.
+
+**Gates (all clean)**
+
+| Gate | Result |
+|------|--------|
+| `gofmt -l .` | empty |
+| `go vet ./...` and `go vet -tags integration ./...` | clean |
+| `go test -race -count=1 ./...` | all packages ok |
+| `go test -tags integration -race -count=1 ./internal/app/... ./internal/db/sqlc/... ./internal/jobs/...` | all ok (the CI scope) |
+| `golangci-lint run --timeout 5m ./...` | 0 issues |
+
+**The tests were checked by mutation, not just by passing.**
+
+- Removing the `user_id` filter from `GetPlannedSession`, from
+  `DeletePlannedSession` or from `ListPlannedSessionsByRange` makes the
+  corresponding integration assertion fail ("GetPlannedSession() for
+  another user expected an error, got nil", "deleted 1 rows, want 0",
+  "user B sees 1 sessions of user A, want 0"). The isolation assertions
+  prove the behaviour, not the presence of a filter.
+- Adding a workout type to the `CHECK` constraint of the migration, or
+  removing one, makes the vocabulary test fail in the corresponding
+  direction ("the database admits \"trail\" but the domain rejects it",
+  "the domain admits \"fartlek\" but the database rejects it"). The same
+  holds for the intensity vocabulary.
+- The first version of that test only checked the Go side and passed
+  against a drifted migration; it was rewritten to compare both sides as
+  sets after the mutation check exposed it.
+
+**Note on the environment:** the `Makefile` targets set `GOTOOLCHAIN=local`
+and fail on this machine, whose `/usr/bin/go` is older than the 1.26 that
+`go.mod` requires. The verification above ran `go` without that variable,
+which resolves the toolchain declared in `go.mod`.
