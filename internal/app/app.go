@@ -23,6 +23,7 @@ import (
 	apphttp "github.com/fgjcarlos/ghamusinos/internal/http"
 	"github.com/fgjcarlos/ghamusinos/internal/jobs"
 	"github.com/fgjcarlos/ghamusinos/internal/strava"
+	"github.com/fgjcarlos/ghamusinos/internal/workouts"
 )
 
 const shutdownTimeout = 10 * time.Second
@@ -227,6 +228,7 @@ func buildRouter(cfg *config.Config, pool *pgxpool.Pool, queries sqlc.Querier, s
 		gpx.TrackTypeService{},
 		gpx.Hasher{},
 	)
+	server.WithWorkouts(workouts.NewStore(queries))
 
 	if cfg.Strava != nil {
 		stravaClient, err := strava.NewClient(strava.Config{

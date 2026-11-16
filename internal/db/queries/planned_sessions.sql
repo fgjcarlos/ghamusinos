@@ -30,7 +30,7 @@ FROM planned_sessions
 WHERE user_id = sqlc.arg('user_id')
   AND scheduled_on >= sqlc.arg('from_date')
   AND scheduled_on <= sqlc.arg('to_date')
-ORDER BY scheduled_on ASC
+ORDER BY scheduled_on ASC, id ASC
 LIMIT sqlc.arg('limit') OFFSET sqlc.arg('offset');
 
 -- name: UpdatePlannedSession :one

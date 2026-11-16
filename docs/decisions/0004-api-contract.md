@@ -37,7 +37,7 @@ No se introduce `huma`, `oapi-codegen`, ni tipos TS manuales en esta fase.
   - Llegamos a 1.3 y hay ≥ 5 endpoints nuevos (los datos confirman complejidad).
   - Aparece un cliente distinto del SPA propio (CLI, integración externa, SDK público).
   - El derive causa un bug de producción (no se ha dado; queremos reaccionar, no anticipar).
-- **Mientras tanto:** cada handler Go nuevo debe tener un test que serializa su respuesta (golden JSON) — esto ya es práctica del repo y lo mantiene vivo sin herramienta nueva.
+- **Mientras tanto:** cada handler Go nuevo debe tener un test que serializa su respuesta (golden JSON) — esto ya es práctica del repo y lo mantiene vivo sin herramienta nueva. El contrato de workouts está documentado en [`docs/api/workouts.md`](../api/workouts.md), con golden JSON en `internal/http/handlers/workouts_test.go`.
 
 ## Lo que NO se hace aquí
 

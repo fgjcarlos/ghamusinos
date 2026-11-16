@@ -93,6 +93,18 @@ func (s *Store) ListRange(ctx context.Context, userID uuid.UUID, from, to time.T
 	if err != nil {
 		return nil, 0, fmt.Errorf("workouts: list sessions: %w", err)
 	}
+	if len(rows) == 0 && offset > 0 {
+		countRows, countErr := s.q.ListPlannedSessionsByRange(ctx, sqlc.ListPlannedSessionsByRangeParams{
+			UserID: toUUID(userID), FromDate: toDate(from), ToDate: toDate(to), Limit: 1, Offset: 0,
+		})
+		if countErr != nil {
+			return nil, 0, fmt.Errorf("workouts: count sessions: %w", countErr)
+		}
+		if len(countRows) > 0 {
+			return []Session{}, countRows[0].TotalCount, nil
+		}
+		return []Session{}, 0, nil
+	}
 	sessions := make([]Session, 0, len(rows))
 	var total int64
 	for _, row := range rows {

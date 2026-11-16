@@ -22,6 +22,10 @@ type mockQuerier struct {
 	deletedRows   int64
 	getErr        error
 	row           sqlc.PlannedSession
+	listRows      []sqlc.ListPlannedSessionsByRangeRow
+	fallbackRows  []sqlc.ListPlannedSessionsByRangeRow
+	fallbackErr   error
+	listCalls     int
 }
 
 func (m *mockQuerier) CreatePlannedSession(_ context.Context, arg sqlc.CreatePlannedSessionParams) (sqlc.PlannedSession, error) {
@@ -39,7 +43,48 @@ func (m *mockQuerier) GetPlannedSession(_ context.Context, arg sqlc.GetPlannedSe
 
 func (m *mockQuerier) ListPlannedSessionsByRange(_ context.Context, arg sqlc.ListPlannedSessionsByRangeParams) ([]sqlc.ListPlannedSessionsByRangeRow, error) {
 	m.listParams = arg
-	return nil, nil
+	m.listCalls++
+	if m.listCalls > 1 {
+		return m.fallbackRows, m.fallbackErr
+	}
+	return m.listRows, nil
+}
+
+func TestStoreListRangeRecoversTotalPastLastOffset(t *testing.T) {
+	day := time.Date(2026, 11, 20, 0, 0, 0, 0, time.UTC)
+	userID := uuid.MustParse("11111111-1111-1111-1111-111111111111")
+	mock := &mockQuerier{fallbackRows: []sqlc.ListPlannedSessionsByRangeRow{{
+		ID:          pgtype.UUID{Bytes: uuid.MustParse("33333333-3333-3333-3333-333333333333"), Valid: true},
+		UserID:      pgtype.UUID{Bytes: userID, Valid: true},
+		ScheduledOn: pgtype.Date{Time: day, Valid: true},
+		WorkoutType: string(WorkoutTypeRodaje),
+		TotalCount:  3,
+	}}}
+	rows, total, err := NewStore(mock).ListRange(context.Background(), userID, day, day, 2, 8)
+	if err != nil {
+		t.Fatalf("ListRange() error = %v", err)
+	}
+	if len(rows) != 0 || total != 3 {
+		t.Fatalf("ListRange() = (%d rows, total %d), want (0, 3)", len(rows), total)
+	}
+	if mock.listCalls != 2 || mock.listParams.Offset != 0 || mock.listParams.Limit != 1 {
+		t.Fatalf("fallback params/calls = %+v / %d, want offset 0 limit 1 and 2 calls", mock.listParams, mock.listCalls)
+	}
+}
+
+func TestStoreListRangeReturnsFallbackError(t *testing.T) {
+	day := time.Date(2026, 11, 20, 0, 0, 0, 0, time.UTC)
+	userID := uuid.MustParse("11111111-1111-1111-1111-111111111111")
+	fallbackErr := errors.New("fallback failure")
+	mock := &mockQuerier{fallbackErr: fallbackErr}
+	// The first call returns an empty page; the fallback call fails.
+	_, _, err := NewStore(mock).ListRange(context.Background(), userID, day, day, 2, 8)
+	if !errors.Is(err, fallbackErr) {
+		t.Fatalf("ListRange() error = %v, want wrapped fallback error", err)
+	}
+	if mock.listCalls != 2 || mock.listParams.Offset != 0 || mock.listParams.Limit != 1 {
+		t.Fatalf("fallback params/calls = %+v / %d, want offset 0 limit 1 and 2 calls", mock.listParams, mock.listCalls)
+	}
 }
 
 func (m *mockQuerier) UpdatePlannedSession(_ context.Context, arg sqlc.UpdatePlannedSessionParams) (sqlc.PlannedSession, error) {

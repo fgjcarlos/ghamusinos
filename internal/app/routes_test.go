@@ -70,20 +70,25 @@ func TestBuildRouter_DefaultRoutesAreWired(t *testing.T) {
 		"CONNECT /*",
 		"DELETE /*",
 		"DELETE /api/v1/gpx/{id}",
+		"DELETE /api/v1/workouts/{id}",
 		"GET /*",
 		"GET /api/v1/gpx/",
 		"GET /api/v1/gpx/{id}",
 		"GET /api/v1/gpx/{id}/terrain",
 		"GET /api/v1/gpx/{id}/weather",
 		"GET /api/v1/me",
+		"GET /api/v1/workouts",
+		"GET /api/v1/workouts/{id}",
 		"GET /healthz",
 		"GET /readyz",
 		"HEAD /*",
 		"OPTIONS /*",
 		"PATCH /*",
+		"PATCH /api/v1/workouts/{id}",
 		"POST /*",
 		"POST /api/v1/gpx/compare",
 		"POST /api/v1/gpx/upload",
+		"POST /api/v1/workouts",
 		"PUT /*",
 		"QUERY /*",
 		"TRACE /*",
@@ -116,6 +121,7 @@ func TestBuildRouterMountsEveryRoute(t *testing.T) {
 		"CONNECT /*",
 		"DELETE /*",
 		"DELETE /api/v1/gpx/{id}",
+		"DELETE /api/v1/workouts/{id}",
 		"GET /*",
 		"GET /api/v1/gpx/",
 		"GET /api/v1/gpx/{id}",
@@ -123,6 +129,8 @@ func TestBuildRouterMountsEveryRoute(t *testing.T) {
 		"GET /api/v1/gpx/{id}/weather",
 		"GET /api/v1/me",
 		"GET /api/v1/strava/connect",
+		"GET /api/v1/workouts",
+		"GET /api/v1/workouts/{id}",
 		"GET /healthz",
 		"GET /readyz",
 		"GET /strava/callback",
@@ -130,9 +138,11 @@ func TestBuildRouterMountsEveryRoute(t *testing.T) {
 		"HEAD /*",
 		"OPTIONS /*",
 		"PATCH /*",
+		"PATCH /api/v1/workouts/{id}",
 		"POST /*",
 		"POST /api/v1/gpx/compare",
 		"POST /api/v1/gpx/upload",
+		"POST /api/v1/workouts",
 		"POST /strava/webhook",
 		"PUT /*",
 		"QUERY /*",
@@ -162,4 +172,32 @@ func (*routeWebhookStore) EnqueueActivityEvent(context.Context, sqlc.EnqueueActi
 
 func (*routeWebhookStore) EnqueueActivityEventJob(context.Context, string) error {
 	return nil
+}
+
+func TestBuildRouterWorkoutEndpointsRequireAuthentication(t *testing.T) {
+	cfg := &config.Config{ClerkJWKSURL: "https://clerk.example.com/jwks"}
+	h := buildRouter(cfg, nil, nil, nil, nil, nil)
+	requests := []struct{ method, path string }{
+		{http.MethodPost, "/api/v1/workouts"},
+		{http.MethodGet, "/api/v1/workouts?from=2026-11-01&to=2026-11-30"},
+		{http.MethodGet, "/api/v1/workouts/00000000-0000-0000-0000-000000000001"},
+		{http.MethodPatch, "/api/v1/workouts/00000000-0000-0000-0000-000000000001"},
+		{http.MethodDelete, "/api/v1/workouts/00000000-0000-0000-0000-000000000001"},
+	}
+	for _, tc := range requests {
+		req := httptest.NewRequestWithContext(context.Background(), tc.method, tc.path, nil)
+		rec := httptest.NewRecorder()
+		h.ServeHTTP(rec, req)
+		require.Equal(t, http.StatusUnauthorized, rec.Code, tc.method+" "+tc.path)
+	}
+
+	// Exercise authenticated router composition through the development auth
+	// middleware; invalid query input is rejected before the nil database store.
+	cfg.AuthDisabled = true
+	h = buildRouter(cfg, nil, nil, nil, nil, nil)
+	req := httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/api/v1/workouts?from=invalid&to=2026-11-30", nil)
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+	require.Equal(t, http.StatusBadRequest, rec.Code)
+	require.Contains(t, rec.Header().Get("Content-Type"), "application/problem+json")
 }
