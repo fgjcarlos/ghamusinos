@@ -126,7 +126,7 @@ FROM planned_sessions
 WHERE user_id = $1
   AND scheduled_on >= $2
   AND scheduled_on <= $3
-ORDER BY scheduled_on ASC
+ORDER BY scheduled_on ASC, id ASC
 LIMIT $5 OFFSET $4
 `
 

@@ -20,6 +20,7 @@ import (
 	"github.com/fgjcarlos/ghamusinos/internal/strava"
 	"github.com/fgjcarlos/ghamusinos/internal/terrain"
 	"github.com/fgjcarlos/ghamusinos/internal/weather"
+	"github.com/fgjcarlos/ghamusinos/internal/workouts"
 )
 
 // Server agrupa las dependencias inyectadas necesarias para construir el router.
@@ -57,6 +58,7 @@ type Server struct {
 	gpxRiskDetector  gpx.RiskZoneDetector
 	gpxTypeDetector  gpx.TrackTypeDetector
 	gpxHasher        gpx.GPXHasher
+	workoutStore     *workouts.Store
 	// riverInserter is the River subset needed by POST /dashboard/recalc
 	// (DA-004, issue #16 PR3). Nil-safe: when nil the recalc handler
 	// returns 503 with a clear message instead of panicking (dev stack
@@ -127,6 +129,12 @@ func (s *Server) WithGPX(
 // (dev stack without River); the handler responds 503 explicitly.
 func (s *Server) WithRiverInserter(inserter jobs.RiverJobInserter) *Server {
 	s.riverInserter = inserter
+	return s
+}
+
+// WithWorkouts wires planned workouts to the authenticated API.
+func (s *Server) WithWorkouts(store *workouts.Store) *Server {
+	s.workoutStore = store
 	return s
 }
 
@@ -214,6 +222,13 @@ func (s *Server) Router() http.Handler {
 		// v1 API routes
 		r.Route("/v1", func(r chi.Router) {
 			r.Get("/me", handlers.Me(s.queries).ServeHTTP)
+			if s.workoutStore != nil {
+				r.Post("/workouts", handlers.CreateWorkout(s.workoutStore).ServeHTTP)
+				r.Get("/workouts", handlers.ListWorkouts(s.workoutStore).ServeHTTP)
+				r.Get("/workouts/{id}", handlers.GetWorkout(s.workoutStore).ServeHTTP)
+				r.Patch("/workouts/{id}", handlers.PatchWorkout(s.workoutStore).ServeHTTP)
+				r.Delete("/workouts/{id}", handlers.DeleteWorkout(s.workoutStore).ServeHTTP)
+			}
 
 			if s.queries != nil {
 				r.Get("/activities", handlers.ListActivities(s.queries).ServeHTTP)
