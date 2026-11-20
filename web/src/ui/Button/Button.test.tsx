@@ -4,6 +4,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { Button } from './Button';
+import styles from './Button.module.css';
 
 describe('Button', () => {
   it('renders children inside a <button type="button"> by default', () => {
@@ -48,5 +49,13 @@ describe('Button', () => {
     const disabledClass = screen.getByRole('button').className;
     // Each variant maps to a unique class (Record<Variant, string>).
     expect(new Set([primaryClass, secondaryClass, destructiveClass, disabledClass]).size).toBe(4);
+  });
+
+  it('combines the touch-target base class with the selected variant class', () => {
+    render(<Button variant="secondary">Accesible</Button>);
+    expect(screen.getByRole('button', { name: 'Accesible' })).toHaveClass(
+      styles.button,
+      styles.secondary,
+    );
   });
 });

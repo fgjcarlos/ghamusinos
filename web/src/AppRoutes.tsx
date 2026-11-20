@@ -11,6 +11,7 @@ import Profile from './routes/profile';
 import { RouteDetailContainer } from './features/gpx/RouteDetailContainer';
 import { AppShell } from './ui/AppShell';
 import { ErrorBoundary } from './ui/ErrorBoundary';
+import { WorkoutsContainer } from './features/workouts/WorkoutsContainer';
 
 // The dashboard is the only screen that pulls ECharts in. Loading it
 // lazily keeps the ECharts chunk out of the initial bundle, so the other
@@ -37,6 +38,7 @@ export function AppRoutes() {
         <Route path="/lab/:id" element={<RouteDetailWithId />} />
         <Route path="/lab/compare" element={<LabCompare />} />
         <Route path="/actividades" element={<Activities />} />
+        <Route path="/entrenos" element={<WorkoutsContainer />} />
         <Route path="/perfil" element={<Profile />} />
         <Route
           path="/dashboard"
