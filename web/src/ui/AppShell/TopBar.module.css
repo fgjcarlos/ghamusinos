@@ -101,3 +101,30 @@
   letter-spacing: 0.04em;
   text-transform: uppercase;
 }
+
+@media (max-width: 767px) {
+  .bar {
+    gap: var(--gh-s-2);
+    padding: 0 var(--gh-s-2);
+  }
+
+  .nav {
+    display: none;
+  }
+
+  .brand {
+    min-width: 0;
+    padding: 0 var(--gh-s-1);
+  }
+
+  .right {
+    flex-shrink: 0;
+    gap: var(--gh-s-2);
+  }
+}
+
+@media (max-width: 359px) {
+  .brandName {
+    display: none;
+  }
+}

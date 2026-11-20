@@ -35,4 +35,21 @@
     border-top: 1px solid var(--gh-line);
     gap: var(--gh-s-1);
   }
+
+  .bottomNav > a {
+    flex: 1 1 0;
+    flex-direction: column;
+    min-width: 0;
+    min-height: 44px;
+    gap: 2px;
+    padding: 4px 2px;
+    font-size: 10px;
+  }
+
+  .bottomNav > a > span:last-child {
+    white-space: normal;
+    overflow-wrap: anywhere;
+    text-align: center;
+    line-height: 1.1;
+  }
 }
