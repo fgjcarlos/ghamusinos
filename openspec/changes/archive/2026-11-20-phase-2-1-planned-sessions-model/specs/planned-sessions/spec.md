@@ -1,7 +1,10 @@
 # Spec Delta: phase-2-1-planned-sessions-model
 
+> Promoted to `openspec/specs/planned-sessions-backend/spec.md` on 2026-11-20.
+> The canonical spec is the source of truth.
+
 > Domain: planned-sessions
-> Source: openspec/changes/phase-2-1-planned-sessions-model/{proposal,design}.md
+> Source: openspec/changes/archive/2026-11-20-phase-2-1-planned-sessions-model/{proposal,design}.md
 > Cross-project: `.` (Go)
 > Stack: Go 1.26.0 + chi/v5 + pgx/v5 + goose/v3 + sqlc + testify
 > Gating test command: `make test`
