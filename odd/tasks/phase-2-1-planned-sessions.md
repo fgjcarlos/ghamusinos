@@ -5,9 +5,10 @@ CRUD and the «Entrenos» screen — and close the epic with the canonical
 specs, the archived change and the verification evidence.
 Base: `main@108adef`. Branch: `chore/phase-2-1-close-epic`.
 Checks: `go test -race ./...`, `go vet ./...`, `pnpm -C web test:run`.
-Delivery: one PR with three documentation work units; the branch totals ~735 authored
-lines, over the advisory ~400-line budget of `openspec/config.yaml`. The units are
-markdown-only and coherent (promotion, API contract, web contract), so a chained PR would
+Delivery: one PR with five documentation work units; the commit hook counts the branch at
+roughly 800 authored changed lines (renames and lock files excluded), over the advisory
+~400-line budget of `openspec/config.yaml`. The units are markdown-only and coherent
+(promotion, API contract, web contract, review fixes, this document), so a chained PR would
 add ceremony without shrinking the review surface; the boundary is recorded here.
 
 ## Specs
@@ -67,3 +68,5 @@ L4. Verification (2026-11-20): `go test -race ./...` green in every package, `go
 L5. Decisions: no runtime change. The three sub-tasks were already merged, so the remaining gap of the epic was SDD/ODD bookkeeping and this session changed documentation only. The list window stays browser-local (the API requires `from` and `to`); the divergence with the design of slice 1, which reserved the resolution of the day to the server from `users.timezone`, is recorded as W1 of the archive report and as a phase 2.2 follow-up instead of changing behaviour inside the epic.
 
 L6. The Engram mirror of this document was not written: no memory tool is exposed in this session, so only the file under `odd/tasks/` exists.
+
+L7. Native review (readability lens, MiniMax-M3.1-Flash) approved the candidate and closed with five advisory findings, none blocking: the leap-day rule of the one-year window was undefined, the line-budget exception did not explain its metric, the placeholder token was called the token of the current user, the title and note limits were expressed in bytes on the web and in characters on the backend, and the ownership of the calendar-day resolution was contradictory. All five were applied in the canonical specs, in the archive report and in this document; the API error message that says `characters` while counting UTF-8 bytes stays as a follow-up, because changing it is a runtime change outside this epic.

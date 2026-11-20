@@ -26,9 +26,12 @@ phase 2.1 (GitHub epic #301). The HTTP contract lives in
 `planned_sessions` SHALL store one planned training session per row, with
 `user_id` referencing `users(id)` ON DELETE CASCADE, and `scheduled_on` as
 a `DATE` carrying the calendar day the session belongs to. The column
-SHALL NOT carry a time or a timezone: the user's local day MUST be
-resolved before the value is written, so that the stored day is
-independent of the session timezone of any later reader.
+SHALL NOT carry a time or a timezone: the calendar day MUST be resolved
+before the value is written, so that the stored day is independent of the
+session timezone of any later reader. The resolution happens at the client
+edge: the SPA sends a civil date computed from its own clock, and the API
+stores it verbatim without consulting `users.timezone` (deferred to phase
+2.2).
 
 **Project root**: `.`
 **Gating test command**: `make test`
@@ -113,7 +116,7 @@ through the domain package.
 `internal/workouts` SHALL expose the planned session as plain Go types
 (`uuid.UUID`, `time.Time`, `string`, `*int`, `*Intensity`) and SHALL
 validate a session before it is written: the title SHALL be present and
-at most 200 characters, the notes at most 2000 characters, the workout
+at most 200 bytes of UTF-8, the notes at most 2000 bytes of UTF-8, the workout
 type and the intensity SHALL belong to the vocabularies of `PS-003`, the
 objectives SHALL NOT be negative, and the date SHALL be set. A validation
 failure SHALL name the offending field.

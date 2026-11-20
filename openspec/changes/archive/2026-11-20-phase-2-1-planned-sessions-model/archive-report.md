@@ -55,8 +55,11 @@ Run on 2026-11-20 against `main@108adef`:
   and the SPA computes them from the browser clock: from today to the
   same month and day of the following year. `users.timezone` is not
   consulted server-side, unlike `design.md` of slice 1, which reserved
-  that resolution for the API edge. The stored value stays a bare
-  `DATE`, so the day never shifts for a later reader.
+  that resolution for the API edge. The API stores the submitted civil
+  date verbatim and never reads `users.timezone`, so the canonical
+  backend spec records the resolution of the day as a client-edge
+  responsibility. The stored value stays a bare `DATE`, so the day never
+  shifts for a later reader.
 - **W2 — The association to an objective is a set of columns.** The
   session carries the duration, distance, elevation and intensity
   targets; the race relation (`race_id`) is deferred to phase 2.3,
@@ -79,3 +82,5 @@ Run on 2026-11-20 against `main@108adef`:
 2. Add `race_id` and the association to a race objective (phase 2.3).
 3. Add the session status and the link to a real activity (phase 2.2).
 4. Replace the placeholder token with the real Clerk session (#306).
+5. Fix the wording of the domain error message: it says `title exceeds
+   200 characters` while the limit counts UTF-8 bytes.

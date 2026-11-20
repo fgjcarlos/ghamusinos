@@ -47,9 +47,10 @@ top bar, so that the screen is reachable from any other view of the SPA.
 ### Requirement: the screen lists the sessions of the user (`PW-002`)
 
 The screen SHALL request the sessions of the authenticated user for a
-date window that starts on the current day and ends on the same day of
-the following year, and SHALL render them grouped by `scheduled_on` in
-ascending order. The screen SHALL page with a page size of `20` and
+date window that starts on the current day and ends on the same month
+and day of the following year, clamped to the last day of that month
+when the day does not exist in it (29 February becomes 28 February), and
+SHALL render them grouped by `scheduled_on` in ascending order. The screen SHALL page with a page size of `20` and
 SHALL offer to load the next page while the API reports that more rows
 exist. The screen SHALL render only the sessions returned for the
 authenticated user.
@@ -66,6 +67,7 @@ authenticated user.
 - WHEN the window is computed
 - THEN `from` is that day in `YYYY-MM-DD`
 - AND `to` is the same month and day of the following year
+- AND `to` is clamped to the last day of that month when the day does not exist in it
 
 #### Scenario: the sessions are grouped by day
 
@@ -166,8 +168,11 @@ fetched, an empty state when the window holds no session, an error
 banner with the failure message when a request fails, and a retry
 action when the list itself failed. While a write is in flight the
 screen SHALL be busy and SHALL NOT send a second write. The screen
-SHALL authenticate every request with the token of the current user and
-SHALL surface the failure of the API as a problem message.
+SHALL send the bearer token it holds with every request and SHALL
+surface the failure of the API as a problem message. Today that token
+comes from the `VITE_AUTH_TOKEN` placeholder, pending the real Clerk
+session of issue #306; the ownership of the sessions is enforced by the
+server, which scopes every query to the authenticated user.
 
 **Project root**: `web`
 **Gating test command**: `pnpm -C web test:run`
