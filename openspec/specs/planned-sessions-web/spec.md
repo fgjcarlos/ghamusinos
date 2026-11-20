@@ -87,7 +87,8 @@ authenticated user.
 
 The screen SHALL offer a form with a date, a title, a workout type, a
 note, the three numeric targets (duration in seconds, distance in
-metres, positive elevation gain in metres) and an intensity. The type
+metres, elevation gain in metres) and an intensity. The elevation gain
+target is the climb and is never negative; zero is a valid target. The type
 SHALL be one of `rodaje`, `tirada_larga`, `series`, `cuestas`, `tempo`,
 `fartlek`, `fuerza`, `recuperacion`, `otro`; the intensity SHALL be one
 of `z1`..`z5` or unplanned. The form SHALL validate before sending: the
