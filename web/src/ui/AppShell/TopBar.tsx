@@ -58,6 +58,9 @@ export function TopBar({ lastSync, now, avatarInitials = '' }: TopBarProps) {
         <NavLink to="/actividades" icon={ACTIVITIES_ICON}>
           Actividades
         </NavLink>
+        <NavLink to="/entrenos" icon={ACTIVITIES_ICON}>
+          Entrenos
+        </NavLink>
         <span className={styles.placeholder} data-state="placeholder">
           <NavLink to="/rendimiento" icon={RENDIMIENTO_ICON}>
             Rendimiento
