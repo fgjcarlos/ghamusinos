@@ -95,11 +95,13 @@ export interface SyncSession {
  */
 export class ApiError extends Error {
   public fields?: Record<string, string>;
+  public instance?: string;
 
   constructor(
     public status: number,
     message: string,
     fields?: Record<string, string>,
+    instance?: string,
   ) {
     super(message);
     this.name = 'ApiError';
@@ -108,6 +110,9 @@ export class ApiError extends Error {
     // property that the consumer treats as "explicitly absent".
     if (fields) {
       this.fields = fields;
+    }
+    if (instance) {
+      this.instance = instance;
     }
     Object.setPrototypeOf(this, ApiError.prototype);
   }

@@ -47,6 +47,15 @@ describe('TopBar', () => {
     expect(screen.getByText(/Llega en la fase 1\.4/i)).toBeInTheDocument();
   });
 
+  it('links to planned workouts without a page reload', () => {
+    render(
+      <MemoryRouter>
+        <TopBar lastSync={null} />
+      </MemoryRouter>,
+    );
+    expect(screen.getByRole('link', { name: /Entrenos/i })).toHaveAttribute('href', '/entrenos');
+  });
+
   it('renders the SyncStatusChip with the provided date', () => {
     const lastSync = new Date('2026-01-15T11:48:00Z');
     const now = new Date('2026-01-15T12:00:00Z');

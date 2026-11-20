@@ -87,6 +87,21 @@ describe('AppShell', () => {
     expect(link).toHaveTextContent('Rendimiento');
   });
 
+  it('links Entrenos from the mobile bottom navigation', () => {
+    render(
+      <MemoryRouter initialEntries={['/entrenos']}>
+        <Routes>
+          <Route element={<AppShell lastSync={null} />}>
+            <Route path="/entrenos" element={<p>entrenos content</p>} />
+          </Route>
+        </Routes>
+      </MemoryRouter>,
+    );
+    expect(screen.getByTestId('bottom-nav').querySelector('a[href="/entrenos"]')).toHaveTextContent(
+      'Entrenos',
+    );
+  });
+
   it('passes lastSync through to the SyncStatusChip in the TopBar', () => {
     const lastSync = new Date('2026-01-15T11:48:00Z');
     const now = new Date('2026-01-15T12:00:00Z');
