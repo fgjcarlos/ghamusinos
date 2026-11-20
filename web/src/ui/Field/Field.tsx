@@ -7,11 +7,12 @@ import styles from './Field.module.css';
 export interface FieldProps {
   label: string;
   unit?: string;
-  error?: string;
+  error?: string | undefined;
   children: ReactNode;
+  errorId?: string | undefined;
 }
 
-export function Field({ label, unit, error, children }: FieldProps) {
+export function Field({ label, unit, error, errorId, children }: FieldProps) {
   return (
     <label className={styles.field}>
       <span className={styles.label} data-testid="field-label">
@@ -24,7 +25,7 @@ export function Field({ label, unit, error, children }: FieldProps) {
       </span>
       <span className={styles.control}>{children}</span>
       {error ? (
-        <span className={styles.error} role="alert" data-testid="field-error">
+        <span className={styles.error} id={errorId} role="alert" data-testid="field-error">
           {error}
         </span>
       ) : null}
