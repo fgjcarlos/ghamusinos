@@ -1,11 +1,23 @@
-# Spec Delta: phase-2-1-planned-sessions-model
+# Canonical spec: planned-sessions (Go)
 
-> Domain: planned-sessions
-> Source: openspec/changes/phase-2-1-planned-sessions-model/{proposal,design}.md
-> Cross-project: `.` (Go)
-> Stack: Go 1.26.0 + chi/v5 + pgx/v5 + goose/v3 + sqlc + testify
-> Gating test command: `make test`
-> Quality gates: `make lint`, `make vet`, `make fmt`
+## Source
+
+- Proposal: `openspec/changes/archive/2026-11-20-phase-2-1-planned-sessions-model/proposal.md`
+- Design: `openspec/changes/archive/2026-11-20-phase-2-1-planned-sessions-model/design.md`
+- Promoted from `specs/planned-sessions/spec.md` of that change on 2026-11-20.
+
+## Domain Metadata
+
+| Project root | `.` |
+| --- | --- |
+| Stack | Go 1.26.0 + chi/v5 + pgx/v5 + goose/v3 + sqlc + testify |
+| Gating test command | `make test` (raw: `go test -race ./...`) |
+| Quality gates | `make lint` (`golangci-lint run ./...`), `make vet`, `make fmt` |
+
+Canonical spec for the `planned-sessions` domain: the persistence layer of
+phase 2.1 (GitHub epic #301). The HTTP contract lives in
+`openspec/specs/planned-sessions-api/spec.md` and the SPA screen in
+`openspec/specs/planned-sessions-web/spec.md`.
 
 ## ADDED Requirements
 
@@ -14,9 +26,12 @@
 `planned_sessions` SHALL store one planned training session per row, with
 `user_id` referencing `users(id)` ON DELETE CASCADE, and `scheduled_on` as
 a `DATE` carrying the calendar day the session belongs to. The column
-SHALL NOT carry a time or a timezone: the user's local day MUST be
-resolved before the value is written, so that the stored day is
-independent of the session timezone of any later reader.
+SHALL NOT carry a time or a timezone: the calendar day MUST be resolved
+before the value is written, so that the stored day is independent of the
+session timezone of any later reader. The API stores the civil date it
+receives verbatim and never consults `users.timezone`: resolving the day is
+the caller's responsibility, and the SPA resolves it from its own clock
+(server-side resolution from `users.timezone` is deferred to phase 2.2).
 
 **Project root**: `.`
 **Gating test command**: `make test`
@@ -101,10 +116,14 @@ through the domain package.
 `internal/workouts` SHALL expose the planned session as plain Go types
 (`uuid.UUID`, `time.Time`, `string`, `*int`, `*Intensity`) and SHALL
 validate a session before it is written: the title SHALL be present and
-at most 200 characters, the notes at most 2000 characters, the workout
+at most 200 bytes of UTF-8, the notes at most 2000 bytes of UTF-8, the workout
 type and the intensity SHALL belong to the vocabularies of `PS-003`, the
 objectives SHALL NOT be negative, and the date SHALL be set. A validation
-failure SHALL name the offending field.
+failure SHALL name the offending field. The store converts every target to
+the signed 32-bit range of the `int4` columns by truncation and does not
+check it: the domain validation only rejects negative targets. A caller
+MUST therefore reject a target outside the signed 32-bit range before it
+reaches the store, and the HTTP layer does it (`PA-002` and `PA-004`).
 
 **Project root**: `.`
 **Gating test command**: `make test`
