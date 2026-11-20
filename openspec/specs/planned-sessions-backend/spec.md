@@ -119,7 +119,10 @@ validate a session before it is written: the title SHALL be present and
 at most 200 bytes of UTF-8, the notes at most 2000 bytes of UTF-8, the workout
 type and the intensity SHALL belong to the vocabularies of `PS-003`, the
 objectives SHALL NOT be negative, and the date SHALL be set. A validation
-failure SHALL name the offending field.
+failure SHALL name the offending field. The store narrows every target to
+the signed 32-bit range of the `int4` columns, so a target outside that
+range MUST be refused before it reaches the store: the HTTP layer owns
+that check (`PA-002` and `PA-004`).
 
 **Project root**: `.`
 **Gating test command**: `make test`

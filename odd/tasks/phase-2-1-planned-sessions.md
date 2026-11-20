@@ -5,10 +5,10 @@ CRUD and the «Entrenos» screen — and close the epic with the canonical
 specs, the archived change and the verification evidence.
 Base: `main@108adef`. Branch: `chore/phase-2-1-close-epic`.
 Checks: `go test -race ./...`, `go vet ./...`, `pnpm -C web test:run`.
-Delivery: one PR with five documentation work units. The branch adds roughly 820 authored
-changed lines since `origin/main`, the count that the session's commit tool reports on every
-commit, where every added or modified line counts once and renames and lock files are
-excluded. That is over the advisory ~400-line budget of `openspec/config.yaml`. The units are markdown-only and coherent
+Delivery: one PR whose work units are documentation only, one per concern. The branch adds
+roughly 820 net changed lines since `origin/main`, the count that the session's commit tool
+reports on every commit, where additions minus deletions are counted and renames and lock
+files are excluded. That is over the advisory ~400-line budget of `openspec/config.yaml`. The units are markdown-only and coherent
 (promotion, API contract, web contract, review fixes, this document), so a chained PR would
 add ceremony without shrinking the review surface; the boundary is recorded here.
 

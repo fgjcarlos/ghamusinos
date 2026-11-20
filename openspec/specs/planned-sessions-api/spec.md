@@ -158,8 +158,9 @@ end — and `has_next` tells whether more rows exist after this page.
 `PATCH /api/v1/workouts/{id}` SHALL update only the supplied fields,
 preserving the omitted ones, SHALL allow the nullable target fields to be
 set to `null` to clear them, and SHALL NOT accept `null` for
-`scheduled_on`, `title`, `workout_type` or `notes`; it SHALL answer `200`
-with the updated session. `DELETE /api/v1/workouts/{id}` SHALL remove
+`scheduled_on`, `title`, `workout_type` or `notes`. A target outside the
+signed 32-bit range SHALL be refused with `422`, as on creation; it SHALL
+answer `200` with the updated session. `DELETE /api/v1/workouts/{id}` SHALL remove
 the session and answer `204` with no body. An id that is not a UUID, a
 session that does not exist and a session of another user SHALL all be
 answered with `404`.
