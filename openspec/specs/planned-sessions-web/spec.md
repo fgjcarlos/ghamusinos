@@ -92,8 +92,9 @@ target is the climb and is never negative; zero is a valid target. The type
 SHALL be one of `rodaje`, `tirada_larga`, `series`, `cuestas`, `tempo`,
 `fartlek`, `fuerza`, `recuperacion`, `otro`; the intensity SHALL be one
 of `z1`..`z5` or unplanned. The form SHALL validate before sending: the
-date SHALL be a valid date inside the visible window, the title SHALL be
-present and at most 200 bytes, the note at most 2000 bytes, the type
+date SHALL be a valid date inside the window that the screen requests
+(the window of `PW-002`), the title SHALL be present and at most 200
+bytes, the note at most 2000 bytes, the type
 SHALL belong to the vocabulary, the intensity SHALL belong to its
 vocabulary, and every target SHALL be a non-negative integer that fits
 a signed 32-bit integer. A session opened for editing SHALL be prefilled
@@ -120,7 +121,7 @@ with its stored values.
 
 #### Scenario: an out-of-window date is refused
 
-- GIVEN a form with a date outside the visible window
+- GIVEN a form with a date outside the window of `PW-002`
 - WHEN the user saves it
 - THEN the date field reports the allowed range
 - AND no request is sent

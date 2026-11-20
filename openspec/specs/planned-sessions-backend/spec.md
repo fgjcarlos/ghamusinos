@@ -28,10 +28,10 @@ phase 2.1 (GitHub epic #301). The HTTP contract lives in
 a `DATE` carrying the calendar day the session belongs to. The column
 SHALL NOT carry a time or a timezone: the calendar day MUST be resolved
 before the value is written, so that the stored day is independent of the
-session timezone of any later reader. The resolution happens at the client
-edge: the SPA sends a civil date computed from its own clock, and the API
-stores it verbatim without consulting `users.timezone` (deferred to phase
-2.2).
+session timezone of any later reader. The API stores the civil date it
+receives verbatim and never consults `users.timezone`: resolving the day is
+the caller's responsibility, and the SPA resolves it from its own clock
+(server-side resolution from `users.timezone` is deferred to phase 2.2).
 
 **Project root**: `.`
 **Gating test command**: `make test`
@@ -119,10 +119,11 @@ validate a session before it is written: the title SHALL be present and
 at most 200 bytes of UTF-8, the notes at most 2000 bytes of UTF-8, the workout
 type and the intensity SHALL belong to the vocabularies of `PS-003`, the
 objectives SHALL NOT be negative, and the date SHALL be set. A validation
-failure SHALL name the offending field. The store narrows every target to
-the signed 32-bit range of the `int4` columns, so a target outside that
-range MUST be refused before it reaches the store: the HTTP layer owns
-that check (`PA-002` and `PA-004`).
+failure SHALL name the offending field. The store converts every target to
+the signed 32-bit range of the `int4` columns by truncation and does not
+check it: the domain validation only rejects negative targets. A caller
+MUST therefore reject a target outside the signed 32-bit range before it
+reaches the store, and the HTTP layer does it (`PA-002` and `PA-004`).
 
 **Project root**: `.`
 **Gating test command**: `make test`

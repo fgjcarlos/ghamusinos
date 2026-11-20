@@ -48,17 +48,31 @@ Run on 2026-11-20 against `main@108adef`:
 - No live third-party request in any test: the Go side uses `httptest`
   and sqlc mocks, and the web client stubs `fetch`.
 
+## Review rounds
+
+The native review (readability lens) ran over the branch and approved it in
+every round. Every finding was advisory: none opened a correction, and
+none reopens a review.
+
+| Round | Findings | Applied |
+| --- | --- | --- |
+| 1 | leap-day rule undefined; slice metric unexplained; the placeholder token called the user token; the title and note limits in bytes on the web and in characters on the backend; contradictory owner of the calendar day | leap-day clamp in `PW-002`; the metric named in the ODD document; the token described as the placeholder it is; the limits in UTF-8 bytes in both specs; the day resolved by the caller |
+| 2 | the slice metric was still hard to audit | the tool that counts the slice, the comparison range and the metric are named |
+| 3 | the elevation target described as positive but validated as non-negative | the elevation target is the climb, never negative, and zero is valid |
+| 4 | the slice count is net growth, not added lines; the owner of the signed 32-bit range check unclear | the metric counts additions minus deletions; the store truncates to `int4` and the caller rejects out-of-range targets |
+| 5 | contradictory owner of the day resolution; the leap-day rule promised here but not stated; the range check owner still unclear; the form window undefined | the API stores the civil date verbatim; the clamp rule is stated in `W1`; the store truncates and the caller rejects; the form uses the window of `PW-002` |
+
 ## Known warnings and limitations
 
 - **W1 — The list window is mandatory and browser-local.** `GET
   /api/v1/workouts` requires `from` and `to` (a missing one is a `400`),
   and the SPA computes them from the browser clock: from today to the
-  same month and day of the following year. `users.timezone` is not
-  consulted server-side, unlike `design.md` of slice 1, which reserved
-  that resolution for the API edge. The API stores the submitted civil
-  date verbatim and never reads `users.timezone`, so the canonical
-  backend spec records the resolution of the day as a client-edge
-  responsibility. The stored value stays a bare `DATE`, so the day never
+  same month and day of the following year, clamped to the last day of
+  that month when the day does not exist in it (29 February becomes
+  28 February). The API stores the submitted civil date verbatim and
+  never reads `users.timezone`, so the resolution of the day belongs to
+  the caller; server-side resolution from `users.timezone` is deferred to
+  phase 2.2. The stored value stays a bare `DATE`, so the day never
   shifts for a later reader.
 - **W2 — The association to an objective is a set of columns.** The
   session carries the duration, distance, elevation and intensity
