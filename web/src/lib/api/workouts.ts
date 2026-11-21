@@ -1,5 +1,5 @@
 import { ApiError } from './types';
-import type { PaginatedWorkouts, Workout, WorkoutInput } from './workout-types';
+import type { PaginatedWorkouts, Workout, WorkoutInput, WorkoutPatch } from './workout-types';
 
 const BASE_URL = '/api/v1/workouts';
 const auth = (token: string): HeadersInit => ({
@@ -56,7 +56,7 @@ export async function createWorkout(token: string, workout: WorkoutInput): Promi
 export async function updateWorkout(
   token: string,
   id: string,
-  workout: Partial<WorkoutInput>,
+  workout: WorkoutPatch,
 ): Promise<Workout> {
   return json<Workout>(
     await fetch(`${BASE_URL}/${encodeURIComponent(id)}`, {
@@ -73,4 +73,27 @@ export async function deleteWorkout(token: string, id: string): Promise<void> {
     headers: auth(token),
   });
   if (!response.ok) await json<unknown>(response);
+}
+
+export async function linkWorkoutActivity(
+  token: string,
+  id: string,
+  activityId: string,
+): Promise<Workout> {
+  return json<Workout>(
+    await fetch(`${BASE_URL}/${encodeURIComponent(id)}/activity`, {
+      method: 'PUT',
+      headers: auth(token),
+      body: JSON.stringify({ activity_id: activityId }),
+    }),
+  );
+}
+
+export async function unlinkWorkoutActivity(token: string, id: string): Promise<Workout> {
+  return json<Workout>(
+    await fetch(`${BASE_URL}/${encodeURIComponent(id)}/activity`, {
+      method: 'DELETE',
+      headers: auth(token),
+    }),
+  );
 }

@@ -13,6 +13,8 @@ const session = (id: string): Workout => ({
   target_distance_m: 0,
   target_elevation_gain_m: null,
   target_intensity: 'z2',
+  status: 'planned',
+  activity_id: null,
 });
 
 describe('WorkoutsList', () => {
