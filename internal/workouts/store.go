@@ -35,6 +35,10 @@ type Querier interface {
 	DeletePlannedSession(context.Context, sqlc.DeletePlannedSessionParams) (int64, error)
 	LinkPlannedSessionActivity(context.Context, sqlc.LinkPlannedSessionActivityParams) (sqlc.PlannedSession, error)
 	UnlinkPlannedSessionActivity(context.Context, sqlc.UnlinkPlannedSessionActivityParams) (sqlc.PlannedSession, error)
+	// La comparacion plan vs real (#312) reutiliza queries existentes:
+	// la zona del usuario (users.timezone) y las actividades del rango.
+	GetUserPreferencesByID(context.Context, pgtype.UUID) (sqlc.GetUserPreferencesByIDRow, error)
+	ListActivitiesInRange(context.Context, sqlc.ListActivitiesInRangeParams) ([]sqlc.ListActivitiesInRangeRow, error)
 }
 
 // Store persiste las sesiones planificadas de un usuario. Todas las

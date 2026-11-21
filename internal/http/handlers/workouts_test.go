@@ -35,6 +35,10 @@ type workoutsMemoryStore struct {
 	deleteErr  error
 	linkErr    error
 	unlinkErr  error
+	// Estado inyectado por los tests de comparacion (#312).
+	compareCalls []compareCall
+	compareOut   []workouts.ComparePeriod
+	compareErr   error
 }
 
 func (s *workoutsMemoryStore) Create(_ context.Context, uid uuid.UUID, v workouts.Session) (workouts.Session, error) {
