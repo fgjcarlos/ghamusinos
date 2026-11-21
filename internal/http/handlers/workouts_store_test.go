@@ -56,6 +56,15 @@ func (q *workoutQuerierStub) UnlinkPlannedSessionActivity(_ context.Context, _ s
 	return q.row, nil
 }
 
+// Stubs de comparacion (#312): el store real los usa solo en Compare,
+// que este test no ejercita (esta cubierto en workouts_compare_test.go).
+func (q *workoutQuerierStub) GetUserPreferencesByID(context.Context, pgtype.UUID) (sqlc.GetUserPreferencesByIDRow, error) {
+	return sqlc.GetUserPreferencesByIDRow{Timezone: "UTC"}, nil
+}
+func (q *workoutQuerierStub) ListActivitiesInRange(context.Context, sqlc.ListActivitiesInRangeParams) ([]sqlc.ListActivitiesInRangeRow, error) {
+	return nil, nil
+}
+
 func TestWorkoutHandlerUsesStoreForIsolationAtomicityAndPaging(t *testing.T) {
 	userID := uuid.MustParse(workoutTestUser)
 	id := uuid.MustParse(workoutTestID)

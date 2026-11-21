@@ -22,6 +22,12 @@ type mockQuerier struct {
 	listParams    sqlc.ListPlannedSessionsByRangeParams
 	linkParams    sqlc.LinkPlannedSessionActivityParams
 	unlinkParams  sqlc.UnlinkPlannedSessionActivityParams
+	prefsID       pgtype.UUID
+	prefs         sqlc.GetUserPreferencesByIDRow
+	prefsErr      error
+	activityArgs  sqlc.ListActivitiesInRangeParams
+	activityRows  []sqlc.ListActivitiesInRangeRow
+	activityErr   error
 	deletedRows   int64
 	getErr        error
 	linkErr       error

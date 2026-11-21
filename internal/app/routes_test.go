@@ -79,6 +79,7 @@ func TestBuildRouter_DefaultRoutesAreWired(t *testing.T) {
 		"GET /api/v1/gpx/{id}/weather",
 		"GET /api/v1/me",
 		"GET /api/v1/workouts",
+		"GET /api/v1/workouts/compare",
 		"GET /api/v1/workouts/{id}",
 		"GET /healthz",
 		"GET /readyz",
@@ -133,6 +134,7 @@ func TestBuildRouterMountsEveryRoute(t *testing.T) {
 		"GET /api/v1/me",
 		"GET /api/v1/strava/connect",
 		"GET /api/v1/workouts",
+		"GET /api/v1/workouts/compare",
 		"GET /api/v1/workouts/{id}",
 		"GET /healthz",
 		"GET /readyz",
@@ -184,6 +186,7 @@ func TestBuildRouterWorkoutEndpointsRequireAuthentication(t *testing.T) {
 	requests := []struct{ method, path string }{
 		{http.MethodPost, "/api/v1/workouts"},
 		{http.MethodGet, "/api/v1/workouts?from=2026-11-01&to=2026-11-30"},
+		{http.MethodGet, "/api/v1/workouts/compare?from=2026-11-01&to=2026-11-30&group=week"},
 		{http.MethodGet, "/api/v1/workouts/00000000-0000-0000-0000-000000000001"},
 		{http.MethodPatch, "/api/v1/workouts/00000000-0000-0000-0000-000000000001"},
 		{http.MethodDelete, "/api/v1/workouts/00000000-0000-0000-0000-000000000001"},

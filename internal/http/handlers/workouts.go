@@ -27,6 +27,7 @@ type WorkoutStore interface {
 	Delete(context.Context, uuid.UUID, uuid.UUID) error
 	LinkActivity(context.Context, uuid.UUID, uuid.UUID, uuid.UUID) (workouts.Session, error)
 	UnlinkActivity(context.Context, uuid.UUID, uuid.UUID) (workouts.Session, error)
+	Compare(context.Context, uuid.UUID, time.Time, time.Time, workouts.CompareGroup) ([]workouts.ComparePeriod, error)
 }
 
 const workoutDefaultLimit = 20
@@ -514,5 +515,55 @@ func UnlinkWorkoutActivity(s WorkoutStore) http.Handler {
 			return
 		}
 		writeWorkoutJSON(w, http.StatusOK, workoutResponse(v))
+	})
+}
+
+// CompareWorkouts handles GET /api/v1/workouts/compare (issue #312):
+// carga planificada frente a carga realizada por periodo de calendario
+// en la zona horaria del usuario. El contrato del rango es el mismo del
+// listado: fechas civiles estrictas YYYY-MM-DD, inclusivas, from <= to;
+// group es obligatorio y vale day o week.
+func CompareWorkouts(s WorkoutStore) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		uid, ok := workoutAuth(w, r)
+		if !ok {
+			return
+		}
+		q := r.URL.Query()
+		from, e := parseWorkoutDate(q.Get("from"))
+		if e != nil {
+			workoutProblem(w, r, http.StatusBadRequest, "from must be a valid YYYY-MM-DD date")
+			return
+		}
+		to, e := parseWorkoutDate(q.Get("to"))
+		if e != nil {
+			workoutProblem(w, r, http.StatusBadRequest, "to must be a valid YYYY-MM-DD date")
+			return
+		}
+		if to.Before(from) {
+			workoutProblem(w, r, http.StatusBadRequest, "to must not be before from")
+			return
+		}
+		var group workouts.CompareGroup
+		switch q.Get("group") {
+		case string(workouts.CompareGroupDay):
+			group = workouts.CompareGroupDay
+		case string(workouts.CompareGroupWeek):
+			group = workouts.CompareGroupWeek
+		default:
+			workoutProblem(w, r, http.StatusBadRequest, "group must be day or week")
+			return
+		}
+		periods, err := s.Compare(r.Context(), uid, from, to, group)
+		if err != nil {
+			workoutProblem(w, r, http.StatusInternalServerError, "failed to compare workouts")
+			return
+		}
+		if periods == nil {
+			periods = []workouts.ComparePeriod{}
+		}
+		writeWorkoutJSON(w, http.StatusOK, struct {
+			Periods []workouts.ComparePeriod `json:"periods"`
+		}{Periods: periods})
 	})
 }
