@@ -65,6 +65,11 @@ func (q *workoutQuerierStub) ListActivitiesInRange(context.Context, sqlc.ListAct
 	return nil, nil
 }
 
+// Stub de la bandeja del calendario (#313, T3): este test no la ejercita.
+func (q *workoutQuerierStub) ListCalendarActivities(context.Context, sqlc.ListCalendarActivitiesParams) ([]sqlc.ListCalendarActivitiesRow, error) {
+	return nil, nil
+}
+
 func TestWorkoutHandlerUsesStoreForIsolationAtomicityAndPaging(t *testing.T) {
 	userID := uuid.MustParse(workoutTestUser)
 	id := uuid.MustParse(workoutTestID)

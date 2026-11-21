@@ -141,6 +141,15 @@ type Querier interface {
 	// convierte en una entrada de TSS diario. Mantener la proyección
 	// estrecha evita cargar JSONB en el worker de recálculo.
 	ListActivitiesInRange(ctx context.Context, arg ListActivitiesInRangeParams) ([]ListActivitiesInRangeRow, error)
+	// Bandeja de actividades del calendario (#313, T3): actividades del
+	// usuario en una ventana temporal con la marca de vinculadas. La
+	// proyeccion es estrecha (id, nombre, instante, linked) y la ventana
+	// llega acolchada en UTC desde Go (-1/+2 dias), que recorta despues por
+	// fecha civil exacta de la zona del usuario (mismo patron que Compare,
+	// #312). El EXISTS cualifica a los DOS duenos (sesion y actividad del
+	// mismo usuario): una sesion ajena nunca marca linked, y la marca es
+	// global, no del rango pedido.
+	ListCalendarActivities(ctx context.Context, arg ListCalendarActivitiesParams) ([]ListCalendarActivitiesRow, error)
 	ListGPXClimbsByTrack(ctx context.Context, trackID pgtype.UUID) ([]GpxClimb, error)
 	ListGPXMurosByTrack(ctx context.Context, trackID pgtype.UUID) ([]GpxMuro, error)
 	ListGPXRecoveryZonesByTrack(ctx context.Context, trackID pgtype.UUID) ([]GpxRecoveryZone, error)

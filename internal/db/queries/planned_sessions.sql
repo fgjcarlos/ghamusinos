@@ -86,3 +86,27 @@ SET activity_id = NULL,
 WHERE id = $1
   AND user_id = $2
 RETURNING *;
+
+-- name: ListCalendarActivities :many
+-- Bandeja de actividades del calendario (#313, T3): actividades del
+-- usuario en una ventana temporal con la marca de vinculadas. La
+-- proyeccion es estrecha (id, nombre, instante, linked) y la ventana
+-- llega acolchada en UTC desde Go (-1/+2 dias), que recorta despues por
+-- fecha civil exacta de la zona del usuario (mismo patron que Compare,
+-- #312). El EXISTS cualifica a los DOS duenos (sesion y actividad del
+-- mismo usuario): una sesion ajena nunca marca linked, y la marca es
+-- global, no del rango pedido.
+SELECT a.id,
+       a.name,
+       a.started_at,
+       EXISTS (
+           SELECT 1
+           FROM planned_sessions AS s
+           WHERE s.activity_id = a.id
+             AND s.user_id = a.user_id
+       ) AS linked
+FROM activities AS a
+WHERE a.user_id = $1
+  AND a.started_at >= $2
+  AND a.started_at <= $3
+ORDER BY a.started_at ASC;
