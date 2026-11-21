@@ -116,6 +116,13 @@ type Querier interface {
 	// Devuelve las preferencias de entrenamiento e IA del usuario
 	// (issue #159). Sólo lectura — la mutación usa UpdateUserPreferences.
 	GetUserPreferencesByID(ctx context.Context, id pgtype.UUID) (GetUserPreferencesByIDRow, error)
+	// Vincula una actividad real a una sesion, comprobando en la misma
+	// sentencia que la sesion Y la actividad son del usuario (user_id = $2
+	// en ambas): una ajena o inexistente no produce filas (pgx.ErrNoRows,
+	// 404 sin distinguir el motivo). El UNIQUE(activity_id) de la migracion
+	// 00017 rechaza una actividad ya enlazada a otra sesion (23505, 409).
+	// Vincular completa la sesion, salvo que ya este marcada modified.
+	LinkPlannedSessionActivity(ctx context.Context, arg LinkPlannedSessionActivityParams) (PlannedSession, error)
 	// Lista los análisis de un usuario, del más reciente al más antiguo.
 	// El límite ($2) acota la respuesta; el llamante decide el tamaño.
 	ListAIAnalyses(ctx context.Context, arg ListAIAnalysesParams) ([]AiAnalysis, error)
@@ -201,6 +208,10 @@ type Querier interface {
 	// (decisión de usuario 2026-10-01) por simplicidad y porque ya está
 	// alineada con la arquitectura actual.
 	SumHRZonesInRange(ctx context.Context, arg SumHRZonesInRangeParams) (SumHRZonesInRangeRow, error)
+	// Desvincula la actividad de una sesion del usuario: activity_id a NULL
+	// sin tocar el estado. 0 filas (pgx.ErrNoRows) si la sesion no existe o
+	// es de otro usuario. La actividad nunca se borra aqui.
+	UnlinkPlannedSessionActivity(ctx context.Context, arg UnlinkPlannedSessionActivityParams) (PlannedSession, error)
 	// Actualiza una sesion del usuario. Solo el dueno de la fila (user_id)
 	// puede modificarla; si no existe o es de otro usuario, pgx.ErrNoRows.
 	UpdatePlannedSession(ctx context.Context, arg UpdatePlannedSessionParams) (PlannedSession, error)

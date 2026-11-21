@@ -88,3 +88,33 @@ func (m *preferencesMockQuerier) UpdatePlannedSession(ctx context.Context, arg s
 func (m *preferencesMockQuerier) DeletePlannedSession(ctx context.Context, arg sqlc.DeletePlannedSessionParams) (int64, error) {
 	return 0, nil
 }
+
+// LinkPlannedSessionActivity stub para activitiesMockQuerier (migración 00017, issue #311).
+func (m *activitiesMockQuerier) LinkPlannedSessionActivity(ctx context.Context, arg sqlc.LinkPlannedSessionActivityParams) (sqlc.PlannedSession, error) {
+	return sqlc.PlannedSession{}, nil
+}
+
+// UnlinkPlannedSessionActivity stub para activitiesMockQuerier (migración 00017, issue #311).
+func (m *activitiesMockQuerier) UnlinkPlannedSessionActivity(ctx context.Context, arg sqlc.UnlinkPlannedSessionActivityParams) (sqlc.PlannedSession, error) {
+	return sqlc.PlannedSession{}, nil
+}
+
+// LinkPlannedSessionActivity stub para mockMeQuerier (migración 00017, issue #311).
+func (m *mockMeQuerier) LinkPlannedSessionActivity(ctx context.Context, arg sqlc.LinkPlannedSessionActivityParams) (sqlc.PlannedSession, error) {
+	return sqlc.PlannedSession{}, nil
+}
+
+// UnlinkPlannedSessionActivity stub para mockMeQuerier (migración 00017, issue #311).
+func (m *mockMeQuerier) UnlinkPlannedSessionActivity(ctx context.Context, arg sqlc.UnlinkPlannedSessionActivityParams) (sqlc.PlannedSession, error) {
+	return sqlc.PlannedSession{}, nil
+}
+
+// LinkPlannedSessionActivity stub para preferencesMockQuerier (migración 00017, issue #311).
+func (m *preferencesMockQuerier) LinkPlannedSessionActivity(ctx context.Context, arg sqlc.LinkPlannedSessionActivityParams) (sqlc.PlannedSession, error) {
+	return sqlc.PlannedSession{}, nil
+}
+
+// UnlinkPlannedSessionActivity stub para preferencesMockQuerier (migración 00017, issue #311).
+func (m *preferencesMockQuerier) UnlinkPlannedSessionActivity(ctx context.Context, arg sqlc.UnlinkPlannedSessionActivityParams) (sqlc.PlannedSession, error) {
+	return sqlc.PlannedSession{}, nil
+}

@@ -9,18 +9,23 @@ import (
 	"github.com/fgjcarlos/ghamusinos/internal/db/sqlc"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
-// mockQuerier implementa los cinco metodos que el store necesita.
+// mockQuerier implementa los metodos que el store necesita.
 type mockQuerier struct {
 	createdParams sqlc.CreatePlannedSessionParams
 	getParams     sqlc.GetPlannedSessionParams
 	updateParams  sqlc.UpdatePlannedSessionParams
 	deleteParams  sqlc.DeletePlannedSessionParams
 	listParams    sqlc.ListPlannedSessionsByRangeParams
+	linkParams    sqlc.LinkPlannedSessionActivityParams
+	unlinkParams  sqlc.UnlinkPlannedSessionActivityParams
 	deletedRows   int64
 	getErr        error
+	linkErr       error
+	unlinkErr     error
 	row           sqlc.PlannedSession
 	listRows      []sqlc.ListPlannedSessionsByRangeRow
 	fallbackRows  []sqlc.ListPlannedSessionsByRangeRow
@@ -95,6 +100,22 @@ func (m *mockQuerier) UpdatePlannedSession(_ context.Context, arg sqlc.UpdatePla
 func (m *mockQuerier) DeletePlannedSession(_ context.Context, arg sqlc.DeletePlannedSessionParams) (int64, error) {
 	m.deleteParams = arg
 	return m.deletedRows, nil
+}
+
+func (m *mockQuerier) LinkPlannedSessionActivity(_ context.Context, arg sqlc.LinkPlannedSessionActivityParams) (sqlc.PlannedSession, error) {
+	m.linkParams = arg
+	if m.linkErr != nil {
+		return sqlc.PlannedSession{}, m.linkErr
+	}
+	return m.row, nil
+}
+
+func (m *mockQuerier) UnlinkPlannedSessionActivity(_ context.Context, arg sqlc.UnlinkPlannedSessionActivityParams) (sqlc.PlannedSession, error) {
+	m.unlinkParams = arg
+	if m.unlinkErr != nil {
+		return sqlc.PlannedSession{}, m.unlinkErr
+	}
+	return m.row, nil
 }
 
 // TestStoreAlwaysScopesByUser proves the store passes the caller's user_id
@@ -240,5 +261,108 @@ func TestStoreKeepsUnplannedTargetsUnset(t *testing.T) {
 	}
 	if mock.createdParams.TargetDistanceM.Valid {
 		t.Error("the query received a valid target distance for an unplanned objective")
+	}
+}
+
+// TestStoreDefaultsEmptyStatusToPlanned proves el estado vacio (sesion
+// recien construida por el handler) persiste como 'planned', el DEFAULT
+// de la migracion 00017.
+func TestStoreDefaultsEmptyStatusToPlanned(t *testing.T) {
+	userID := uuid.MustParse("11111111-1111-1111-1111-111111111111")
+	sessionID := uuid.MustParse("33333333-3333-3333-3333-333333333333")
+	day := time.Date(2026, 11, 20, 0, 0, 0, 0, time.UTC)
+	mock := &mockQuerier{}
+	store := NewStore(mock)
+	ctx := context.Background()
+
+	if _, err := store.Create(ctx, userID, Session{ScheduledOn: day, Title: "Rodaje", WorkoutType: WorkoutTypeRodaje}); err != nil {
+		t.Fatalf("Create() unexpected error: %v (el estado vacio debe validarse como planned, no rechazarse)", err)
+	}
+	// El INSERT no lleva status: aplica el DEFAULT 'planned' de la tabla,
+	// que el test de integracion (migracion 00017) verifica de punta a punta.
+
+	if _, err := store.Update(ctx, userID, sessionID, Session{ScheduledOn: day, Title: "Rodaje", WorkoutType: WorkoutTypeRodaje}); err != nil {
+		t.Fatalf("Update() unexpected error: %v", err)
+	}
+	if got := Status(mock.updateParams.Status); got != StatusPlanned {
+		t.Errorf("Update() status = %q, want %q", got, StatusPlanned)
+	}
+}
+
+// TestStoreLinkActivityScopesAndMapsErrors proves la vinculacion lleva el
+// user_id del llamador a los dos filtros (sesion y actividad) y traduce
+// pgx.ErrNoRows y la violacion de UNIQUE a los errores de dominio.
+func TestStoreLinkActivityScopesAndMapsErrors(t *testing.T) {
+	userID := uuid.MustParse("11111111-1111-1111-1111-111111111111")
+	sessionID := uuid.MustParse("33333333-3333-3333-3333-333333333333")
+	activityID := uuid.MustParse("44444444-4444-4444-4444-444444444444")
+	row := sqlc.PlannedSession{
+		ID:          pgtype.UUID{Bytes: sessionID, Valid: true},
+		UserID:      pgtype.UUID{Bytes: userID, Valid: true},
+		ActivityID:  pgtype.UUID{Bytes: activityID, Valid: true},
+		Status:      string(StatusCompleted),
+		ScheduledOn: pgtype.Date{Time: time.Date(2026, 11, 20, 0, 0, 0, 0, time.UTC), Valid: true},
+		Title:       "Rodaje",
+		WorkoutType: string(WorkoutTypeRodaje),
+	}
+	ctx := context.Background()
+
+	linked, err := NewStore(&mockQuerier{row: row}).LinkActivity(ctx, userID, sessionID, activityID)
+	if err != nil {
+		t.Fatalf("LinkActivity() unexpected error: %v", err)
+	}
+	if linked.Status != StatusCompleted || linked.ActivityID == nil || *linked.ActivityID != activityID {
+		t.Errorf("LinkActivity() = %+v, want status completed and activity %s", linked, activityID)
+	}
+
+	mock := &mockQuerier{linkErr: pgx.ErrNoRows}
+	if _, err := NewStore(mock).LinkActivity(ctx, userID, sessionID, activityID); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("LinkActivity() error = %v, want ErrNotFound", err)
+	}
+	if mock.linkParams.UserID.Bytes != userID || mock.linkParams.ID.Bytes != sessionID || mock.linkParams.ActivityID.Bytes != activityID {
+		t.Errorf("LinkActivity() params = %+v, want caller-scoped session and activity", mock.linkParams)
+	}
+
+	duplicate := &pgconn.PgError{Code: "23505"}
+	if _, err := NewStore(&mockQuerier{linkErr: duplicate}).LinkActivity(ctx, userID, sessionID, activityID); !errors.Is(err, ErrActivityInUse) {
+		t.Fatalf("LinkActivity() error = %v, want ErrActivityInUse", err)
+	}
+
+	boom := errors.New("connection refused")
+	if _, err := NewStore(&mockQuerier{linkErr: boom}).LinkActivity(ctx, userID, sessionID, activityID); !errors.Is(err, boom) || errors.Is(err, ErrNotFound) {
+		t.Fatalf("LinkActivity() error = %v, want the wrapped failure and no sentinel", err)
+	}
+}
+
+// TestStoreUnlinkActivityScopesAndMapsErrors proves la desvinculacion
+// limpia el enlace sin tocar el estado y mantiene el aislamiento.
+func TestStoreUnlinkActivityScopesAndMapsErrors(t *testing.T) {
+	userID := uuid.MustParse("11111111-1111-1111-1111-111111111111")
+	sessionID := uuid.MustParse("33333333-3333-3333-3333-333333333333")
+	day := time.Date(2026, 11, 20, 0, 0, 0, 0, time.UTC)
+	row := sqlc.PlannedSession{
+		ID:          pgtype.UUID{Bytes: sessionID, Valid: true},
+		UserID:      pgtype.UUID{Bytes: userID, Valid: true},
+		Status:      string(StatusSkipped),
+		ScheduledOn: pgtype.Date{Time: day, Valid: true},
+		Title:       "Rodaje",
+		WorkoutType: string(WorkoutTypeRodaje),
+	}
+	ctx := context.Background()
+
+	unlinked, err := NewStore(&mockQuerier{row: row}).UnlinkActivity(ctx, userID, sessionID)
+	if err != nil {
+		t.Fatalf("UnlinkActivity() unexpected error: %v", err)
+	}
+	if unlinked.Status != StatusSkipped || unlinked.ActivityID != nil {
+		t.Errorf("UnlinkActivity() = %+v, want status kept and no activity", unlinked)
+	}
+
+	mock := &mockQuerier{unlinkErr: pgx.ErrNoRows}
+	if _, err := NewStore(mock).UnlinkActivity(ctx, userID, sessionID); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("UnlinkActivity() error = %v, want ErrNotFound", err)
+	}
+	if mock.unlinkParams.UserID.Bytes != userID || mock.unlinkParams.ID.Bytes != sessionID {
+		t.Errorf("UnlinkActivity() params = %+v, want caller-scoped session", mock.unlinkParams)
 	}
 }

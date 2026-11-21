@@ -318,7 +318,9 @@ CREATE TABLE ai_analysis (
 CREATE INDEX idx_ai_analysis_user_created ON ai_analysis (user_id, created_at DESC);
 
 -- Fase 2.1 (issue #298) -- sesiones de entrenamiento planificadas.
--- Mirrors migration 00016_planned_sessions.sql for sqlc generation.
+-- Mirrors migration 00016_planned_sessions.sql for sqlc generation, plus
+-- 00017_planned_sessions_status_activity.sql (estado + vinculacion de
+-- actividad).
 --
 -- `scheduled_on` es un DATE (día civil, sin hora ni offset): el día se
 -- resuelve en la zona horaria del usuario antes de escribir, así que el
@@ -346,6 +348,10 @@ CREATE TABLE planned_sessions (
                                       CHECK (target_elevation_gain_m IS NULL OR target_elevation_gain_m >= 0),
     target_intensity        TEXT        CONSTRAINT planned_sessions_target_intensity_valido
                                       CHECK (target_intensity IS NULL OR target_intensity IN ('z1', 'z2', 'z3', 'z4', 'z5')),
+    status                  TEXT        NOT NULL DEFAULT 'planned' CONSTRAINT planned_sessions_status_valido
+                                      CHECK (status IN ('planned', 'completed', 'skipped', 'modified')),
+    activity_id             UUID        CONSTRAINT planned_sessions_activity_unica UNIQUE
+                                      REFERENCES activities(id) ON DELETE SET NULL,
     created_at              TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at              TIMESTAMPTZ NOT NULL DEFAULT now()
 );

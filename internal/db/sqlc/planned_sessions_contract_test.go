@@ -227,3 +227,136 @@ func TestGenerated00016_ExposeTheQueryContract(t *testing.T) {
 		}
 	}
 }
+
+// ─── Fase 2.2 (issue #311): estado y vinculación de actividad ────────────
+
+// plannedSessionsStatusMigration añade status y activity_id.
+const plannedSessionsStatusMigration = "00017_planned_sessions_status_activity.sql"
+
+// plannedSessionsStatuses es el vocabulario cerrado de estados.
+var plannedSessionsStatuses = []string{"planned", "completed", "skipped", "modified"}
+
+// expectedPlannedSessionsLinkQueries son las dos queries nuevas del store.
+var expectedPlannedSessionsLinkQueries = []string{
+	"LinkPlannedSessionActivity",
+	"UnlinkPlannedSessionActivity",
+}
+
+// TestMigration00017_AddsStatusAndActivityLink proves the storage contract
+// of migration 00017: estado cerrado con DEFAULT 'planned', actividad
+// opcional con FK que no borra la actividad y UNIQUE de un solo enlace por
+// actividad.
+func TestMigration00017_AddsStatusAndActivityLink(t *testing.T) {
+	migration := readPlannedSessionsFile(t, "..", "migrations", plannedSessionsStatusMigration)
+	up := plannedSessionsGooseSection(t, migration, "Up")
+
+	if !strings.Contains(up, "ADD COLUMN status") {
+		t.Fatalf("expected the migration to add the status column, got:\n%s", up)
+	}
+	if !strings.Contains(up, "DEFAULT 'planned'") {
+		t.Errorf("expected status to default to 'planned', got:\n%s", up)
+	}
+	if !strings.Contains(up, "planned_sessions_status_valido") {
+		t.Errorf("expected a named status CHECK constraint, got:\n%s", up)
+	}
+	for _, s := range plannedSessionsStatuses {
+		if !strings.Contains(up, "'"+s+"'") {
+			t.Errorf("expected the status constraint to admit %q, got:\n%s", s, up)
+		}
+	}
+	if !strings.Contains(up, "ADD COLUMN activity_id") {
+		t.Errorf("expected the migration to add the activity_id column, got:\n%s", up)
+	}
+	if !strings.Contains(up, "REFERENCES activities(id) ON DELETE SET NULL") {
+		t.Errorf("expected activity_id to reference activities(id) ON DELETE SET NULL, got:\n%s", up)
+	}
+	if !strings.Contains(up, "planned_sessions_activity_unica") || !strings.Contains(up, "UNIQUE") {
+		t.Errorf("expected a named UNIQUE constraint on activity_id (one link per activity), got:\n%s", up)
+	}
+}
+
+// TestMigration00017_DownDropsOnlyTheNewColumns proves el rollback es
+// reversible: caen las columnas nuevas, la tabla y sus sesiones siguen.
+func TestMigration00017_DownDropsOnlyTheNewColumns(t *testing.T) {
+	migration := readPlannedSessionsFile(t, "..", "migrations", plannedSessionsStatusMigration)
+	down := plannedSessionsGooseSection(t, migration, "Down")
+	if down == "" {
+		t.Fatal("expected the migration to declare a Down section")
+	}
+	for _, column := range []string{"activity_id", "status"} {
+		if !strings.Contains(down, "DROP COLUMN IF EXISTS "+column) {
+			t.Errorf("expected the Down section to drop the column %q, got:\n%s", column, down)
+		}
+	}
+	if strings.Contains(down, "DROP TABLE") {
+		t.Errorf("the Down section must keep the planned_sessions table, got:\n%s", down)
+	}
+}
+
+// TestSchema00017_MirrorsTheMigration proves the sqlc schema agrees with
+// migration 00017.
+func TestSchema00017_MirrorsTheMigration(t *testing.T) {
+	schema := readPlannedSessionsFile(t, "..", "schema.sql")
+	if !strings.Contains(schema, "status                  TEXT        NOT NULL DEFAULT 'planned'") {
+		t.Error("expected schema.sql to declare status with DEFAULT 'planned'")
+	}
+	if !strings.Contains(schema, "planned_sessions_status_valido") {
+		t.Error("expected schema.sql to declare the status CHECK constraint")
+	}
+	if !strings.Contains(schema, "planned_sessions_activity_unica UNIQUE") {
+		t.Error("expected schema.sql to declare the UNIQUE constraint on activity_id")
+	}
+	if !strings.Contains(schema, "REFERENCES activities(id) ON DELETE SET NULL") {
+		t.Error("expected schema.sql to declare activity_id with ON DELETE SET NULL")
+	}
+	for _, s := range plannedSessionsStatuses {
+		if !strings.Contains(schema, "'"+s+"'") {
+			t.Errorf("expected schema.sql to admit the status %q", s)
+		}
+	}
+}
+
+// TestQueries00017_LinkUnlinkAreOwnershipScoped proves the two new queries
+// check the ownership of the session AND the activity in the same atomic
+// statement, and that unlinking only clears the link.
+func TestQueries00017_LinkUnlinkAreOwnershipScoped(t *testing.T) {
+	queries := readPlannedSessionsFile(t, "..", "queries", "planned_sessions.sql")
+	for _, name := range expectedPlannedSessionsLinkQueries {
+		if !strings.Contains(queries, "-- name: "+name+" ") {
+			t.Errorf("expected the query file to declare the query %q, got:\n%s", name, queries)
+		}
+	}
+
+	link := plannedSessionsQueryBlock(t, queries, "LinkPlannedSessionActivity")
+	if !strings.Contains(link, "a.user_id = $2") {
+		t.Errorf("expected the link query to check the activity ownership atomically, got:\n%s", link)
+	}
+	if !strings.Contains(link, "s.user_id = $2") {
+		t.Errorf("expected the link query to check the session ownership atomically, got:\n%s", link)
+	}
+	if !strings.Contains(link, "CASE WHEN s.status = 'modified' THEN 'modified' ELSE 'completed' END") {
+		t.Errorf("expected linking to complete the session but keep 'modified', got:\n%s", link)
+	}
+
+	unlink := plannedSessionsQueryBlock(t, queries, "UnlinkPlannedSessionActivity")
+	if !strings.Contains(unlink, "SET activity_id = NULL") {
+		t.Errorf("expected the unlink query to clear activity_id, got:\n%s", unlink)
+	}
+	if strings.Contains(unlink, "status =") {
+		t.Errorf("the unlink query must not touch the status, got:\n%s", unlink)
+	}
+	if !strings.Contains(unlink, "user_id = $2") {
+		t.Errorf("expected the unlink query to filter by user_id, got:\n%s", unlink)
+	}
+}
+
+// TestGenerated00017_ExposeTheQueryContract proves the generated code
+// exposes the link queries.
+func TestGenerated00017_ExposeTheQueryContract(t *testing.T) {
+	generated := readPlannedSessionsFile(t, "planned_sessions.sql.go")
+	for _, name := range expectedPlannedSessionsLinkQueries {
+		if !strings.Contains(generated, "func (q *Queries) "+name+"(") {
+			t.Errorf("expected the generated code to expose %s, got:\n%s", name, generated)
+		}
+	}
+}

@@ -9,6 +9,7 @@ import (
 	"github.com/fgjcarlos/ghamusinos/internal/db/sqlc"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
@@ -16,6 +17,11 @@ import (
 // El handler HTTP responde 404 en ambos casos: la respuesta no distingue
 // los dos escenarios.
 var ErrNotFound = errors.New("workouts: session not found")
+
+// ErrActivityInUse se devuelve cuando la actividad ya esta vinculada a
+// otra sesion: el UNIQUE(activity_id) de la migracion 00017 la rechaza.
+// El handler HTTP responde 409.
+var ErrActivityInUse = errors.New("workouts: activity already linked to another session")
 
 // Querier es el subconjunto de sqlc.Querier que necesita el store. Es
 // deliberadamente estrecho (mismo patron que internal/gpx): permite
@@ -27,6 +33,8 @@ type Querier interface {
 	ListPlannedSessionsByRange(context.Context, sqlc.ListPlannedSessionsByRangeParams) ([]sqlc.ListPlannedSessionsByRangeRow, error)
 	UpdatePlannedSession(context.Context, sqlc.UpdatePlannedSessionParams) (sqlc.PlannedSession, error)
 	DeletePlannedSession(context.Context, sqlc.DeletePlannedSessionParams) (int64, error)
+	LinkPlannedSessionActivity(context.Context, sqlc.LinkPlannedSessionActivityParams) (sqlc.PlannedSession, error)
+	UnlinkPlannedSessionActivity(context.Context, sqlc.UnlinkPlannedSessionActivityParams) (sqlc.PlannedSession, error)
 }
 
 // Store persiste las sesiones planificadas de un usuario. Todas las
@@ -44,6 +52,7 @@ func NewStore(q Querier) *Store {
 // Create guarda una sesion nueva para el usuario y devuelve la fila
 // persistida (con id y timestamps de la base de datos).
 func (s *Store) Create(ctx context.Context, userID uuid.UUID, session Session) (Session, error) {
+	session = NormalizeStatus(session)
 	if err := Validate(session); err != nil {
 		return Session{}, err
 	}
@@ -117,6 +126,7 @@ func (s *Store) ListRange(ctx context.Context, userID uuid.UUID, from, to time.T
 // Update guarda los cambios de una sesion del usuario. Si la sesion no
 // existe o es de otro usuario devuelve ErrNotFound.
 func (s *Store) Update(ctx context.Context, userID, id uuid.UUID, session Session) (Session, error) {
+	session = NormalizeStatus(session)
 	if err := Validate(session); err != nil {
 		return Session{}, err
 	}
@@ -131,6 +141,7 @@ func (s *Store) Update(ctx context.Context, userID, id uuid.UUID, session Sessio
 		TargetDistanceM:      toInt4(session.TargetDistanceM),
 		TargetElevationGainM: toInt4(session.TargetElevationGainM),
 		TargetIntensity:      toIntensity(session.TargetIntensity),
+		Status:               string(session.Status),
 	})
 	if errors.Is(err, pgx.ErrNoRows) {
 		return Session{}, ErrNotFound
@@ -157,6 +168,60 @@ func (s *Store) Delete(ctx context.Context, userID, id uuid.UUID) error {
 	return nil
 }
 
+// LinkActivity vincula una actividad real del usuario a una sesion y
+// devuelve la sesion actualizada. La query comprueba en la misma
+// sentencia que la sesion y la actividad son del usuario: si alguna no
+// existe o es ajena devuelve ErrNotFound (404 sin distinguir el motivo).
+// Vincular completa la sesion salvo que ya este marcada modified. Si la
+// actividad ya justifica otra sesion, el UNIQUE(activity_id) de la
+// migracion 00017 devuelve ErrActivityInUse (409).
+func (s *Store) LinkActivity(ctx context.Context, userID, sessionID, activityID uuid.UUID) (Session, error) {
+	row, err := s.q.LinkPlannedSessionActivity(ctx, sqlc.LinkPlannedSessionActivityParams{
+		ID:         toUUID(sessionID),
+		UserID:     toUUID(userID),
+		ActivityID: toUUID(activityID),
+	})
+	if errors.Is(err, pgx.ErrNoRows) {
+		return Session{}, ErrNotFound
+	}
+	var pgErr *pgconn.PgError
+	if errors.As(err, &pgErr) && pgErr.Code == "23505" { // UNIQUE_VIOLATION
+		return Session{}, ErrActivityInUse
+	}
+	if err != nil {
+		return Session{}, fmt.Errorf("workouts: link activity: %w", err)
+	}
+	return fromRow(row), nil
+}
+
+// UnlinkActivity desvincula la actividad de una sesion del usuario sin
+// tocar el estado ni borrar la actividad. Si la sesion no existe o es de
+// otro usuario devuelve ErrNotFound; desvincular una sesion sin enlace es
+// un no-op que devuelve la sesion.
+func (s *Store) UnlinkActivity(ctx context.Context, userID, sessionID uuid.UUID) (Session, error) {
+	row, err := s.q.UnlinkPlannedSessionActivity(ctx, sqlc.UnlinkPlannedSessionActivityParams{
+		ID:     toUUID(sessionID),
+		UserID: toUUID(userID),
+	})
+	if errors.Is(err, pgx.ErrNoRows) {
+		return Session{}, ErrNotFound
+	}
+	if err != nil {
+		return Session{}, fmt.Errorf("workouts: unlink activity: %w", err)
+	}
+	return fromRow(row), nil
+}
+
+// NormalizeStatus normaliza la ausencia de estado a planned, el DEFAULT
+// de la tabla: una sesion recien construida no lleva estado y la base no
+// admite vacio.
+func NormalizeStatus(session Session) Session {
+	if session.Status == "" {
+		session.Status = StatusPlanned
+	}
+	return session
+}
+
 // fromRow convierte una fila de sqlc en el tipo de dominio.
 func fromRow(row sqlc.PlannedSession) Session {
 	return Session{
@@ -170,6 +235,8 @@ func fromRow(row sqlc.PlannedSession) Session {
 		TargetDistanceM:      fromInt4(row.TargetDistanceM),
 		TargetElevationGainM: fromInt4(row.TargetElevationGainM),
 		TargetIntensity:      fromIntensity(row.TargetIntensity),
+		Status:               Status(row.Status),
+		ActivityID:           fromUUIDPtr(row.ActivityID),
 	}
 }
 
@@ -186,6 +253,8 @@ func fromListRow(row sqlc.ListPlannedSessionsByRangeRow) Session {
 		TargetDistanceM:      fromInt4(row.TargetDistanceM),
 		TargetElevationGainM: fromInt4(row.TargetElevationGainM),
 		TargetIntensity:      fromIntensity(row.TargetIntensity),
+		Status:               Status(row.Status),
+		ActivityID:           fromUUIDPtr(row.ActivityID),
 	}
 }
 
@@ -197,6 +266,16 @@ func toUUID(id uuid.UUID) pgtype.UUID {
 // fromUUID convierte el pgtype.UUID de la base de datos en uuid.UUID.
 func fromUUID(id pgtype.UUID) uuid.UUID {
 	return uuid.UUID(id.Bytes)
+}
+
+// fromUUIDPtr convierte un UUID opcional de la base de datos a *uuid.UUID
+// (nil cuando la columna es NULL).
+func fromUUIDPtr(id pgtype.UUID) *uuid.UUID {
+	if !id.Valid {
+		return nil
+	}
+	out := uuid.UUID(id.Bytes)
+	return &out
 }
 
 // toDate reduce un instante al dia civil en UTC. La columna es un DATE:

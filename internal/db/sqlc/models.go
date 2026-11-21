@@ -180,6 +180,8 @@ type PlannedSession struct {
 	TargetDistanceM      pgtype.Int4        `json:"target_distance_m"`
 	TargetElevationGainM pgtype.Int4        `json:"target_elevation_gain_m"`
 	TargetIntensity      pgtype.Text        `json:"target_intensity"`
+	Status               string             `json:"status"`
+	ActivityID           pgtype.UUID        `json:"activity_id"`
 	CreatedAt            pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt            pgtype.Timestamptz `json:"updated_at"`
 }

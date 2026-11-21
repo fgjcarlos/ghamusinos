@@ -40,6 +40,16 @@ var validIntensities = map[Intensity]bool{
 	IntensityZ5: true,
 }
 
+// validStatuses son los estados admitidos (issue #311). Fuente unica del
+// dominio: el CHECK de la migracion 00017 repite esta lista y el test de
+// contrato verifica que ambos sigan coincidiendo.
+var validStatuses = map[Status]bool{
+	StatusPlanned:   true,
+	StatusCompleted: true,
+	StatusSkipped:   true,
+	StatusModified:  true,
+}
+
 // Validate comprueba la sesion antes de guardarla. Devuelve un error que
 // envuelve ErrValidation con el campo y el motivo concretos.
 func Validate(s Session) error {
@@ -66,6 +76,12 @@ func Validate(s Session) error {
 	}
 	if s.TargetIntensity != nil && !validIntensities[*s.TargetIntensity] {
 		return fmt.Errorf("%w: unknown target_intensity %q", ErrValidation, string(*s.TargetIntensity))
+	}
+	if s.Status == "" {
+		return fmt.Errorf("%w: status is required", ErrValidation)
+	}
+	if !validStatuses[s.Status] {
+		return fmt.Errorf("%w: unknown status %q", ErrValidation, string(s.Status))
 	}
 	if s.ScheduledOn.IsZero() {
 		return fmt.Errorf("%w: scheduled_on is required", ErrValidation)

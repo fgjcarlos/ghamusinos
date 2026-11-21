@@ -25,6 +25,8 @@ type WorkoutStore interface {
 	ListRange(context.Context, uuid.UUID, time.Time, time.Time, int32, int32) ([]workouts.Session, int64, error)
 	Update(context.Context, uuid.UUID, uuid.UUID, workouts.Session) (workouts.Session, error)
 	Delete(context.Context, uuid.UUID, uuid.UUID) error
+	LinkActivity(context.Context, uuid.UUID, uuid.UUID, uuid.UUID) (workouts.Session, error)
+	UnlinkActivity(context.Context, uuid.UUID, uuid.UUID) (workouts.Session, error)
 }
 
 const workoutDefaultLimit = 20
@@ -40,10 +42,18 @@ type workoutDTO struct {
 	TargetDistanceM      *int                 `json:"target_distance_m"`
 	TargetElevationGainM *int                 `json:"target_elevation_gain_m"`
 	TargetIntensity      *workouts.Intensity  `json:"target_intensity"`
+	Status               workouts.Status      `json:"status"`
+	ActivityID           *uuid.UUID           `json:"activity_id"`
 }
 
 func workoutResponse(s workouts.Session) workoutDTO {
-	return workoutDTO{ID: s.ID, ScheduledOn: s.ScheduledOn.UTC().Format("2006-01-02"), Title: s.Title, Notes: s.Notes, WorkoutType: s.WorkoutType, TargetDurationSec: s.TargetDurationSec, TargetDistanceM: s.TargetDistanceM, TargetElevationGainM: s.TargetElevationGainM, TargetIntensity: s.TargetIntensity}
+	// El estado vacio solo aparece en sesiones recien construidas: en la
+	// base siempre hay estado (DEFAULT 'planned').
+	status := s.Status
+	if status == "" {
+		status = workouts.StatusPlanned
+	}
+	return workoutDTO{ID: s.ID, ScheduledOn: s.ScheduledOn.UTC().Format("2006-01-02"), Title: s.Title, Notes: s.Notes, WorkoutType: s.WorkoutType, TargetDurationSec: s.TargetDurationSec, TargetDistanceM: s.TargetDistanceM, TargetElevationGainM: s.TargetElevationGainM, TargetIntensity: s.TargetIntensity, Status: status, ActivityID: s.ActivityID}
 }
 func workoutAuth(w http.ResponseWriter, r *http.Request) (uuid.UUID, bool) {
 	id := middleware.GetReqID(r.Context())
@@ -100,6 +110,18 @@ func workoutProblem(w http.ResponseWriter, r *http.Request, status int, detail s
 	}
 	WriteProblem(w, p)
 }
+
+// workoutConflict escribe el 409 del enlace duplicado (UNIQUE de
+// activity_id, issue #311) con el mismo formato RFC 9457 que el resto.
+func workoutConflict(w http.ResponseWriter, r *http.Request, detail string) {
+	WriteProblem(w, ProblemDetail{
+		Type:     "about:blank",
+		Title:    "Conflict",
+		Status:   http.StatusConflict,
+		Detail:   detail,
+		Instance: middleware.GetReqID(r.Context()),
+	})
+}
 func parseWorkoutDate(raw string) (time.Time, error) {
 	d, e := time.Parse("2006-01-02", raw)
 	if e != nil || d.Format("2006-01-02") != raw {
@@ -138,7 +160,7 @@ func CreateWorkout(s WorkoutStore) http.Handler {
 			workoutProblem(w, r, http.StatusBadRequest, err.Error())
 			return
 		}
-		v := workouts.Session{ScheduledOn: date, Title: *b.Title, WorkoutType: *b.WorkoutType, TargetDurationSec: b.TargetDurationSec, TargetDistanceM: b.TargetDistanceM, TargetElevationGainM: b.TargetElevationGainM, TargetIntensity: b.TargetIntensity}
+		v := workouts.Session{ScheduledOn: date, Title: *b.Title, WorkoutType: *b.WorkoutType, TargetDurationSec: b.TargetDurationSec, TargetDistanceM: b.TargetDistanceM, TargetElevationGainM: b.TargetElevationGainM, TargetIntensity: b.TargetIntensity, Status: workouts.StatusPlanned}
 		if !workoutIntsFitDatabase(v.TargetDurationSec, v.TargetDistanceM, v.TargetElevationGainM) {
 			workoutProblem(w, r, http.StatusUnprocessableEntity, "target values must fit a 32-bit integer")
 			return
@@ -277,6 +299,7 @@ func PatchWorkout(s WorkoutStore) http.Handler {
 			workoutProblem(w, r, http.StatusInternalServerError, "failed to get workout")
 			return
 		}
+		v = workouts.NormalizeStatus(v)
 		var scheduled string
 		for k, raw := range fields {
 			switch k {
@@ -343,6 +366,11 @@ func PatchWorkout(s WorkoutStore) http.Handler {
 						return
 					}
 					v.TargetIntensity = &i
+				}
+			case "status":
+				if string(raw) == "null" || json.Unmarshal(raw, &v.Status) != nil {
+					workoutProblem(w, r, http.StatusBadRequest, "status must be a string")
+					return
 				}
 			default:
 				workoutProblem(w, r, http.StatusBadRequest, "unknown field: "+k)
@@ -412,5 +440,79 @@ func DeleteWorkout(s WorkoutStore) http.Handler {
 			return
 		}
 		w.WriteHeader(http.StatusNoContent)
+	})
+}
+
+// LinkWorkoutActivity handles PUT /api/v1/workouts/{id}/activity (issue
+// #311): vincula una actividad real del usuario a la sesion. Vincular
+// completa la sesion salvo que ya este marcada modified. Una sesion o
+// actividad ajena o inexistente es 404 sin distinguir el motivo; una
+// actividad ya vinculada a otra sesion es 409.
+func LinkWorkoutActivity(s WorkoutStore) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		uid, ok := workoutAuth(w, r)
+		if !ok {
+			return
+		}
+		id, ok := workoutID(w, r)
+		if !ok {
+			return
+		}
+		var b struct {
+			ActivityID *string `json:"activity_id"`
+		}
+		if err := decodeWorkoutJSON(r, &b); err != nil {
+			writeWorkoutDecodeError(w, r, err)
+			return
+		}
+		if b.ActivityID == nil {
+			workoutProblem(w, r, http.StatusBadRequest, "activity_id is required")
+			return
+		}
+		activityID, err := uuid.Parse(*b.ActivityID)
+		if err != nil {
+			workoutProblem(w, r, http.StatusBadRequest, "activity_id must be a UUID")
+			return
+		}
+		v, err := s.LinkActivity(r.Context(), uid, id, activityID)
+		if errors.Is(err, workouts.ErrNotFound) {
+			workoutProblem(w, r, http.StatusNotFound, "workout or activity not found")
+			return
+		}
+		if errors.Is(err, workouts.ErrActivityInUse) {
+			workoutConflict(w, r, "activity already linked to another session")
+			return
+		}
+		if err != nil {
+			workoutProblem(w, r, http.StatusInternalServerError, "failed to link activity")
+			return
+		}
+		writeWorkoutJSON(w, http.StatusOK, workoutResponse(v))
+	})
+}
+
+// UnlinkWorkoutActivity handles DELETE /api/v1/workouts/{id}/activity
+// (issue #311): desvincula la actividad dejando activity_id a null, sin
+// cambiar el estado de la sesion y sin borrar la actividad.
+func UnlinkWorkoutActivity(s WorkoutStore) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		uid, ok := workoutAuth(w, r)
+		if !ok {
+			return
+		}
+		id, ok := workoutID(w, r)
+		if !ok {
+			return
+		}
+		v, err := s.UnlinkActivity(r.Context(), uid, id)
+		if errors.Is(err, workouts.ErrNotFound) {
+			workoutProblem(w, r, http.StatusNotFound, "workout not found")
+			return
+		}
+		if err != nil {
+			workoutProblem(w, r, http.StatusInternalServerError, "failed to unlink activity")
+			return
+		}
+		writeWorkoutJSON(w, http.StatusOK, workoutResponse(v))
 	})
 }
