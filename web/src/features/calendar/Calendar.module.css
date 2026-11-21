@@ -1,0 +1,331 @@
+/* Calendar (#313, T3). Colours and spacing from tokens.css. The grid
+   keeps a 96px column minimum and scrolls horizontally below it: on a
+   phone the week/month comparison stays readable instead of
+   collapsing the columns. */
+
+.page {
+  width: min(100%, 1080px);
+  min-width: 0;
+  margin: 0 auto;
+  padding: var(--gh-s-5);
+}
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--gh-s-3);
+  flex-wrap: wrap;
+  margin-bottom: var(--gh-s-3);
+}
+.header h1 {
+  margin: 0;
+  color: var(--gh-text);
+  font-family: var(--gh-font-display);
+}
+.viewToggle {
+  display: inline-flex;
+  gap: var(--gh-s-1);
+  padding: var(--gh-s-1);
+  border: 1px solid var(--gh-line);
+  border-radius: var(--gh-r-control);
+  background: var(--gh-bg-2);
+}
+.toggle {
+  min-height: 40px;
+  padding: 0 var(--gh-s-3);
+  border: 0;
+  border-radius: var(--gh-r-chip);
+  background: transparent;
+  color: var(--gh-text-2);
+  font: inherit;
+  cursor: pointer;
+}
+.toggle[aria-pressed='true'] {
+  background: var(--gh-accent);
+  color: var(--gh-accent-ink);
+  font-weight: 600;
+}
+.nav {
+  display: flex;
+  gap: var(--gh-s-2);
+  margin-bottom: var(--gh-s-2);
+}
+.navBtn {
+  min-height: 44px;
+  padding: 0 var(--gh-s-3);
+  border: 1px solid var(--gh-line);
+  border-radius: var(--gh-r-control);
+  background: var(--gh-surface);
+  color: var(--gh-text);
+  font: inherit;
+  cursor: pointer;
+}
+.navBtn:hover:not(:disabled) {
+  border-color: var(--gh-line-2);
+  background: var(--gh-surface-2);
+}
+.period {
+  margin: 0 0 var(--gh-s-3);
+  color: var(--gh-text);
+  font-family: var(--gh-font-display);
+  font-size: 1.1rem;
+}
+.error {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--gh-s-2);
+  padding: var(--gh-s-3);
+  margin-bottom: var(--gh-s-3);
+  border: 1px solid var(--gh-risk);
+  border-radius: var(--gh-r-control);
+  color: var(--gh-risk);
+}
+.tray {
+  padding: var(--gh-s-3);
+  margin-bottom: var(--gh-s-4);
+  border: 1px solid var(--gh-line);
+  border-radius: var(--gh-r-card);
+  background: var(--gh-bg-2);
+}
+.trayTitle {
+  margin: 0 0 var(--gh-s-2);
+  color: var(--gh-text);
+  font-family: var(--gh-font-display);
+  font-size: 1rem;
+}
+.trayList {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--gh-s-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.trayItem {
+  padding: var(--gh-s-2) var(--gh-s-3);
+  border: 1px dashed var(--gh-accent-dim);
+  border-radius: var(--gh-r-chip);
+  background: var(--gh-surface);
+  color: var(--gh-text);
+  cursor: grab;
+  overflow-wrap: anywhere;
+}
+.trayEmpty {
+  margin: 0;
+  color: var(--gh-text-3);
+}
+.hint {
+  margin: var(--gh-s-2) 0 0;
+  color: var(--gh-text-3);
+  font-size: 0.85rem;
+}
+.gridWrap {
+  overflow-x: auto;
+  border: 1px solid var(--gh-line);
+  border-radius: var(--gh-r-card);
+  background: var(--gh-bg);
+}
+.weekdays {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(96px, 1fr));
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  background: var(--gh-bg-2);
+  border-bottom: 1px solid var(--gh-line);
+}
+.weekdays li {
+  padding: var(--gh-s-2);
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--gh-text-3);
+}
+.grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(96px, 1fr));
+}
+.cell {
+  display: flex;
+  flex-direction: column;
+  gap: var(--gh-s-1);
+  min-width: 0;
+  min-height: 84px;
+  padding: var(--gh-s-1);
+  border-top: 1px solid var(--gh-line);
+  border-left: 1px solid var(--gh-line);
+}
+.cellHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--gh-s-1);
+}
+.dateNum {
+  color: var(--gh-text-2);
+  font-family: var(--gh-font-mono);
+  font-size: 0.85rem;
+}
+.today {
+  padding: 1px 6px;
+  border-radius: var(--gh-r-chip);
+  background: var(--gh-accent);
+  color: var(--gh-accent-ink);
+  font-family: var(--gh-font-mono);
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+.add {
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--gh-line);
+  border-radius: var(--gh-r-chip);
+  background: transparent;
+  color: var(--gh-text-2);
+  font-size: 1.05rem;
+  line-height: 1;
+  cursor: pointer;
+}
+.add:hover:not(:disabled) {
+  border-color: var(--gh-accent);
+  color: var(--gh-accent);
+}
+.items {
+  display: flex;
+  flex-direction: column;
+  gap: var(--gh-s-1);
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.card {
+  display: grid;
+  gap: var(--gh-s-1);
+  min-width: 0;
+  padding: var(--gh-s-2);
+  border: 1px solid var(--gh-line-2);
+  border-left: 3px solid var(--gh-accent-dim);
+  border-radius: var(--gh-r-chip);
+  background: var(--gh-surface);
+  cursor: grab;
+}
+.card[data-status='completed'] {
+  border-left-color: var(--gh-accent);
+}
+.card[data-status='skipped'] {
+  border-left-color: var(--gh-text-3);
+  opacity: 0.75;
+}
+.card[data-status='modified'] {
+  border-left-color: var(--gh-warn);
+}
+.cardTitle {
+  margin: 0;
+  color: var(--gh-text);
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.control {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  color: var(--gh-text-3);
+  font-size: 0.8rem;
+}
+.control select,
+.control input {
+  width: 100%;
+  min-width: 0;
+  min-height: 36px;
+  padding: var(--gh-s-1);
+  border: 1px solid var(--gh-line);
+  border-radius: var(--gh-r-chip);
+  background: var(--gh-bg);
+  color: var(--gh-text);
+  font: inherit;
+}
+.linked {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--gh-s-2);
+  color: var(--gh-text-2);
+  font-size: 0.85rem;
+}
+.unlink {
+  min-height: 32px;
+  padding: 0 var(--gh-s-2);
+  border: 1px solid var(--gh-line);
+  border-radius: var(--gh-r-chip);
+  background: transparent;
+  color: var(--gh-text-2);
+  font: inherit;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+.unlink:hover:not(:disabled) {
+  border-color: var(--gh-risk);
+  color: var(--gh-risk);
+}
+.freeActivity {
+  padding: 2px 6px;
+  border: 1px dashed var(--gh-accent-dim);
+  border-radius: var(--gh-r-chip);
+  color: var(--gh-text-2);
+  font-size: 0.8rem;
+  cursor: grab;
+  overflow-wrap: anywhere;
+}
+.linkedActivity {
+  padding: 2px 6px;
+  border: 1px solid var(--gh-line);
+  border-radius: var(--gh-r-chip);
+  background: var(--gh-bg-2);
+  color: var(--gh-text-2);
+  font-size: 0.8rem;
+  overflow-wrap: anywhere;
+}
+.formPanel {
+  max-width: 620px;
+  padding: var(--gh-s-4);
+  margin-bottom: var(--gh-s-4);
+  border: 1px solid var(--gh-line);
+  border-radius: var(--gh-r-card);
+  background: var(--gh-bg-2);
+}
+.formPanel h2 {
+  margin: 0 0 var(--gh-s-3);
+  color: var(--gh-text);
+  font-family: var(--gh-font-display);
+  font-size: 1rem;
+}
+.skeleton {
+  display: grid;
+  gap: var(--gh-s-3);
+  color: var(--gh-text-3);
+}
+.skeleton span {
+  height: 96px;
+  border-radius: var(--gh-r-card);
+  background: linear-gradient(90deg, var(--gh-bg-2), var(--gh-surface), var(--gh-bg-2));
+  background-size: 200% 100%;
+  animation: shimmer 1.3s ease-in-out infinite;
+}
+@keyframes shimmer {
+  to {
+    background-position: -200% 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .skeleton span {
+    animation: none;
+  }
+}
+@media (max-width: 600px) {
+  .page {
+    padding: var(--gh-s-3);
+  }
+}

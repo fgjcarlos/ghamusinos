@@ -9,6 +9,7 @@ import Lab from './routes/lab';
 import LabCompare from './routes/lab-compare';
 import Profile from './routes/profile';
 import { RouteDetailContainer } from './features/gpx/RouteDetailContainer';
+import { CalendarContainer } from './features/calendar/CalendarContainer';
 import { AppShell } from './ui/AppShell';
 import { ErrorBoundary } from './ui/ErrorBoundary';
 import { WorkoutsContainer } from './features/workouts/WorkoutsContainer';
@@ -39,6 +40,7 @@ export function AppRoutes() {
         <Route path="/lab/compare" element={<LabCompare />} />
         <Route path="/actividades" element={<Activities />} />
         <Route path="/entrenos" element={<WorkoutsContainer />} />
+        <Route path="/calendario" element={<CalendarContainer />} />
         <Route path="/perfil" element={<Profile />} />
         <Route
           path="/dashboard"

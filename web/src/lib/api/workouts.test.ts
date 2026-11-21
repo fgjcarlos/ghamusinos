@@ -1,5 +1,12 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { createWorkout, deleteWorkout, listWorkouts, updateWorkout } from './workouts';
+import {
+  createWorkout,
+  deleteWorkout,
+  linkWorkoutActivity,
+  listWorkouts,
+  unlinkWorkoutActivity,
+  updateWorkout,
+} from './workouts';
 
 const response = (status: number, body?: unknown) =>
   ({
@@ -89,5 +96,33 @@ describe('workouts API', () => {
     await deleteWorkout('token', 'id/unsafe');
     expect(fetch.mock.calls[0]?.[0]).toBe('/api/v1/workouts/id%2Funsafe');
     expect(result.json).not.toHaveBeenCalled();
+  });
+
+  it('links an activity with a PUT of the activity id', async () => {
+    const linked = { id: 'a', status: 'completed' };
+    const fetch = vi.fn().mockResolvedValue(response(200, linked));
+    vi.stubGlobal('fetch', fetch);
+    await expect(linkWorkoutActivity('token', 'id/unsafe', 'act-1')).resolves.toBe(linked);
+    expect(fetch.mock.calls[0]?.[0]).toBe('/api/v1/workouts/id%2Funsafe/activity');
+    expect(fetch.mock.calls[0]?.[1].method).toBe('PUT');
+    expect(JSON.parse(fetch.mock.calls[0]?.[1].body)).toEqual({ activity_id: 'act-1' });
+  });
+
+  it('unlinks with a DELETE and returns the updated session', async () => {
+    const unlinked = { id: 'a', activity_id: null };
+    const fetch = vi.fn().mockResolvedValue(response(200, unlinked));
+    vi.stubGlobal('fetch', fetch);
+    await expect(unlinkWorkoutActivity('token', 'id/unsafe')).resolves.toBe(unlinked);
+    expect(fetch.mock.calls[0]?.[0]).toBe('/api/v1/workouts/id%2Funsafe/activity');
+    expect(fetch.mock.calls[0]?.[1].method).toBe('DELETE');
+    expect(fetch.mock.calls[0]?.[1].body).toBeUndefined();
+  });
+
+  it('patches the session status through the shared update path', async () => {
+    const fetch = vi.fn().mockResolvedValue(response(200, { id: 'a', status: 'completed' }));
+    vi.stubGlobal('fetch', fetch);
+    await updateWorkout('token', 'id/unsafe', { status: 'completed' });
+    expect(fetch.mock.calls[0]?.[1].method).toBe('PATCH');
+    expect(JSON.parse(fetch.mock.calls[0]?.[1].body)).toEqual({ status: 'completed' });
   });
 });

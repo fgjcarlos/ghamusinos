@@ -16,6 +16,19 @@ vi.mock('./lib/api/workouts', () => ({
   updateWorkout: vi.fn(),
   deleteWorkout: vi.fn(),
 }));
+vi.mock('./lib/api/calendar', () => ({
+  listCalendarActivities: vi.fn().mockResolvedValue({ activities: [] }),
+}));
+vi.mock('./lib/api/profile', () => ({
+  getPreferences: vi.fn().mockResolvedValue({
+    hr_max: null,
+    lthr: null,
+    ftp: null,
+    level: null,
+    timezone: 'UTC',
+    ai_enabled: false,
+  }),
+}));
 
 describe('AppRoutes', () => {
   // The dashboard route is lazy loaded, so the first render has to
@@ -36,6 +49,18 @@ describe('AppRoutes', () => {
     expect(
       screen.getByTestId('bottom-nav').querySelector('a[href="/entrenos"]'),
     ).toBeInTheDocument();
+  });
+
+  it('mounts the interactive calendar at /calendario inside the shell navigation', async () => {
+    render(
+      <MemoryRouter initialEntries={['/calendario']}>
+        <AppRoutes />
+      </MemoryRouter>,
+    );
+    expect(await screen.findByRole('heading', { name: 'Calendario' })).toBeInTheDocument();
+    expect(
+      screen.getByTestId('bottom-nav').querySelector('a[href="/calendario"]'),
+    ).toHaveTextContent('Calendario');
   });
 
   it('mounts the dashboard page on /dashboard', async () => {

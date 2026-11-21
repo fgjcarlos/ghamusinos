@@ -56,6 +56,18 @@ describe('TopBar', () => {
     expect(screen.getByRole('link', { name: /Entrenos/i })).toHaveAttribute('href', '/entrenos');
   });
 
+  it('links to the calendar in the desktop navigation', () => {
+    render(
+      <MemoryRouter>
+        <TopBar lastSync={null} />
+      </MemoryRouter>,
+    );
+    expect(screen.getByRole('link', { name: /Calendario/i })).toHaveAttribute(
+      'href',
+      '/calendario',
+    );
+  });
+
   it('renders the SyncStatusChip with the provided date', () => {
     const lastSync = new Date('2026-01-15T11:48:00Z');
     const now = new Date('2026-01-15T12:00:00Z');

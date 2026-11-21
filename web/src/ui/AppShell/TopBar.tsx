@@ -35,6 +35,15 @@ const RENDIMIENTO_ICON: ReactNode = (
   </svg>
 );
 
+const CALENDAR_ICON: ReactNode = (
+  <svg viewBox="0 0 24 24" aria-hidden="true">
+    <rect x="3" y="5" width="18" height="16" rx="2" />
+    <line x1="3" y1="10" x2="21" y2="10" />
+    <rect x="6" y="13" width="4" height="4" rx="1" />
+    <rect x="13" y="13" width="4" height="4" rx="1" />
+  </svg>
+);
+
 export interface TopBarProps {
   lastSync: Date | null;
   /** Reference clock for SyncStatusChip's relative-time formatter. */
@@ -60,6 +69,9 @@ export function TopBar({ lastSync, now, avatarInitials = '' }: TopBarProps) {
         </NavLink>
         <NavLink to="/entrenos" icon={ACTIVITIES_ICON}>
           Entrenos
+        </NavLink>
+        <NavLink to="/calendario" icon={CALENDAR_ICON}>
+          Calendario
         </NavLink>
         <span className={styles.placeholder} data-state="placeholder">
           <NavLink to="/rendimiento" icon={RENDIMIENTO_ICON}>

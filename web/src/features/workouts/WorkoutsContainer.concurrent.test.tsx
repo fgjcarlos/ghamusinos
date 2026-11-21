@@ -21,6 +21,8 @@ const session = (id: string, title = `Plan ${id}`): Workout => ({
   target_distance_m: null,
   target_elevation_gain_m: null,
   target_intensity: null,
+  status: 'planned',
+  activity_id: null,
 });
 const page = (data: Workout[], has_next = false) => ({
   data,

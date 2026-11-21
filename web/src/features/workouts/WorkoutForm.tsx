@@ -27,7 +27,8 @@ const targets = {
 } as const;
 
 export interface WorkoutFormProps {
-  initial?: Workout;
+  /** Prefill; the calendar (#313) passes only the day to create from. */
+  initial?: Partial<Workout>;
   onSave: (value: WorkoutInput) => Promise<void>;
   onCancel: () => void;
   busy: boolean;
