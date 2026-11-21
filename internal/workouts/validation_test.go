@@ -15,6 +15,7 @@ func TestValidate(t *testing.T) {
 	validDate := time.Date(2026, 11, 20, 0, 0, 0, 0, time.UTC)
 	negative := -1
 	badIntensity := Intensity("z9")
+	badStatus := Status("drafted")
 
 	tests := []struct {
 		name    string
@@ -27,6 +28,7 @@ func TestValidate(t *testing.T) {
 				ScheduledOn: validDate,
 				Title:       "Tirada larga",
 				WorkoutType: WorkoutTypeTiradaLarga,
+				Status:      StatusPlanned,
 			},
 		},
 		{
@@ -40,6 +42,7 @@ func TestValidate(t *testing.T) {
 				TargetDistanceM:      intPtr(8000),
 				TargetElevationGainM: intPtr(400),
 				TargetIntensity:      intensityPtr(IntensityZ3),
+				Status:               StatusCompleted,
 			},
 		},
 		{
@@ -120,6 +123,25 @@ func TestValidate(t *testing.T) {
 			wantErr: true,
 		},
 		{
+			name: "estado desconocido",
+			session: Session{
+				ScheduledOn: validDate,
+				Title:       "Sesion",
+				WorkoutType: WorkoutTypeRodaje,
+				Status:      badStatus,
+			},
+			wantErr: true,
+		},
+		{
+			name: "estado ausente",
+			session: Session{
+				ScheduledOn: validDate,
+				Title:       "Sesion",
+				WorkoutType: WorkoutTypeRodaje,
+			},
+			wantErr: true,
+		},
+		{
 			name: "fecha ausente",
 			session: Session{
 				Title:       "Rodaje",
@@ -172,6 +194,19 @@ func TestIntensityVocabularyMatchesTheDatabase(t *testing.T) {
 		got[string(intensity)] = true
 	}
 	assertSameVocabulary(t, "target_intensity", db, got)
+}
+
+// TestStatusVocabularyMatchesTheDatabase proves the Go status vocabulary
+// (issue #311) and the CHECK of migration 00017 admit exactly the same
+// states.
+func TestStatusVocabularyMatchesTheDatabase(t *testing.T) {
+	db := databaseVocabulary(t, "planned_sessions_status_valido", "status")
+
+	got := make(map[string]bool, len(validStatuses))
+	for status := range validStatuses {
+		got[string(status)] = true
+	}
+	assertSameVocabulary(t, "status", db, got)
 }
 
 // databaseVocabulary extracts the values of a CHECK constraint from the
@@ -239,14 +274,19 @@ func assertSameVocabulary(t *testing.T, name string, dbValues []string, domain m
 	}
 }
 
-// readMigration reads the planned_sessions migration from disk.
+// readMigration reads the planned_sessions migrations from disk: 00016
+// creates the table and 00017 adds status and activity_id.
 func readMigration(t *testing.T) string {
 	t.Helper()
-	b, err := os.ReadFile(filepath.Join("..", "db", "migrations", "00016_planned_sessions.sql"))
-	if err != nil {
-		t.Fatalf("read migration: %v", err)
+	var all string
+	for _, name := range []string{"00016_planned_sessions.sql", "00017_planned_sessions_status_activity.sql"} {
+		b, err := os.ReadFile(filepath.Join("..", "db", "migrations", name))
+		if err != nil {
+			t.Fatalf("read migration %s: %v", name, err)
+		}
+		all += string(b) + "\n"
 	}
-	return string(b)
+	return all
 }
 
 // intPtr devuelve un puntero al entero dado.

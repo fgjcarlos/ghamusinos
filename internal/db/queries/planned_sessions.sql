@@ -45,6 +45,7 @@ SET scheduled_on = $3,
     target_distance_m = $8,
     target_elevation_gain_m = $9,
     target_intensity = $10,
+    status = $11,
     updated_at = now()
 WHERE id = $1
   AND user_id = $2
@@ -56,3 +57,32 @@ RETURNING *;
 DELETE FROM planned_sessions
 WHERE id = $1
   AND user_id = $2;
+
+-- name: LinkPlannedSessionActivity :one
+-- Vincula una actividad real a una sesion, comprobando en la misma
+-- sentencia que la sesion Y la actividad son del usuario (user_id = $2
+-- en ambas): una ajena o inexistente no produce filas (pgx.ErrNoRows,
+-- 404 sin distinguir el motivo). El UNIQUE(activity_id) de la migracion
+-- 00017 rechaza una actividad ya enlazada a otra sesion (23505, 409).
+-- Vincular completa la sesion, salvo que ya este marcada modified.
+UPDATE planned_sessions AS s
+SET activity_id = $3,
+    status = CASE WHEN s.status = 'modified' THEN 'modified' ELSE 'completed' END,
+    updated_at = now()
+FROM activities AS a
+WHERE s.id = $1
+  AND s.user_id = $2
+  AND a.id = $3
+  AND a.user_id = $2
+RETURNING s.*;
+
+-- name: UnlinkPlannedSessionActivity :one
+-- Desvincula la actividad de una sesion del usuario: activity_id a NULL
+-- sin tocar el estado. 0 filas (pgx.ErrNoRows) si la sesion no existe o
+-- es de otro usuario. La actividad nunca se borra aqui.
+UPDATE planned_sessions
+SET activity_id = NULL,
+    updated_at = now()
+WHERE id = $1
+  AND user_id = $2
+RETURNING *;

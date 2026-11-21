@@ -49,6 +49,12 @@ func (q *workoutQuerierStub) UpdatePlannedSession(_ context.Context, _ sqlc.Upda
 func (q *workoutQuerierStub) DeletePlannedSession(context.Context, sqlc.DeletePlannedSessionParams) (int64, error) {
 	return 0, nil
 }
+func (q *workoutQuerierStub) LinkPlannedSessionActivity(_ context.Context, _ sqlc.LinkPlannedSessionActivityParams) (sqlc.PlannedSession, error) {
+	return q.row, nil
+}
+func (q *workoutQuerierStub) UnlinkPlannedSessionActivity(_ context.Context, _ sqlc.UnlinkPlannedSessionActivityParams) (sqlc.PlannedSession, error) {
+	return q.row, nil
+}
 
 func TestWorkoutHandlerUsesStoreForIsolationAtomicityAndPaging(t *testing.T) {
 	userID := uuid.MustParse(workoutTestUser)

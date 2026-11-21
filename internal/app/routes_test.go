@@ -71,6 +71,7 @@ func TestBuildRouter_DefaultRoutesAreWired(t *testing.T) {
 		"DELETE /*",
 		"DELETE /api/v1/gpx/{id}",
 		"DELETE /api/v1/workouts/{id}",
+		"DELETE /api/v1/workouts/{id}/activity",
 		"GET /*",
 		"GET /api/v1/gpx/",
 		"GET /api/v1/gpx/{id}",
@@ -90,6 +91,7 @@ func TestBuildRouter_DefaultRoutesAreWired(t *testing.T) {
 		"POST /api/v1/gpx/upload",
 		"POST /api/v1/workouts",
 		"PUT /*",
+		"PUT /api/v1/workouts/{id}/activity",
 		"QUERY /*",
 		"TRACE /*",
 	}
@@ -122,6 +124,7 @@ func TestBuildRouterMountsEveryRoute(t *testing.T) {
 		"DELETE /*",
 		"DELETE /api/v1/gpx/{id}",
 		"DELETE /api/v1/workouts/{id}",
+		"DELETE /api/v1/workouts/{id}/activity",
 		"GET /*",
 		"GET /api/v1/gpx/",
 		"GET /api/v1/gpx/{id}",
@@ -145,6 +148,7 @@ func TestBuildRouterMountsEveryRoute(t *testing.T) {
 		"POST /api/v1/workouts",
 		"POST /strava/webhook",
 		"PUT /*",
+		"PUT /api/v1/workouts/{id}/activity",
 		"QUERY /*",
 		"TRACE /*",
 	}

@@ -56,6 +56,25 @@ const (
 	IntensityZ5 Intensity = "z5"
 )
 
+// Status es el estado de la sesion en el ciclo de planificacion (fase
+// 2.2, issue #311). Los valores son exactamente los que admite el CHECK
+// de la migracion 00017: el dominio y la base de datos no pueden
+// discrepar.
+type Status string
+
+const (
+	// StatusPlanned: planificada, sin mas (el DEFAULT de la tabla).
+	StatusPlanned Status = "planned"
+	// StatusCompleted: realizada tal como estaba planificada. Vincular una
+	// actividad la fija, salvo que la sesion ya sea modified.
+	StatusCompleted Status = "completed"
+	// StatusSkipped: omitida a proposito.
+	StatusSkipped Status = "skipped"
+	// StatusModified: realizada, pero cambiando el plan. Vincular no la
+	// sobrescribe: el usuario ya dijo que la real fue distinta.
+	StatusModified Status = "modified"
+)
+
 // Session es una sesion de entrenamiento planificada.
 //
 // Los objetivos son opcionales: nil significa "no planificado", que no es
@@ -73,4 +92,12 @@ type Session struct {
 	TargetDistanceM      *int        `json:"target_distance_m,omitempty"`
 	TargetElevationGainM *int        `json:"target_elevation_gain_m,omitempty"`
 	TargetIntensity      *Intensity  `json:"target_intensity,omitempty"`
+	// Status es el estado del ciclo de planificacion; la ausencia de valor
+	// (sesion recien construida) persiste como StatusPlanned, el DEFAULT
+	// de la tabla.
+	Status Status `json:"status"`
+	// ActivityID es la actividad real vinculada a la sesion, o nil. El
+	// enlace vive en la base con UNIQUE: una actividad justifica como mucho
+	// una sesion.
+	ActivityID *uuid.UUID `json:"activity_id,omitempty"`
 }

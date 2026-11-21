@@ -228,6 +228,8 @@ func (s *Server) Router() http.Handler {
 				r.Get("/workouts/{id}", handlers.GetWorkout(s.workoutStore).ServeHTTP)
 				r.Patch("/workouts/{id}", handlers.PatchWorkout(s.workoutStore).ServeHTTP)
 				r.Delete("/workouts/{id}", handlers.DeleteWorkout(s.workoutStore).ServeHTTP)
+				r.Put("/workouts/{id}/activity", handlers.LinkWorkoutActivity(s.workoutStore).ServeHTTP)
+				r.Delete("/workouts/{id}/activity", handlers.UnlinkWorkoutActivity(s.workoutStore).ServeHTTP)
 			}
 
 			if s.queries != nil {

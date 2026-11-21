@@ -23,15 +23,18 @@ const otherWorkoutUser = "00000000-0000-0000-0000-000000000002"
 const workoutTestID = "00000000-0000-0000-0000-000000000003"
 
 type workoutsMemoryStore struct {
-	rows      map[uuid.UUID]workouts.Session
-	updated   bool
-	creates   int
-	createdID uuid.UUID
-	createErr error
-	getErr    error
-	listErr   error
-	updateErr error
-	deleteErr error
+	rows       map[uuid.UUID]workouts.Session
+	activities map[uuid.UUID]uuid.UUID
+	updated    bool
+	creates    int
+	createdID  uuid.UUID
+	createErr  error
+	getErr     error
+	listErr    error
+	updateErr  error
+	deleteErr  error
+	linkErr    error
+	unlinkErr  error
 }
 
 func (s *workoutsMemoryStore) Create(_ context.Context, uid uuid.UUID, v workouts.Session) (workouts.Session, error) {
@@ -116,7 +119,7 @@ func TestWorkoutsHandlers(t *testing.T) {
 		rec := httptest.NewRecorder()
 		CreateWorkout(s).ServeHTTP(rec, workoutRequest("POST", "/api/v1/workouts", `{"scheduled_on":"2026-11-20","title":"Easy","workout_type":"rodaje","target_duration_sec":3600}`, workoutTestUser))
 		require.Equal(t, 201, rec.Code)
-		require.JSONEq(t, `{"id":"00000000-0000-0000-0000-000000000003","scheduled_on":"2026-11-20","title":"Easy","notes":"","workout_type":"rodaje","target_duration_sec":3600,"target_distance_m":null,"target_elevation_gain_m":null,"target_intensity":null}`, rec.Body.String())
+		require.JSONEq(t, `{"id":"00000000-0000-0000-0000-000000000003","scheduled_on":"2026-11-20","title":"Easy","notes":"","workout_type":"rodaje","target_duration_sec":3600,"target_distance_m":null,"target_elevation_gain_m":null,"target_intensity":null,"status":"planned","activity_id":null}`, rec.Body.String())
 	})
 	t.Run("create validation and malformed trailing JSON", func(t *testing.T) {
 		for _, tc := range []struct {
@@ -137,7 +140,7 @@ func TestWorkoutsHandlers(t *testing.T) {
 		var b map[string]any
 		require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &b))
 		require.Equal(t, float64(10), b["limit"])
-		require.JSONEq(t, `{"data":[{"id":"00000000-0000-0000-0000-000000000003","scheduled_on":"2026-11-20","title":"Easy","notes":"","workout_type":"rodaje","target_duration_sec":null,"target_distance_m":null,"target_elevation_gain_m":null,"target_intensity":null}],"total":1,"limit":10,"offset":0,"has_next":false}`, rec.Body.String())
+		require.JSONEq(t, `{"data":[{"id":"00000000-0000-0000-0000-000000000003","scheduled_on":"2026-11-20","title":"Easy","notes":"","workout_type":"rodaje","target_duration_sec":null,"target_distance_m":null,"target_elevation_gain_m":null,"target_intensity":null,"status":"planned","activity_id":null}],"total":1,"limit":10,"offset":0,"has_next":false}`, rec.Body.String())
 		for _, query := range []string{"from=2026-11-01&to=2026-11-30&limit=nope", "from=2026-11-01&to=2026-11-30&offset=-1", "from=2026-11-01&to=2026-11-30&offset=2147483648", "from=2026-11-30&to=2026-11-01", "from=2026-11-01&to=2026-02-30"} {
 			rec = httptest.NewRecorder()
 			ListWorkouts(s).ServeHTTP(rec, workoutRequest("GET", "/api/v1/workouts?"+query, "", workoutTestUser))
@@ -259,12 +262,12 @@ func TestWorkoutsHandlers(t *testing.T) {
 		rec := httptest.NewRecorder()
 		GetWorkout(s).ServeHTTP(rec, workoutRequest("GET", "/api/v1/workouts/"+workoutTestID, "", workoutTestUser))
 		require.Equal(t, 200, rec.Code)
-		require.JSONEq(t, `{"id":"00000000-0000-0000-0000-000000000003","scheduled_on":"2026-11-20","title":"Easy","notes":"","workout_type":"rodaje","target_duration_sec":null,"target_distance_m":null,"target_elevation_gain_m":null,"target_intensity":null}`, rec.Body.String())
+		require.JSONEq(t, `{"id":"00000000-0000-0000-0000-000000000003","scheduled_on":"2026-11-20","title":"Easy","notes":"","workout_type":"rodaje","target_duration_sec":null,"target_distance_m":null,"target_elevation_gain_m":null,"target_intensity":null,"status":"planned","activity_id":null}`, rec.Body.String())
 		rec = httptest.NewRecorder()
 		PatchWorkout(s).ServeHTTP(rec, workoutRequest("PATCH", "/api/v1/workouts/"+workoutTestID, `{"title":"Tempo"}`, workoutTestUser))
 		require.Equal(t, 200, rec.Code)
 		require.Equal(t, "Tempo", s.rows[id].Title)
-		require.JSONEq(t, `{"id":"00000000-0000-0000-0000-000000000003","scheduled_on":"2026-11-20","title":"Tempo","notes":"","workout_type":"rodaje","target_duration_sec":null,"target_distance_m":null,"target_elevation_gain_m":null,"target_intensity":null}`, rec.Body.String())
+		require.JSONEq(t, `{"id":"00000000-0000-0000-0000-000000000003","scheduled_on":"2026-11-20","title":"Tempo","notes":"","workout_type":"rodaje","target_duration_sec":null,"target_distance_m":null,"target_elevation_gain_m":null,"target_intensity":null,"status":"planned","activity_id":null}`, rec.Body.String())
 		rec = httptest.NewRecorder()
 		DeleteWorkout(s).ServeHTTP(rec, workoutRequest("DELETE", "/api/v1/workouts/"+workoutTestID, "", workoutTestUser))
 		require.Equal(t, 204, rec.Code)

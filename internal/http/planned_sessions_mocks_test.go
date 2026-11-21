@@ -38,3 +38,13 @@ func (m *mockQuerier) UpdatePlannedSession(ctx context.Context, arg sqlc.UpdateP
 func (m *mockQuerier) DeletePlannedSession(ctx context.Context, arg sqlc.DeletePlannedSessionParams) (int64, error) {
 	return 0, nil
 }
+
+// LinkPlannedSessionActivity stub para mockQuerier (migración 00017, issue #311).
+func (m *mockQuerier) LinkPlannedSessionActivity(ctx context.Context, arg sqlc.LinkPlannedSessionActivityParams) (sqlc.PlannedSession, error) {
+	return sqlc.PlannedSession{}, nil
+}
+
+// UnlinkPlannedSessionActivity stub para mockQuerier (migración 00017, issue #311).
+func (m *mockQuerier) UnlinkPlannedSessionActivity(ctx context.Context, arg sqlc.UnlinkPlannedSessionActivityParams) (sqlc.PlannedSession, error) {
+	return sqlc.PlannedSession{}, nil
+}
