@@ -329,3 +329,37 @@
     padding: var(--gh-s-3);
   }
 }
+
+.comparisonMetric {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--gh-s-2);
+}
+.comparisonMetric select {
+  min-height: 44px;
+  padding: var(--gh-s-2);
+  background: var(--gh-surface);
+  color: var(--gh-text);
+  border: 1px solid var(--gh-line);
+  border-radius: var(--gh-r-control);
+  font: inherit;
+}
+.comparisonChart {
+  width: 100%;
+  height: 240px;
+}
+.comparisonTable {
+  overflow-x: auto;
+  margin-top: var(--gh-s-2);
+}
+.comparisonTable table {
+  width: 100%;
+  border-collapse: collapse;
+}
+.comparisonTable th,
+.comparisonTable td {
+  padding: var(--gh-s-2);
+  border-bottom: 1px solid var(--gh-line);
+  text-align: start;
+}

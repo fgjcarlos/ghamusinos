@@ -3,7 +3,7 @@
 // bearer auth and RFC 9457 problem passthrough.
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { listCalendarActivities } from './calendar';
+import { listCalendarActivities, loadCalendarComparison } from './calendar';
 
 const response = (status: number, body?: unknown) =>
   ({
@@ -35,6 +35,19 @@ describe('calendar API', () => {
     const controller = new AbortController();
     await listCalendarActivities('token', '2026-10-26', '2026-12-06', controller.signal);
     expect(fetch.mock.calls[0]?.[1].signal).toBe(controller.signal);
+  });
+
+  it('fetches comparison for the requested dates and grouping', async () => {
+    const fetch = vi.fn().mockResolvedValue(response(200, { periods: [] }));
+    vi.stubGlobal('fetch', fetch);
+    const signal = new AbortController().signal;
+    await expect(
+      loadCalendarComparison('token', '2026-11-23', '2026-11-29', 'day', signal),
+    ).resolves.toEqual({ periods: [] });
+    expect(fetch).toHaveBeenCalledWith(
+      '/api/v1/workouts/compare?from=2026-11-23&to=2026-11-29&group=day',
+      { headers: { Authorization: 'Bearer token' }, signal },
+    );
   });
 
   it('exposes the problem detail of a failed feed', async () => {

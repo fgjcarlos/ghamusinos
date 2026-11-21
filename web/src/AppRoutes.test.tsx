@@ -18,6 +18,7 @@ vi.mock('./lib/api/workouts', () => ({
 }));
 vi.mock('./lib/api/calendar', () => ({
   listCalendarActivities: vi.fn().mockResolvedValue({ activities: [] }),
+  loadCalendarComparison: vi.fn().mockResolvedValue({ periods: [] }),
 }));
 vi.mock('./lib/api/profile', () => ({
   getPreferences: vi.fn().mockResolvedValue({

@@ -46,3 +46,30 @@ export async function listCalendarActivities(
   if (signal) init.signal = signal;
   return json<{ activities: CalendarActivity[] }>(await fetch(`${BASE_URL}?${query}`, init));
 }
+
+export type ComparisonGroup = 'day' | 'week';
+
+type LoadTotals = { duration_seconds: number; distance_m: number; elevation_gain_m: number };
+
+export interface ComparisonPeriod {
+  period_start: string;
+  planned: LoadTotals;
+  actual: LoadTotals;
+  compliance: { total: number; completed: number; skipped: number; modified: number };
+}
+
+export async function loadCalendarComparison(
+  token: string,
+  from: string,
+  to: string,
+  group: ComparisonGroup,
+  signal: AbortSignal,
+): Promise<{ periods: ComparisonPeriod[] }> {
+  const query = new URLSearchParams({ from, to, group });
+  return json(
+    await fetch(`/api/v1/workouts/compare?${query}`, {
+      headers: { Authorization: `Bearer ${token}` },
+      signal,
+    }),
+  );
+}

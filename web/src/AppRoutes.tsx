@@ -9,16 +9,17 @@ import Lab from './routes/lab';
 import LabCompare from './routes/lab-compare';
 import Profile from './routes/profile';
 import { RouteDetailContainer } from './features/gpx/RouteDetailContainer';
-import { CalendarContainer } from './features/calendar/CalendarContainer';
 import { AppShell } from './ui/AppShell';
 import { ErrorBoundary } from './ui/ErrorBoundary';
 import { WorkoutsContainer } from './features/workouts/WorkoutsContainer';
 
-// The dashboard is the only screen that pulls ECharts in. Loading it
-// lazily keeps the ECharts chunk out of the initial bundle, so the other
-// routes do not pay for it (task 4.1: bundle size budget of the
-// dashboard chunk, < 250 kB gzipped).
+// Load the chart routes lazily so other routes do not pay for ECharts.
 const Dashboard = lazy(() => import('./routes/dashboard'));
+const Calendar = lazy(() =>
+  import('./features/calendar/CalendarContainer').then(({ CalendarContainer }) => ({
+    default: CalendarContainer,
+  })),
+);
 
 // Reads the :id URL param and forwards it to the container. Both
 // /rutas/:id and /lab/:id mount this same wrapper so the legacy alias
@@ -40,7 +41,16 @@ export function AppRoutes() {
         <Route path="/lab/compare" element={<LabCompare />} />
         <Route path="/actividades" element={<Activities />} />
         <Route path="/entrenos" element={<WorkoutsContainer />} />
-        <Route path="/calendario" element={<CalendarContainer />} />
+        <Route
+          path="/calendario"
+          element={
+            <ErrorBoundary message="No se pudo cargar el calendario.">
+              <Suspense fallback={<div role="status">Cargando calendario…</div>}>
+                <Calendar />
+              </Suspense>
+            </ErrorBoundary>
+          }
+        />
         <Route path="/perfil" element={<Profile />} />
         <Route
           path="/dashboard"

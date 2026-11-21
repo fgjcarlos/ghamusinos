@@ -6,15 +6,7 @@
 // endpoint (every page) and refreshed after each mutation; stale loads
 // are dropped by request id.
 
-import {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  type DragEvent,
-  type ReactNode,
-} from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent } from 'react';
 import { ApiError } from '../../lib/api/types';
 import type { Workout, WorkoutInput, WorkoutStatus } from '../../lib/api/workout-types';
 import {
@@ -43,6 +35,7 @@ import {
   weekdayHeaders,
 } from './calendar-model';
 import styles from './Calendar.module.css';
+import { CalendarComparison } from './CalendarComparison';
 
 const PAGE_SIZE = 100; // backend max limit: fewest round trips per range
 const SESSION_MIME = 'application/x-ghamusinos-session';
@@ -65,11 +58,9 @@ type View = 'week' | 'month';
 export interface CalendarContainerProps {
   /** Reference clock so tests can pin "today" deterministically. */
   now?: Date;
-  /** Slot for the plan-vs-real comparison panel (T4, #312). */
-  comparisonPanel?: ReactNode;
 }
 
-export function CalendarContainer({ now = new Date(), comparisonPanel }: CalendarContainerProps) {
+export function CalendarContainer({ now = new Date() }: CalendarContainerProps) {
   const token = import.meta.env.VITE_AUTH_TOKEN || '';
   const [zone, setZone] = useState('');
   const [anchor, setAnchor] = useState<string | null>(null);
@@ -318,7 +309,15 @@ export function CalendarContainer({ now = new Date(), comparisonPanel }: Calenda
           </button>
         </div>
       )}
-      {comparisonPanel}
+      {token && from && to && (
+        <CalendarComparison
+          token={token}
+          from={from}
+          to={to}
+          group={view === 'week' ? 'day' : 'week'}
+          revision={retryKey}
+        />
+      )}
       {createDate && (
         <section className={styles.formPanel} aria-labelledby="new-session-title">
           <h2 id="new-session-title">Nueva sesión</h2>
