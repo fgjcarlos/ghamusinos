@@ -15,7 +15,7 @@ import {
   unlinkWorkoutActivity,
   updateWorkout,
 } from '../../lib/api/workouts';
-import { listCalendarActivities } from '../../lib/api/calendar';
+import { listCalendarActivities, loadCalendarComparison } from '../../lib/api/calendar';
 import { getPreferences } from '../../lib/api/profile';
 import { ApiError } from '../../lib/api/types';
 import type { Workout } from '../../lib/api/workout-types';
@@ -27,7 +27,10 @@ vi.mock('../../lib/api/workouts', () => ({
   linkWorkoutActivity: vi.fn(),
   unlinkWorkoutActivity: vi.fn(),
 }));
-vi.mock('../../lib/api/calendar', () => ({ listCalendarActivities: vi.fn() }));
+vi.mock('../../lib/api/calendar', () => ({
+  listCalendarActivities: vi.fn(),
+  loadCalendarComparison: vi.fn(),
+}));
 vi.mock('../../lib/api/profile', () => ({ getPreferences: vi.fn() }));
 
 const now = new Date('2026-11-25T12:00:00Z'); // hoy en Madrid: 2026-11-25
@@ -65,6 +68,7 @@ function happy({ sessions = [rodazo, linked] as Workout[], activities = [trail, 
     has_next: false,
   }));
   vi.mocked(listCalendarActivities).mockResolvedValue({ activities });
+  vi.mocked(loadCalendarComparison).mockResolvedValue({ periods: [] });
   vi.mocked(getPreferences).mockResolvedValue({
     hr_max: null,
     lthr: null,
@@ -395,13 +399,33 @@ describe('CalendarContainer', () => {
     expect(screen.getByText('Rodazo')).toBeInTheDocument();
   });
 
-  it('renders the comparison panel slot for T4', async () => {
+  it('groups the comparison by view and refreshes after a session change', async () => {
     happy();
-    render(
-      <CalendarContainer now={now} comparisonPanel={<p data-testid="t4-panel">Comparación</p>} />,
+    vi.mocked(updateWorkout).mockResolvedValue(rodazo);
+    render(<CalendarContainer now={now} />);
+    await screen.findByText('Tirada larga');
+    expect(loadCalendarComparison).toHaveBeenCalledWith(
+      'token',
+      '2026-10-26',
+      '2026-12-06',
+      'week',
+      expect.any(AbortSignal),
     );
-    await screen.findByText('Rodazo');
-    expect(screen.getByTestId('t4-panel')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Semana' }));
+    await waitFor(() =>
+      expect(loadCalendarComparison).toHaveBeenCalledWith(
+        'token',
+        '2026-11-23',
+        '2026-11-29',
+        'day',
+        expect.any(AbortSignal),
+      ),
+    );
+    const requests = vi.mocked(loadCalendarComparison).mock.calls.length;
+    fireEvent.change(screen.getByLabelText('Estado de Tirada larga'), {
+      target: { value: 'skipped' },
+    });
+    await waitFor(() => expect(loadCalendarComparison).toHaveBeenCalledTimes(requests + 1));
   });
 
   it('renders an explicit error when the auth token is missing', () => {
