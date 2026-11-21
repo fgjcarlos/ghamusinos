@@ -112,6 +112,8 @@ func (s *Store) Compare(ctx context.Context, userID uuid.UUID, from, to time.Tim
 			b.Compliance.Skipped++
 		case StatusModified:
 			b.Compliance.Modified++
+		case StatusPlanned:
+			// Already counted in Total.
 		}
 		if session.Status == StatusSkipped {
 			continue // omitida a proposito: sus objetivos no son carga planificada
