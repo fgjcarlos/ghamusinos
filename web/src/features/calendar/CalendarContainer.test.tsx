@@ -369,11 +369,11 @@ describe('CalendarContainer', () => {
     const lateUTC = new Date('2026-11-30T23:30:00Z'); // en Madrid ya es 1 de diciembre
     render(<CalendarContainer now={lateUTC} />);
     await screen.findByRole('heading', { name: 'Diciembre de 2026' });
+    await waitFor(() => expect(cell('2026-12-01')).toBeInTheDocument());
     expect(vi.mocked(listWorkouts).mock.calls[0]?.slice(1, 3)).toEqual([
       '2026-11-30',
       '2027-01-10',
     ]);
-    await waitFor(() => expect(cell('2026-12-01')).toBeInTheDocument());
     expect(cell('2026-12-01').querySelector('[aria-current="date"]')).not.toBeNull();
   });
 
