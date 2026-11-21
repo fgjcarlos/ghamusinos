@@ -225,6 +225,7 @@ func (s *Server) Router() http.Handler {
 			if s.workoutStore != nil {
 				r.Post("/workouts", handlers.CreateWorkout(s.workoutStore).ServeHTTP)
 				r.Get("/workouts", handlers.ListWorkouts(s.workoutStore).ServeHTTP)
+				r.Get("/workouts/calendar-activities", handlers.CalendarActivities(s.workoutStore).ServeHTTP)
 				r.Get("/workouts/compare", handlers.CompareWorkouts(s.workoutStore).ServeHTTP)
 				r.Get("/workouts/{id}", handlers.GetWorkout(s.workoutStore).ServeHTTP)
 				r.Patch("/workouts/{id}", handlers.PatchWorkout(s.workoutStore).ServeHTTP)

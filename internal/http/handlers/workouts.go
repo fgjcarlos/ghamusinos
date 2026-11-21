@@ -28,6 +28,7 @@ type WorkoutStore interface {
 	LinkActivity(context.Context, uuid.UUID, uuid.UUID, uuid.UUID) (workouts.Session, error)
 	UnlinkActivity(context.Context, uuid.UUID, uuid.UUID) (workouts.Session, error)
 	Compare(context.Context, uuid.UUID, time.Time, time.Time, workouts.CompareGroup) ([]workouts.ComparePeriod, error)
+	CalendarActivities(context.Context, uuid.UUID, time.Time, time.Time) ([]workouts.CalendarActivity, error)
 }
 
 const workoutDefaultLimit = 20

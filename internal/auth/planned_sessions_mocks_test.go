@@ -48,3 +48,9 @@ func (m *mockQuerier) LinkPlannedSessionActivity(ctx context.Context, arg sqlc.L
 func (m *mockQuerier) UnlinkPlannedSessionActivity(ctx context.Context, arg sqlc.UnlinkPlannedSessionActivityParams) (sqlc.PlannedSession, error) {
 	return sqlc.PlannedSession{}, nil
 }
+
+// ListCalendarActivities stub para mockQuerier (bandeja del calendario,
+// migración de queries de #313, T3).
+func (m *mockQuerier) ListCalendarActivities(ctx context.Context, arg sqlc.ListCalendarActivitiesParams) ([]sqlc.ListCalendarActivitiesRow, error) {
+	return nil, nil
+}

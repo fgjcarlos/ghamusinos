@@ -39,6 +39,9 @@ type Querier interface {
 	// la zona del usuario (users.timezone) y las actividades del rango.
 	GetUserPreferencesByID(context.Context, pgtype.UUID) (sqlc.GetUserPreferencesByIDRow, error)
 	ListActivitiesInRange(context.Context, sqlc.ListActivitiesInRangeParams) ([]sqlc.ListActivitiesInRangeRow, error)
+	// La bandeja del calendario (#313, T3) tiene su propia query: la
+	// bandera linked vive en el SQL, no se calcula en Go.
+	ListCalendarActivities(context.Context, sqlc.ListCalendarActivitiesParams) ([]sqlc.ListCalendarActivitiesRow, error)
 }
 
 // Store persiste las sesiones planificadas de un usuario. Todas las

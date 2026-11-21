@@ -39,6 +39,10 @@ type workoutsMemoryStore struct {
 	compareCalls []compareCall
 	compareOut   []workouts.ComparePeriod
 	compareErr   error
+	// Estado inyectado por los tests del feed del calendario (#313).
+	calendarActivitiesCalls []calendarActivitiesCall
+	calendarActivitiesOut   []workouts.CalendarActivity
+	calendarActivitiesErr   error
 }
 
 func (s *workoutsMemoryStore) Create(_ context.Context, uid uuid.UUID, v workouts.Session) (workouts.Session, error) {

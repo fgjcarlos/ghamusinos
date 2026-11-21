@@ -171,6 +171,69 @@ func (q *Queries) LinkPlannedSessionActivity(ctx context.Context, arg LinkPlanne
 	return i, err
 }
 
+const listCalendarActivities = `-- name: ListCalendarActivities :many
+SELECT a.id,
+       a.name,
+       a.started_at,
+       EXISTS (
+           SELECT 1
+           FROM planned_sessions AS s
+           WHERE s.activity_id = a.id
+             AND s.user_id = a.user_id
+       ) AS linked
+FROM activities AS a
+WHERE a.user_id = $1
+  AND a.started_at >= $2
+  AND a.started_at <= $3
+ORDER BY a.started_at ASC
+`
+
+type ListCalendarActivitiesParams struct {
+	UserID      pgtype.UUID        `json:"user_id"`
+	StartedAt   pgtype.Timestamptz `json:"started_at"`
+	StartedAt_2 pgtype.Timestamptz `json:"started_at_2"`
+}
+
+type ListCalendarActivitiesRow struct {
+	ID        pgtype.UUID        `json:"id"`
+	Name      string             `json:"name"`
+	StartedAt pgtype.Timestamptz `json:"started_at"`
+	Linked    bool               `json:"linked"`
+}
+
+// Bandeja de actividades del calendario (#313, T3): actividades del
+// usuario en una ventana temporal con la marca de vinculadas. La
+// proyeccion es estrecha (id, nombre, instante, linked) y la ventana
+// llega acolchada en UTC desde Go (-1/+2 dias), que recorta despues por
+// fecha civil exacta de la zona del usuario (mismo patron que Compare,
+// #312). El EXISTS cualifica a los DOS duenos (sesion y actividad del
+// mismo usuario): una sesion ajena nunca marca linked, y la marca es
+// global, no del rango pedido.
+func (q *Queries) ListCalendarActivities(ctx context.Context, arg ListCalendarActivitiesParams) ([]ListCalendarActivitiesRow, error) {
+	rows, err := q.db.Query(ctx, listCalendarActivities, arg.UserID, arg.StartedAt, arg.StartedAt_2)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListCalendarActivitiesRow
+	for rows.Next() {
+		var i ListCalendarActivitiesRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Name,
+			&i.StartedAt,
+			&i.Linked,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listPlannedSessionsByRange = `-- name: ListPlannedSessionsByRange :many
 SELECT id, user_id, scheduled_on, title, notes, workout_type, target_duration_sec, target_distance_m, target_elevation_gain_m, target_intensity, status, activity_id, created_at, updated_at, COUNT(*) OVER() AS total_count
 FROM planned_sessions

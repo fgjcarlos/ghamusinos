@@ -28,6 +28,10 @@ type mockQuerier struct {
 	activityArgs  sqlc.ListActivitiesInRangeParams
 	activityRows  []sqlc.ListActivitiesInRangeRow
 	activityErr   error
+	calendarArgs  sqlc.ListCalendarActivitiesParams
+	calendarRows  []sqlc.ListCalendarActivitiesRow
+	calendarErr   error
+	calendarCalls int
 	deletedRows   int64
 	getErr        error
 	linkErr       error

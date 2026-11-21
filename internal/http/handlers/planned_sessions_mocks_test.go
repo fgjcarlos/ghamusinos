@@ -118,3 +118,21 @@ func (m *preferencesMockQuerier) LinkPlannedSessionActivity(ctx context.Context,
 func (m *preferencesMockQuerier) UnlinkPlannedSessionActivity(ctx context.Context, arg sqlc.UnlinkPlannedSessionActivityParams) (sqlc.PlannedSession, error) {
 	return sqlc.PlannedSession{}, nil
 }
+
+// ListCalendarActivities stub para activitiesMockQuerier (bandeja del
+// calendario, #313, T3).
+func (m *activitiesMockQuerier) ListCalendarActivities(ctx context.Context, arg sqlc.ListCalendarActivitiesParams) ([]sqlc.ListCalendarActivitiesRow, error) {
+	return nil, nil
+}
+
+// ListCalendarActivities stub para mockMeQuerier (bandeja del calendario,
+// #313, T3).
+func (m *mockMeQuerier) ListCalendarActivities(ctx context.Context, arg sqlc.ListCalendarActivitiesParams) ([]sqlc.ListCalendarActivitiesRow, error) {
+	return nil, nil
+}
+
+// ListCalendarActivities stub para preferencesMockQuerier (bandeja del
+// calendario, #313, T3).
+func (m *preferencesMockQuerier) ListCalendarActivities(ctx context.Context, arg sqlc.ListCalendarActivitiesParams) ([]sqlc.ListCalendarActivitiesRow, error) {
+	return nil, nil
+}
