@@ -94,7 +94,7 @@ it('creates, edits, attaches and detaches a GPX track, then deletes a race witho
   click('Nueva carrera');
   enter('Nombre', race.name);
   enter('Fecha', race.race_date);
-  enter('Distancia (metros)', '42000');
+  enter('Distancia (metros)', '42195');
   enter('Desnivel positivo (metros)', '2200');
   click('Guardar carrera');
   expect(await screen.findByRole('heading', { name: race.name })).toBeInTheDocument();
@@ -111,6 +111,9 @@ it('creates, edits, attaches and detaches a GPX track, then deletes a race witho
     'href',
     '/rutas/g1',
   );
+  // The only route is now attached, so the picker offers nothing else to link.
+  expect(await screen.findByText(/No hay más rutas GPX disponibles/)).toBeInTheDocument();
+  expect(screen.getByText(/42,195 km/)).toBeInTheDocument();
   click('Desvincular Cresta');
   expect(await screen.findByText('No hay rutas vinculadas.')).toBeInTheDocument();
   click('Borrar carrera');

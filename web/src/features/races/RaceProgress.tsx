@@ -34,7 +34,7 @@ export function RaceProgressPanel({ token, id }: { token: string; id: string }) 
               ? 'La fecha de la carrera ya pasó.'
               : data.days_remaining === 0
                 ? 'La carrera es hoy.'
-                : `Faltan ${data.days_remaining} días (${data.weeks_remaining} semanas completas).`}
+                : `Faltan ${data.days_remaining} días (${data.weeks_remaining} ${data.weeks_remaining === 1 ? 'semana' : 'semanas'} completa${data.weeks_remaining === 1 ? '' : 's'}).`}
           </p>
           {data.sessions.total === 0 && data.activity_count === 0 && !current && (
             <p>No hay sesiones ni actividades para mostrar el progreso.</p>

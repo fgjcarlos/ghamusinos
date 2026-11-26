@@ -327,6 +327,8 @@ function TrackPicker({
   const { result, retry } = useRaceData(load);
   const [chosen, setChosen] = useState('');
   const attached = new Set(tracks.map(({ id }) => trackKey(id)));
+  // A route that became attached is no longer selectable, so the choice resets itself.
+  const current = chosen && !attached.has(trackKey(chosen)) ? chosen : '';
   const available =
     result.phase === 'ready' ? result.data.filter(({ id }) => !attached.has(trackKey(id))) : [];
   if (result.phase === 'loading') return <p role="status">Cargando rutas disponibles…</p>;
@@ -350,13 +352,13 @@ function TrackPicker({
       className={styles.actions}
       onSubmit={(event) => {
         event.preventDefault();
-        if (chosen && !busy) onAttach(chosen);
+        if (current && !busy) onAttach(current);
       }}
     >
       <Field label="Ruta GPX">
         <select
           required
-          value={chosen}
+          value={current}
           disabled={busy}
           onChange={(event) => setChosen(event.target.value)}
         >
