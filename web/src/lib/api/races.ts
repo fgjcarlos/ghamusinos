@@ -1,4 +1,5 @@
 import { ApiError } from './types';
+import { listGpxTracks } from './gpx';
 import type { WorkoutStatus } from './workout-types';
 
 export type Priority = 'A' | 'B' | 'C';
@@ -73,11 +74,32 @@ export const setRaceTrack = (token: string, id: string, trackId: string, attache
     method: attached ? 'PUT' : 'DELETE',
   });
 
-export async function listRaceOptions(token: string, signal: AbortSignal): Promise<Race[]> {
-  const races: Race[] = [];
+/** Walks every page; stops on a short or final page so a bad total cannot loop. */
+async function listAll<T>(
+  page: (offset: number, signal: AbortSignal) => Promise<{ data: T[]; has_next: boolean }>,
+  signal: AbortSignal,
+): Promise<T[]> {
+  const items: T[] = [];
   for (;;) {
-    const page = await listRaces(token, 100, races.length, signal);
-    races.push(...page.data);
-    if (!page.has_next || !page.data.length) return races;
+    const result = await page(items.length, signal);
+    items.push(...result.data);
+    if (!result.has_next || !result.data.length) return items;
   }
 }
+
+export const listRaceOptions = (token: string, signal: AbortSignal) =>
+  listAll((offset, signal) => listRaces(token, 100, offset, signal), signal);
+
+export interface RaceTrackOption {
+  id: string;
+  name: string;
+}
+
+/** GPX list rows wrap ids in pgtype, so normalise to the dashed UUID the races API takes. */
+export const listRaceTrackOptions = async (token: string, signal: AbortSignal) => {
+  const rows = await listAll((offset) => listGpxTracks(token, 100, offset), signal);
+  return rows.map<RaceTrackOption>(({ track }) => ({
+    id: typeof track.id === 'string' ? track.id : track.id.bytes,
+    name: track.name,
+  }));
+};

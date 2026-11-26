@@ -64,6 +64,7 @@ export function WorkoutForm({
     if (Object.keys(validation).length) return;
     const numberOrNull = (key: keyof typeof targets) =>
       values[key] === '' ? null : Number(values[key]);
+    // Omitting race_id keeps the session's race; only an explicit change (or null) is sent.
     const race = new FormData(form).get('race_id');
     await onSave({
       scheduled_on: values.scheduled_on,
