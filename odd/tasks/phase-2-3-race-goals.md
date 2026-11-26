@@ -144,8 +144,8 @@ Las carreras objetivo necesitan su pantalla para crearlas, asociarles rutas y ve
 ## Tasks
 
 - [x] T1 · S1–S2 · Race model, CRUD, GPX links and workout linkage · parent · commit 99cf912; high / approved and acknowledged
-- [ ] T2 · S1, S3 · Define and implement race progress · parent · local checks passed; review pending
-- [ ] T3 · S1, S4 · Race screens and workout selector · parent · commit pending
+- [x] T2 · S1, S3 · Define and implement race progress · parent · commit a740e11; high / approved and acknowledged
+- [x] T3 · S1, S4 · Race screens and workout selector · parent · commits afbbe9e, c3d06be and the options helper; high / approved and acknowledged
 
 ## Log
 
@@ -154,3 +154,10 @@ Las carreras objetivo necesitan su pantalla para crearlas, asociarles rutas y ve
 - L3 (T1; local slice `1ed6f8e..99cf912`, 1260 total diff lines including SQLC and tracking): RED missing routes and POST workout rejected race_id; GREEN focused handlers, PostgreSQL cross-user CRUD/links/deletion, migration up/redo/status, Go race suite, and base differential for existing workout handlers. Risk: item 2 (ownership checks for race, track and session links); migration rollback removes only the new race data.
 - L4 (T1): Independent verifier met S1 (T1 subset) and S2. Native review review-2181a9fc026a54d1: approved acknowledgement consumed authority; all advisory claims are non-blocking.
 - L5 (T2): RED missing progress route; GREEN future, past, empty and foreign race incl. real DB ownership, Go race suite and vet. Phase 2.2 already stores statuses; the report counts them rather than inferring them. Risk: item 2 (per-user aggregates).
+- L6 (T2; local slice `99cf912..a740e11`, 298 diff lines): Independent verifier met S1 (T2 subset)/S3. Native review review-edd75b5e3467d254 approved and consumed authority; UTC training-load buckets are a known non-blocking convention.
+- L7 (T3): RED /carreras route missing. GREEN 514 web tests, typecheck, lint, build, Chromium fixture smoke (1280×900 and 360×800), and differential 23 existing workout/calendar assertions. The build emits a chunk-size warning. Risk: item 3 (session form shared by Entrenos and Calendario).
+- L8 (T3): Independent verifier met S4. Fixed two of its advisories: the route picker resets after a successful attach, and distances keep metre precision (42,195 km). Pluralized “1 semana completa”. The calendar lazy-route test flake it saw under CPU starvation predates this change and was not reproduced locally.
+- L9 (T3): Native review review-f034cefa0c5e66ba approved and consumed authority. Applied two readability advisories: one shared paginated helper for race and GPX options, and a comment naming the omit-preserves / null-clears contract. 514 web tests, typecheck, lint and the 23-case differential green.
+- L10 (T3): Native review review-26eae9578828edfb approved and consumed authority. Fixed the one real advisory: one remaining day now reads “Falta 1 día”, and the shared pagination helper checks the abort signal again. 515 web tests, typecheck and lint green.
+- L11 (delivery): Published the feature branch chain: #350, #351, #352 and a draft tracker #353. Fixed a noctx lint failure in the progress slice (a4952f8).
+- L12 (delivery): #350 squashed into main as 59f39b9 and #351 as 9214949; both child branches were auto-deleted, so #352 and #353 now target main. Each was realigned by merging main and keeping the slice side, since main was byte-identical to the slice bases.
