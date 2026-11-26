@@ -145,7 +145,7 @@ Las carreras objetivo necesitan su pantalla para crearlas, asociarles rutas y ve
 
 - [x] T1 · S1–S2 · Race model, CRUD, GPX links and workout linkage · parent · commit 99cf912; high / approved and acknowledged
 - [x] T2 · S1, S3 · Define and implement race progress · parent · commit a740e11; high / approved and acknowledged
-- [ ] T3 · S1, S4 · Race screens and workout selector · parent · local checks passed; review pending
+- [x] T3 · S1, S4 · Race screens and workout selector · parent · commits afbbe9e, c3d06be and the options helper; high / approved and acknowledged
 
 ## Log
 
@@ -157,3 +157,4 @@ Las carreras objetivo necesitan su pantalla para crearlas, asociarles rutas y ve
 - L6 (T2; local slice `99cf912..a740e11`, 298 diff lines): Independent verifier met S1 (T2 subset)/S3. Native review review-edd75b5e3467d254 approved and consumed authority; UTC training-load buckets are a known non-blocking convention.
 - L7 (T3): RED /carreras route missing. GREEN 514 web tests, typecheck, lint, build, Chromium fixture smoke (1280×900 and 360×800), and differential 23 existing workout/calendar assertions. The build emits a chunk-size warning. Risk: item 3 (session form shared by Entrenos and Calendario).
 - L8 (T3): Independent verifier met S4. Fixed two of its advisories: the route picker resets after a successful attach, and distances keep metre precision (42,195 km). Pluralized “1 semana completa”. The calendar lazy-route test flake it saw under CPU starvation predates this change and was not reproduced locally.
+- L9 (T3): Native review review-f034cefa0c5e66ba approved and consumed authority. Applied two readability advisories: one shared paginated helper for race and GPX options, and a comment naming the omit-preserves / null-clears contract. 514 web tests, typecheck, lint and the 23-case differential green.

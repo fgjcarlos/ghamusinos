@@ -1,15 +1,15 @@
 import { useCallback, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { listGpxTracks } from '../../lib/api/gpx';
 import {
   deleteRace,
   getRace,
+  listRaceTrackOptions,
   listRaces,
   saveRace,
   setRaceTrack,
   type Race,
-  type RaceDetail,
   type RaceInput,
+  type RaceTrackOption,
 } from '../../lib/api/races';
 import { Button, Chip, EmptyState, Field } from '../../ui';
 import { RaceForm } from './RaceForm';
@@ -304,26 +304,11 @@ function TrackPicker({
   onAttach,
 }: {
   auth: string;
-  tracks: RaceDetail['tracks'];
+  tracks: RaceTrackOption[];
   busy: boolean;
   onAttach: (id: string) => void;
 }) {
-  const load = useCallback(
-    async (signal: AbortSignal) => {
-      const all: RaceDetail['tracks'] = [];
-      for (;;) {
-        const page = await listGpxTracks(auth, 100, all.length);
-        all.push(
-          ...page.data.map(({ track }) => ({
-            id: typeof track.id === 'string' ? track.id : track.id.bytes,
-            name: track.name,
-          })),
-        );
-        if (signal.aborted || !page.has_next || !page.data.length) return all;
-      }
-    },
-    [auth],
-  );
+  const load = useCallback((signal: AbortSignal) => listRaceTrackOptions(auth, signal), [auth]);
   const { result, retry } = useRaceData(load);
   const [chosen, setChosen] = useState('');
   const attached = new Set(tracks.map(({ id }) => trackKey(id)));
