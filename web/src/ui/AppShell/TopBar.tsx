@@ -6,6 +6,7 @@
 import { Link } from 'react-router-dom';
 import type { ReactNode } from 'react';
 import { NavLink } from './NavLink';
+import { RaceFlag } from './RaceFlag';
 import { SyncStatusChip } from './SyncStatusChip';
 import styles from './TopBar.module.css';
 
@@ -69,6 +70,9 @@ export function TopBar({ lastSync, now, avatarInitials = '' }: TopBarProps) {
         </NavLink>
         <NavLink to="/entrenos" icon={ACTIVITIES_ICON}>
           Entrenos
+        </NavLink>
+        <NavLink to="/carreras" icon={<RaceFlag />} end={false}>
+          Carreras
         </NavLink>
         <NavLink to="/calendario" icon={CALENDAR_ICON}>
           Calendario

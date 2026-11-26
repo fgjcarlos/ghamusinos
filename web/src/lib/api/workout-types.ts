@@ -22,6 +22,7 @@ export interface Workout {
   target_intensity: WorkoutIntensity | null;
   status: WorkoutStatus;
   activity_id: string | null;
+  race_id?: string | null;
 }
 export type WorkoutInput = Omit<Workout, 'id' | 'notes' | 'status' | 'activity_id'> & {
   notes?: string;

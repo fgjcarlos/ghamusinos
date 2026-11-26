@@ -144,8 +144,8 @@ Las carreras objetivo necesitan su pantalla para crearlas, asociarles rutas y ve
 ## Tasks
 
 - [x] T1 · S1–S2 · Race model, CRUD, GPX links and workout linkage · parent · commit 99cf912; high / approved and acknowledged
-- [ ] T2 · S1, S3 · Define and implement race progress · parent · local checks passed; review pending
-- [ ] T3 · S1, S4 · Race screens and workout selector · parent · commit pending
+- [x] T2 · S1, S3 · Define and implement race progress · parent · commit a740e11; high / approved and acknowledged
+- [ ] T3 · S1, S4 · Race screens and workout selector · parent · local checks passed; review pending
 
 ## Log
 
@@ -154,3 +154,5 @@ Las carreras objetivo necesitan su pantalla para crearlas, asociarles rutas y ve
 - L3 (T1; local slice `1ed6f8e..99cf912`, 1260 total diff lines including SQLC and tracking): RED missing routes and POST workout rejected race_id; GREEN focused handlers, PostgreSQL cross-user CRUD/links/deletion, migration up/redo/status, Go race suite, and base differential for existing workout handlers. Risk: item 2 (ownership checks for race, track and session links); migration rollback removes only the new race data.
 - L4 (T1): Independent verifier met S1 (T1 subset) and S2. Native review review-2181a9fc026a54d1: approved acknowledgement consumed authority; all advisory claims are non-blocking.
 - L5 (T2): RED missing progress route; GREEN future, past, empty and foreign race incl. real DB ownership, Go race suite and vet. Phase 2.2 already stores statuses; the report counts them rather than inferring them. Risk: item 2 (per-user aggregates).
+- L6 (T2; local slice `99cf912..a740e11`, 298 diff lines): Independent verifier met S1 (T2 subset)/S3. Native review review-edd75b5e3467d254 approved and consumed authority; UTC training-load buckets are a known non-blocking convention.
+- L7 (T3): RED /carreras route missing. GREEN 514 web tests, typecheck, lint, build, Chromium fixture smoke (1280×900 and 360×800), and differential 23 existing workout/calendar assertions. The build emits a chunk-size warning. Risk: item 3 (session form shared by Entrenos and Calendario).

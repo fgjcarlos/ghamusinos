@@ -6,6 +6,7 @@
 import { Outlet } from 'react-router-dom';
 import type { ReactNode } from 'react';
 import { NavLink } from './NavLink';
+import { RaceFlag } from './RaceFlag';
 import { TopBar } from './TopBar';
 import styles from './AppShell.module.css';
 
@@ -73,6 +74,9 @@ export function AppShell({ lastSync, now, avatarInitials }: AppShellProps) {
         </NavLink>
         <NavLink to="/entrenos" icon={PLANNED_ICON}>
           Entrenos
+        </NavLink>
+        <NavLink to="/carreras" icon={<RaceFlag />} end={false}>
+          Carreras
         </NavLink>
         <NavLink to="/calendario" icon={CALENDAR_ICON}>
           Calendario
