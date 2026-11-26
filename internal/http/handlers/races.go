@@ -4,6 +4,7 @@ import (
 	"errors"
 	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/fgjcarlos/ghamusinos/internal/races"
 	"github.com/go-chi/chi/v5"
@@ -15,6 +16,7 @@ func MountRaces(r chi.Router, s *races.Store) {
 	r.Method(http.MethodGet, "/races", raceHandler(s))
 	r.Method(http.MethodPost, "/races", raceHandler(s))
 	r.Method(http.MethodGet, "/races/{id}", raceHandler(s))
+	r.Get("/races/{id}/progress", raceProgressHandler(s, time.Now))
 	r.Method(http.MethodPut, "/races/{id}", raceHandler(s))
 	r.Method(http.MethodDelete, "/races/{id}", raceHandler(s))
 	r.Method(http.MethodPut, "/races/{id}/tracks/{trackId}", raceTrackHandler(s))
@@ -117,5 +119,21 @@ func writeRaceResponse(w http.ResponseWriter, r *http.Request, status int, v any
 		w.WriteHeader(status)
 	default:
 		writeWorkoutJSON(w, status, v)
+	}
+}
+
+func raceProgressHandler(s *races.Store, now func() time.Time) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		user, ok := workoutAuth(w, r)
+		if !ok {
+			return
+		}
+		id, err := uuid.Parse(chi.URLParam(r, "id"))
+		if err != nil {
+			writeRaceResponse(w, r, 0, nil, races.ErrNotFound)
+			return
+		}
+		v, err := s.Progress(r.Context(), user, id, now())
+		writeRaceResponse(w, r, http.StatusOK, v, err)
 	}
 }

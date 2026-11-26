@@ -143,12 +143,14 @@ Las carreras objetivo necesitan su pantalla para crearlas, asociarles rutas y ve
 
 ## Tasks
 
-- [ ] T1 · S1–S2 · Race model, CRUD, GPX links and workout linkage · parent · commit pending
-- [ ] T2 · S1, S3 · Define and implement race progress · parent · commit pending
+- [x] T1 · S1–S2 · Race model, CRUD, GPX links and workout linkage · parent · commit 99cf912; high / approved and acknowledged
+- [ ] T2 · S1, S3 · Define and implement race progress · parent · local checks passed; review pending
 - [ ] T3 · S1, S4 · Race screens and workout selector · parent · commit pending
 
 ## Log
 
 - L1: Resuelve la issue #303
 - L2: Selected “Progreso de 4 semanas (recomendado)” — “Comparar las últimas 4 semanas de actividades registradas con la distancia y el D+ objetivo, como referencia orientativa. Mostrar sesiones vinculadas sin inferir completadas u omitidas hasta que exista ese dato.” GPX Lab plan persistence is out of scope.
-- L3 (T1): RED missing routes and POST workout rejected race_id; GREEN focused handlers, PostgreSQL cross-user CRUD/links/deletion, migration up/redo/status, Go race suite, and base differential for existing workout handlers. Risk: item 2 (ownership checks for race, track and session links); migration rollback removes only the new race data.
+- L3 (T1; local slice `1ed6f8e..99cf912`, 1260 total diff lines including SQLC and tracking): RED missing routes and POST workout rejected race_id; GREEN focused handlers, PostgreSQL cross-user CRUD/links/deletion, migration up/redo/status, Go race suite, and base differential for existing workout handlers. Risk: item 2 (ownership checks for race, track and session links); migration rollback removes only the new race data.
+- L4 (T1): Independent verifier met S1 (T1 subset) and S2. Native review review-2181a9fc026a54d1: approved acknowledgement consumed authority; all advisory claims are non-blocking.
+- L5 (T2): RED missing progress route; GREEN future, past, empty and foreign race incl. real DB ownership, Go race suite and vet. Phase 2.2 already stores statuses; the report counts them rather than inferring them. Risk: item 2 (per-user aggregates).
