@@ -433,6 +433,7 @@ func TestSyncStatus_NotFoundWhenNoSessionExists(t *testing.T) {
 
 // Mock Querier for activities tests
 type activitiesMockQuerier struct {
+	sqlc.Querier
 	t *testing.T
 
 	ListActivitiesByUserFunc    func(context.Context, sqlc.ListActivitiesByUserParams) ([]sqlc.ListActivitiesByUserRow, error)

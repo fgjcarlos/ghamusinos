@@ -181,6 +181,7 @@ func TestResolveUser_EmailCollision_ReturnsErrEmailTaken(t *testing.T) {
 
 // Mock querier for testing
 type mockQuerier struct {
+	sqlc.Querier
 	users               map[string]sqlc.User
 	onCreateUser        func(clerkID, email, name string) (sqlc.User, error)
 	getActiveInviteFunc func(email string) (sqlc.GetActiveInviteByEmailRow, error)

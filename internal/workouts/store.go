@@ -18,6 +18,8 @@ import (
 // los dos escenarios.
 var ErrNotFound = errors.New("workouts: session not found")
 
+var ErrRaceNotFound = errors.New("workouts: race not found")
+
 // ErrActivityInUse se devuelve cuando la actividad ya esta vinculada a
 // otra sesion: el UNIQUE(activity_id) de la migracion 00017 la rechaza.
 // El handler HTTP responde 409.
@@ -73,7 +75,11 @@ func (s *Store) Create(ctx context.Context, userID uuid.UUID, session Session) (
 		TargetDistanceM:      toInt4(session.TargetDistanceM),
 		TargetElevationGainM: toInt4(session.TargetElevationGainM),
 		TargetIntensity:      toIntensity(session.TargetIntensity),
+		RaceID:               optionalUUID(session.RaceID),
 	})
+	if errors.Is(err, pgx.ErrNoRows) || raceForeignKeyError(err) {
+		return Session{}, ErrRaceNotFound
+	}
 	if err != nil {
 		return Session{}, fmt.Errorf("workouts: create session: %w", err)
 	}
@@ -148,8 +154,12 @@ func (s *Store) Update(ctx context.Context, userID, id uuid.UUID, session Sessio
 		TargetDistanceM:      toInt4(session.TargetDistanceM),
 		TargetElevationGainM: toInt4(session.TargetElevationGainM),
 		TargetIntensity:      toIntensity(session.TargetIntensity),
+		RaceID:               optionalUUID(session.RaceID),
 		Status:               string(session.Status),
 	})
+	if raceForeignKeyError(err) {
+		return Session{}, ErrRaceNotFound
+	}
 	if errors.Is(err, pgx.ErrNoRows) {
 		return Session{}, ErrNotFound
 	}
@@ -244,6 +254,7 @@ func fromRow(row sqlc.PlannedSession) Session {
 		TargetIntensity:      fromIntensity(row.TargetIntensity),
 		Status:               Status(row.Status),
 		ActivityID:           fromUUIDPtr(row.ActivityID),
+		RaceID:               fromUUIDPtr(row.RaceID),
 	}
 }
 
@@ -262,6 +273,7 @@ func fromListRow(row sqlc.ListPlannedSessionsByRangeRow) Session {
 		TargetIntensity:      fromIntensity(row.TargetIntensity),
 		Status:               Status(row.Status),
 		ActivityID:           fromUUIDPtr(row.ActivityID),
+		RaceID:               fromUUIDPtr(row.RaceID),
 	}
 }
 
@@ -338,4 +350,16 @@ func fromIntensity(v pgtype.Text) *Intensity {
 	}
 	out := Intensity(v.String)
 	return &out
+}
+
+func optionalUUID(id *uuid.UUID) pgtype.UUID {
+	if id == nil {
+		return pgtype.UUID{}
+	}
+	return toUUID(*id)
+}
+
+func raceForeignKeyError(err error) bool {
+	var pgErr *pgconn.PgError
+	return errors.As(err, &pgErr) && pgErr.Code == "23503" && pgErr.ConstraintName == "planned_sessions_race_fk"
 }

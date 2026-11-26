@@ -69,6 +69,7 @@ func newPatchReq(body string) *http.Request {
 // copying the entire interface. Defaults to zero-value behaviour
 // when nil.
 type preferencesMockQuerier struct {
+	sqlc.Querier
 	t                  *testing.T
 	deleteStravaTokens func(userID pgtype.UUID) error
 	// getPreferences overrides the stored preferences returned by

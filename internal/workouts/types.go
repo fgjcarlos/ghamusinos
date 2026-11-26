@@ -100,4 +100,5 @@ type Session struct {
 	// enlace vive en la base con UNIQUE: una actividad justifica como mucho
 	// una sesion.
 	ActivityID *uuid.UUID `json:"activity_id,omitempty"`
+	RaceID     *uuid.UUID `json:"race_id,omitempty"`
 }

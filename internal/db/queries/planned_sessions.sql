@@ -3,8 +3,15 @@
 -- token, nunca del cuerpo de la peticion.
 INSERT INTO planned_sessions (
     user_id, scheduled_on, title, notes, workout_type,
-    target_duration_sec, target_distance_m, target_elevation_gain_m, target_intensity
-) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+    target_duration_sec, target_distance_m, target_elevation_gain_m, target_intensity, race_id
+)
+SELECT sqlc.arg(user_id)::uuid, sqlc.arg(scheduled_on)::date, sqlc.arg(title)::text,
+       sqlc.narg(notes)::text, sqlc.arg(workout_type)::text, sqlc.narg(target_duration_sec)::int,
+       sqlc.narg(target_distance_m)::int, sqlc.narg(target_elevation_gain_m)::int,
+       sqlc.narg(target_intensity)::text, sqlc.narg(race_id)::uuid
+WHERE sqlc.narg(race_id)::uuid IS NULL OR EXISTS (
+    SELECT 1 FROM races WHERE races.id = sqlc.narg(race_id)::uuid AND races.user_id = sqlc.arg(user_id)::uuid
+)
 RETURNING *;
 
 -- name: GetPlannedSession :one
@@ -46,9 +53,13 @@ SET scheduled_on = $3,
     target_elevation_gain_m = $9,
     target_intensity = $10,
     status = $11,
+    race_id = sqlc.narg(race_id),
     updated_at = now()
-WHERE id = $1
-  AND user_id = $2
+WHERE planned_sessions.id = $1
+  AND planned_sessions.user_id = $2
+  AND (sqlc.narg(race_id)::uuid IS NULL OR EXISTS (
+      SELECT 1 FROM races WHERE races.id = sqlc.narg(race_id)::uuid AND races.user_id = planned_sessions.user_id
+  ))
 RETURNING *;
 
 -- name: DeletePlannedSession :execrows

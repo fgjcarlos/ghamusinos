@@ -184,6 +184,25 @@ type PlannedSession struct {
 	ActivityID           pgtype.UUID        `json:"activity_id"`
 	CreatedAt            pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt            pgtype.Timestamptz `json:"updated_at"`
+	RaceID               pgtype.UUID        `json:"race_id"`
+}
+
+type Race struct {
+	ID             pgtype.UUID        `json:"id"`
+	UserID         pgtype.UUID        `json:"user_id"`
+	Name           string             `json:"name"`
+	RaceDate       pgtype.Date        `json:"race_date"`
+	DistanceM      int32              `json:"distance_m"`
+	ElevationGainM int32              `json:"elevation_gain_m"`
+	Priority       string             `json:"priority"`
+	Notes          string             `json:"notes"`
+	CreatedAt      pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt      pgtype.Timestamptz `json:"updated_at"`
+}
+
+type RaceTrack struct {
+	RaceID     pgtype.UUID `json:"race_id"`
+	GpxTrackID pgtype.UUID `json:"gpx_track_id"`
 }
 
 type StravaToken struct {

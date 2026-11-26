@@ -281,3 +281,28 @@ func TestWorkoutsHandlers(t *testing.T) {
 		require.Equal(t, 204, rec.Code)
 	})
 }
+
+func TestWorkoutRaceIDCreatePatchAndClear(t *testing.T) {
+	const raceID = "00000000-0000-0000-0000-000000000005"
+	store := &workoutsMemoryStore{rows: map[uuid.UUID]workouts.Session{}, createdID: uuid.MustParse(workoutTestID)}
+	path := "/api/v1/workouts/" + workoutTestID
+	steps := []struct {
+		h                  http.Handler
+		method, path, body string
+		status             int
+		race               any
+	}{
+		{CreateWorkout(store), "POST", "/api/v1/workouts", `{"scheduled_on":"2026-11-20","title":"Easy","workout_type":"rodaje","race_id":"` + raceID + `"}`, 201, raceID},
+		{PatchWorkout(store), "PATCH", path, `{"title":"Renamed"}`, 200, raceID},
+		{PatchWorkout(store), "PATCH", path, `{"race_id":null}`, 200, nil},
+		{PatchWorkout(store), "PATCH", path, `{"race_id":"` + raceID + `"}`, 200, raceID},
+	}
+	for _, step := range steps {
+		rec := httptest.NewRecorder()
+		step.h.ServeHTTP(rec, workoutRequest(step.method, step.path, step.body, workoutTestUser))
+		require.Equal(t, step.status, rec.Code, rec.Body.String())
+		var body map[string]any
+		require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &body))
+		require.Equal(t, step.race, body["race_id"])
+	}
+}

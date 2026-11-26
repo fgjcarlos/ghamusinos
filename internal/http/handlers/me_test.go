@@ -94,7 +94,7 @@ func TestMe_NoUser(t *testing.T) {
 // Mock querier for Me handler tests.
 // Implementa sqlc.Querier completo; los métodos Strava/Activities/Sync
 // devuelven valores cero porque estos tests no los ejercitan.
-type mockMeQuerier struct{}
+type mockMeQuerier struct{ sqlc.Querier }
 
 func (m *mockMeQuerier) CreateInvite(ctx context.Context, arg sqlc.CreateInviteParams) (sqlc.Invite, error) {
 	return sqlc.Invite{}, nil
