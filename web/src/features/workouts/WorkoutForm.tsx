@@ -1,10 +1,12 @@
-import { useState, type FormEvent } from 'react';
+import { useCallback, useState, type FormEvent } from 'react';
 import type {
   Workout,
   WorkoutInput,
   WorkoutType,
   WorkoutIntensity,
 } from '../../lib/api/workout-types';
+import { listRaceOptions } from '../../lib/api/races';
+import { useRaceData } from '../races/useRaceData';
 import { Button, Field } from '../../ui';
 import { validateWorkoutValues, workoutValuesFromForm } from './workout-model';
 import styles from './Workouts.module.css';
@@ -62,6 +64,7 @@ export function WorkoutForm({
     if (Object.keys(validation).length) return;
     const numberOrNull = (key: keyof typeof targets) =>
       values[key] === '' ? null : Number(values[key]);
+    const race = new FormData(form).get('race_id');
     await onSave({
       scheduled_on: values.scheduled_on,
       title: values.title,
@@ -71,6 +74,9 @@ export function WorkoutForm({
       target_distance_m: numberOrNull('target_distance_m'),
       target_elevation_gain_m: numberOrNull('target_elevation_gain_m'),
       target_intensity: (values.target_intensity || null) as WorkoutIntensity | null,
+      ...(typeof race === 'string' && race !== (initial?.race_id ?? '')
+        ? { race_id: race || null }
+        : {}),
     });
   }
   const errorProps = (name: string) => ({
@@ -113,6 +119,7 @@ export function WorkoutForm({
             ))}
           </select>
         </Field>
+        <WorkoutRaceField initialId={initial?.race_id ?? ''} />
         <Field label="Notas" {...errorProps('notes')}>
           <textarea
             name="notes"
@@ -160,5 +167,47 @@ export function WorkoutForm({
         </div>
       </fieldset>
     </form>
+  );
+}
+
+function WorkoutRaceField({ initialId }: { initialId: string }) {
+  const token = import.meta.env.VITE_AUTH_TOKEN || '';
+  const load = useCallback(
+    (signal: AbortSignal) => (token ? listRaceOptions(token, signal) : Promise.resolve([])),
+    [token],
+  );
+  const { result, retry } = useRaceData(load);
+  const [choice, setChoice] = useState(initialId);
+  const races = result.phase === 'ready' ? result.data : [];
+  return (
+    <div>
+      <Field label="Carrera objetivo">
+        <select
+          name="race_id"
+          value={choice}
+          disabled={result.phase !== 'ready'}
+          onChange={(event) => setChoice(event.target.value)}
+        >
+          <option value="">Sin carrera</option>
+          {initialId && !races.some(({ id }) => id === initialId) && (
+            <option value={initialId}>Carrera vinculada</option>
+          )}
+          {races.map((race) => (
+            <option key={race.id} value={race.id}>
+              {race.name} ({race.race_date})
+            </option>
+          ))}
+        </select>
+      </Field>
+      {result.phase === 'loading' && <small role="status">Cargando carreras objetivo…</small>}
+      {result.phase === 'error' && (
+        <small role="status">
+          No se pudieron cargar las carreras.{' '}
+          <button type="button" onClick={retry}>
+            Reintentar
+          </button>
+        </small>
+      )}
+    </div>
   );
 }

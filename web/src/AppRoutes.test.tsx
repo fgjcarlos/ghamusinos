@@ -64,6 +64,21 @@ describe('AppRoutes', () => {
     ).toHaveTextContent('Calendario');
   });
 
+  it('mounts race goals and exposes the mobile and desktop links', async () => {
+    render(
+      <MemoryRouter initialEntries={['/carreras']}>
+        <AppRoutes />
+      </MemoryRouter>,
+    );
+    expect(await screen.findByRole('heading', { name: 'Carreras' })).toBeInTheDocument();
+    expect(screen.getByTestId('bottom-nav').querySelector('a[href="/carreras"]')).toHaveTextContent(
+      'Carreras',
+    );
+    expect(
+      screen.getByRole('navigation', { name: 'Principal' }).querySelector('a[href="/carreras"]'),
+    ).toHaveTextContent('Carreras');
+  });
+
   it('mounts the dashboard page on /dashboard', async () => {
     render(
       <MemoryRouter initialEntries={['/dashboard']}>

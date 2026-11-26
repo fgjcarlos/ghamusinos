@@ -12,6 +12,7 @@ import { RouteDetailContainer } from './features/gpx/RouteDetailContainer';
 import { AppShell } from './ui/AppShell';
 import { ErrorBoundary } from './ui/ErrorBoundary';
 import { WorkoutsContainer } from './features/workouts/WorkoutsContainer';
+import { RaceDetailRoute, RacesPage } from './features/races/RacesPage';
 
 // Load the chart routes lazily so other routes do not pay for ECharts.
 const Dashboard = lazy(() => import('./routes/dashboard'));
@@ -41,6 +42,8 @@ export function AppRoutes() {
         <Route path="/lab/compare" element={<LabCompare />} />
         <Route path="/actividades" element={<Activities />} />
         <Route path="/entrenos" element={<WorkoutsContainer />} />
+        <Route path="/carreras" element={<RacesPage />} />
+        <Route path="/carreras/:id" element={<RaceDetailRoute />} />
         <Route
           path="/calendario"
           element={
