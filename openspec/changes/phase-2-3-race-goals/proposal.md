@@ -18,6 +18,8 @@ Una carrera reúne sus rutas GPX, sesiones planificadas y una referencia de prep
 - Distancia y D+ totales de las actividades registradas del usuario en los últimos 28 días naturales, incluyendo hoy. Se devuelven junto a las metas de la carrera; la comparación describe el volumen registrado, no un porcentaje de preparación. Una carrera pasada mantiene la misma ventana reciente.
 - CTL, ATL y TSB de la serie de `internal/metrics`, al final de la ventana y como tendencia diaria dentro de ella. Si no hay carga calculada, no se inventa un valor. Sin registros, los recuentos y totales son cero y la serie está vacía. Solo el dueño puede consultar el progreso.
 
+El último elemento de `load` representa la carga actual. La serie usa la misma media exponencial que el dashboard, calculada a partir del TSS de la ventana de 28 días.
+
 ## Interfaz (#316)
 
 `/carreras` ofrece listado por fecha, prioridad y cuenta atrás, formulario de alta y edición, detalle con rutas y sesiones, y panel orientativo con estados vacío, cargando y error. El formulario de entreno permite elegir o quitar la carrera objetivo.

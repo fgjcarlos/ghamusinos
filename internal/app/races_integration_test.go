@@ -107,6 +107,8 @@ func TestIntegration_RaceGoalsCRUDAndOwnership(t *testing.T) {
 	require.NoError(t, json.Unmarshal(request(owner, "PUT", racePath, patch, 200).Body.Bytes(), &updated))
 	require.Equal(t, "B", updated.Priority)
 	request(other, "GET", racePath, "", 404)
+	request(other, "GET", racePath+"/progress", "", 404)
+	request(owner, "GET", racePath+"/progress", "", 200)
 	request(other, "PUT", racePath, raceDraft, 404)
 	request(other, "DELETE", racePath, "", 404)
 
