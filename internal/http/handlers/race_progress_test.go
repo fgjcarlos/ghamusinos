@@ -96,8 +96,9 @@ func TestRaceProgress(t *testing.T) {
 			router := chi.NewRouter()
 			router.Get("/api/v1/races/{id}/progress", raceProgressHandler(races.NewStore(q), func() time.Time { return now }))
 			rec := httptest.NewRecorder()
-			req := httptest.NewRequest("GET", "/api/v1/races/"+workoutTestID+"/progress", nil)
-			router.ServeHTTP(rec, req.WithContext(auth.WithAuthUser(req.Context(), &auth.User{ID: tc.user.String()})))
+			ctx := auth.WithAuthUser(context.Background(), &auth.User{ID: tc.user.String()})
+			req := httptest.NewRequestWithContext(ctx, "GET", "/api/v1/races/"+workoutTestID+"/progress", nil)
+			router.ServeHTTP(rec, req)
 			require.Equal(t, tc.status, rec.Code, rec.Body.String())
 			if tc.status == 404 {
 				require.JSONEq(t, `{"type":"about:blank","title":"Not Found","status":404,"detail":"race or track not found"}`, rec.Body.String())
