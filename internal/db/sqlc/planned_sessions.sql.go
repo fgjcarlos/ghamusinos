@@ -14,9 +14,16 @@ import (
 const createPlannedSession = `-- name: CreatePlannedSession :one
 INSERT INTO planned_sessions (
     user_id, scheduled_on, title, notes, workout_type,
-    target_duration_sec, target_distance_m, target_elevation_gain_m, target_intensity
-) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-RETURNING id, user_id, scheduled_on, title, notes, workout_type, target_duration_sec, target_distance_m, target_elevation_gain_m, target_intensity, status, activity_id, created_at, updated_at
+    target_duration_sec, target_distance_m, target_elevation_gain_m, target_intensity, race_id
+)
+SELECT $1::uuid, $2::date, $3::text,
+       $4::text, $5::text, $6::int,
+       $7::int, $8::int,
+       $9::text, $10::uuid
+WHERE $10::uuid IS NULL OR EXISTS (
+    SELECT 1 FROM races WHERE races.id = $10::uuid AND races.user_id = $1::uuid
+)
+RETURNING id, user_id, scheduled_on, title, notes, workout_type, target_duration_sec, target_distance_m, target_elevation_gain_m, target_intensity, status, activity_id, created_at, updated_at, race_id
 `
 
 type CreatePlannedSessionParams struct {
@@ -29,6 +36,7 @@ type CreatePlannedSessionParams struct {
 	TargetDistanceM      pgtype.Int4 `json:"target_distance_m"`
 	TargetElevationGainM pgtype.Int4 `json:"target_elevation_gain_m"`
 	TargetIntensity      pgtype.Text `json:"target_intensity"`
+	RaceID               pgtype.UUID `json:"race_id"`
 }
 
 // Crea una sesion planificada para el usuario. El `user_id` viene del
@@ -44,6 +52,7 @@ func (q *Queries) CreatePlannedSession(ctx context.Context, arg CreatePlannedSes
 		arg.TargetDistanceM,
 		arg.TargetElevationGainM,
 		arg.TargetIntensity,
+		arg.RaceID,
 	)
 	var i PlannedSession
 	err := row.Scan(
@@ -61,6 +70,7 @@ func (q *Queries) CreatePlannedSession(ctx context.Context, arg CreatePlannedSes
 		&i.ActivityID,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.RaceID,
 	)
 	return i, err
 }
@@ -87,7 +97,7 @@ func (q *Queries) DeletePlannedSession(ctx context.Context, arg DeletePlannedSes
 }
 
 const getPlannedSession = `-- name: GetPlannedSession :one
-SELECT id, user_id, scheduled_on, title, notes, workout_type, target_duration_sec, target_distance_m, target_elevation_gain_m, target_intensity, status, activity_id, created_at, updated_at
+SELECT id, user_id, scheduled_on, title, notes, workout_type, target_duration_sec, target_distance_m, target_elevation_gain_m, target_intensity, status, activity_id, created_at, updated_at, race_id
 FROM planned_sessions
 WHERE id = $1
   AND user_id = $2
@@ -120,6 +130,7 @@ func (q *Queries) GetPlannedSession(ctx context.Context, arg GetPlannedSessionPa
 		&i.ActivityID,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.RaceID,
 	)
 	return i, err
 }
@@ -134,7 +145,7 @@ WHERE s.id = $1
   AND s.user_id = $2
   AND a.id = $3
   AND a.user_id = $2
-RETURNING s.id, s.user_id, s.scheduled_on, s.title, s.notes, s.workout_type, s.target_duration_sec, s.target_distance_m, s.target_elevation_gain_m, s.target_intensity, s.status, s.activity_id, s.created_at, s.updated_at
+RETURNING s.id, s.user_id, s.scheduled_on, s.title, s.notes, s.workout_type, s.target_duration_sec, s.target_distance_m, s.target_elevation_gain_m, s.target_intensity, s.status, s.activity_id, s.created_at, s.updated_at, s.race_id
 `
 
 type LinkPlannedSessionActivityParams struct {
@@ -167,6 +178,7 @@ func (q *Queries) LinkPlannedSessionActivity(ctx context.Context, arg LinkPlanne
 		&i.ActivityID,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.RaceID,
 	)
 	return i, err
 }
@@ -235,7 +247,7 @@ func (q *Queries) ListCalendarActivities(ctx context.Context, arg ListCalendarAc
 }
 
 const listPlannedSessionsByRange = `-- name: ListPlannedSessionsByRange :many
-SELECT id, user_id, scheduled_on, title, notes, workout_type, target_duration_sec, target_distance_m, target_elevation_gain_m, target_intensity, status, activity_id, created_at, updated_at, COUNT(*) OVER() AS total_count
+SELECT id, user_id, scheduled_on, title, notes, workout_type, target_duration_sec, target_distance_m, target_elevation_gain_m, target_intensity, status, activity_id, created_at, updated_at, race_id, COUNT(*) OVER() AS total_count
 FROM planned_sessions
 WHERE user_id = $1
   AND scheduled_on >= $2
@@ -267,6 +279,7 @@ type ListPlannedSessionsByRangeRow struct {
 	ActivityID           pgtype.UUID        `json:"activity_id"`
 	CreatedAt            pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt            pgtype.Timestamptz `json:"updated_at"`
+	RaceID               pgtype.UUID        `json:"race_id"`
 	TotalCount           int64              `json:"total_count"`
 }
 
@@ -307,6 +320,7 @@ func (q *Queries) ListPlannedSessionsByRange(ctx context.Context, arg ListPlanne
 			&i.ActivityID,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.RaceID,
 			&i.TotalCount,
 		); err != nil {
 			return nil, err
@@ -325,7 +339,7 @@ SET activity_id = NULL,
     updated_at = now()
 WHERE id = $1
   AND user_id = $2
-RETURNING id, user_id, scheduled_on, title, notes, workout_type, target_duration_sec, target_distance_m, target_elevation_gain_m, target_intensity, status, activity_id, created_at, updated_at
+RETURNING id, user_id, scheduled_on, title, notes, workout_type, target_duration_sec, target_distance_m, target_elevation_gain_m, target_intensity, status, activity_id, created_at, updated_at, race_id
 `
 
 type UnlinkPlannedSessionActivityParams struct {
@@ -354,6 +368,7 @@ func (q *Queries) UnlinkPlannedSessionActivity(ctx context.Context, arg UnlinkPl
 		&i.ActivityID,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.RaceID,
 	)
 	return i, err
 }
@@ -369,10 +384,14 @@ SET scheduled_on = $3,
     target_elevation_gain_m = $9,
     target_intensity = $10,
     status = $11,
+    race_id = $12,
     updated_at = now()
-WHERE id = $1
-  AND user_id = $2
-RETURNING id, user_id, scheduled_on, title, notes, workout_type, target_duration_sec, target_distance_m, target_elevation_gain_m, target_intensity, status, activity_id, created_at, updated_at
+WHERE planned_sessions.id = $1
+  AND planned_sessions.user_id = $2
+  AND ($12::uuid IS NULL OR EXISTS (
+      SELECT 1 FROM races WHERE races.id = $12::uuid AND races.user_id = planned_sessions.user_id
+  ))
+RETURNING id, user_id, scheduled_on, title, notes, workout_type, target_duration_sec, target_distance_m, target_elevation_gain_m, target_intensity, status, activity_id, created_at, updated_at, race_id
 `
 
 type UpdatePlannedSessionParams struct {
@@ -387,6 +406,7 @@ type UpdatePlannedSessionParams struct {
 	TargetElevationGainM pgtype.Int4 `json:"target_elevation_gain_m"`
 	TargetIntensity      pgtype.Text `json:"target_intensity"`
 	Status               string      `json:"status"`
+	RaceID               pgtype.UUID `json:"race_id"`
 }
 
 // Actualiza una sesion del usuario. Solo el dueno de la fila (user_id)
@@ -404,6 +424,7 @@ func (q *Queries) UpdatePlannedSession(ctx context.Context, arg UpdatePlannedSes
 		arg.TargetElevationGainM,
 		arg.TargetIntensity,
 		arg.Status,
+		arg.RaceID,
 	)
 	var i PlannedSession
 	err := row.Scan(
@@ -421,6 +442,7 @@ func (q *Queries) UpdatePlannedSession(ctx context.Context, arg UpdatePlannedSes
 		&i.ActivityID,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.RaceID,
 	)
 	return i, err
 }

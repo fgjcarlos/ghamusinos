@@ -11,10 +11,12 @@ import (
 )
 
 type Querier interface {
+	AttachRaceTrack(ctx context.Context, arg AttachRaceTrackParams) (pgtype.UUID, error)
 	// Marca el análisis como completado y guarda el payload enviado y la
 	// respuesta validada. Sólo el dueño de la fila (user_id) puede
 	// actualizarla.
 	CompleteAIAnalysis(ctx context.Context, arg CompleteAIAnalysisParams) (AiAnalysis, error)
+	CountRaces(ctx context.Context, userID pgtype.UUID) (int64, error)
 	// Crea (o reutiliza) el análisis de un usuario para un objetivo concreto.
 	//
 	// La restricción UNIQUE (user_id, kind, scope) hace que una petición
@@ -35,6 +37,7 @@ type Querier interface {
 	// Crea una sesion planificada para el usuario. El `user_id` viene del
 	// token, nunca del cuerpo de la peticion.
 	CreatePlannedSession(ctx context.Context, arg CreatePlannedSessionParams) (PlannedSession, error)
+	CreateRace(ctx context.Context, arg CreateRaceParams) (Race, error)
 	// Crea una nueva sesión de sincronización en estado 'pending'. El caller la
 	// transita a 'running' con UpdateSyncSessionStatus cuando empieza a procesar.
 	CreateSyncSession(ctx context.Context, arg CreateSyncSessionParams) (SyncSession, error)
@@ -43,8 +46,10 @@ type Querier interface {
 	// Borra una sesion del usuario. Devuelve el numero de filas afectadas: 0
 	// significa que no existia o que era de otro usuario (misma respuesta).
 	DeletePlannedSession(ctx context.Context, arg DeletePlannedSessionParams) (int64, error)
+	DeleteRace(ctx context.Context, arg DeleteRaceParams) (int64, error)
 	// Limpia los tokens del usuario (logout / desvinculación).
 	DeleteStravaTokensByUserID(ctx context.Context, userID pgtype.UUID) error
+	DetachRaceTrack(ctx context.Context, arg DetachRaceTrackParams) (pgtype.UUID, error)
 	// Return the existing row when Strava retries the same natural event key.
 	EnqueueActivityEvent(ctx context.Context, arg EnqueueActivityEventParams) (ActivityEvent, error)
 	// Marca el análisis como fallido y guarda un error seguro: error_code es
@@ -101,6 +106,7 @@ type Querier interface {
 	// de aislamiento: la sesion de otro usuario no existe para esta consulta
 	// (pgx.ErrNoRows).
 	GetPlannedSession(ctx context.Context, arg GetPlannedSessionParams) (PlannedSession, error)
+	GetRace(ctx context.Context, arg GetRaceParams) (Race, error)
 	// Recupera los tokens OAuth de Strava de un usuario (cifrados).
 	GetStravaTokensByUserID(ctx context.Context, userID pgtype.UUID) (StravaToken, error)
 	GetUserByClerkID(ctx context.Context, clerkUserID string) (User, error)
@@ -182,6 +188,9 @@ type Querier interface {
 	// Los parametros de fecha van nombrados: con $2/$3 posicionales sobre dos
 	// columnas DATE, SQLC no puede inferir los tipos y la generacion falla.
 	ListPlannedSessionsByRange(ctx context.Context, arg ListPlannedSessionsByRangeParams) ([]ListPlannedSessionsByRangeRow, error)
+	ListRaceSessions(ctx context.Context, arg ListRaceSessionsParams) ([]ListRaceSessionsRow, error)
+	ListRaceTracks(ctx context.Context, arg ListRaceTracksParams) ([]ListRaceTracksRow, error)
+	ListRaces(ctx context.Context, arg ListRacesParams) ([]Race, error)
 	// Lista las sesiones de sincronización del usuario, más recientes primero.
 	ListSyncSessionsByUser(ctx context.Context, arg ListSyncSessionsByUserParams) ([]SyncSession, error)
 	// Serie completa desde la primera actividad hasta hoy. Usada por el job
@@ -224,6 +233,7 @@ type Querier interface {
 	// Actualiza una sesion del usuario. Solo el dueno de la fila (user_id)
 	// puede modificarla; si no existe o es de otro usuario, pgx.ErrNoRows.
 	UpdatePlannedSession(ctx context.Context, arg UpdatePlannedSessionParams) (PlannedSession, error)
+	UpdateRace(ctx context.Context, arg UpdateRaceParams) (Race, error)
 	// Actualiza los contadores de progreso sin tocar status/finished_at.
 	UpdateSyncSessionProgress(ctx context.Context, arg UpdateSyncSessionProgressParams) (SyncSession, error)
 	// Cambia el estado de la sesión. Si falla el job, se guarda el error.

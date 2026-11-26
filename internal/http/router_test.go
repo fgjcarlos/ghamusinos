@@ -21,7 +21,7 @@ import (
 // mockQuerier es un stub minimal para tests sin base de datos.
 // Implementa sqlc.Querier completo; los métodos Strava/Activities/Sync
 // devuelven valores cero porque estos tests no ejercitan Strava.
-type mockQuerier struct{}
+type mockQuerier struct{ sqlc.Querier }
 
 func (m *mockQuerier) GetActivityStreams(context.Context, pgtype.UUID) ([]sqlc.ActivityStream, error) {
 	return nil, nil

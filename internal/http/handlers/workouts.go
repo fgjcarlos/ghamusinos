@@ -46,6 +46,7 @@ type workoutDTO struct {
 	TargetIntensity      *workouts.Intensity  `json:"target_intensity"`
 	Status               workouts.Status      `json:"status"`
 	ActivityID           *uuid.UUID           `json:"activity_id"`
+	RaceID               *uuid.UUID           `json:"race_id,omitempty"`
 }
 
 func workoutResponse(s workouts.Session) workoutDTO {
@@ -55,7 +56,7 @@ func workoutResponse(s workouts.Session) workoutDTO {
 	if status == "" {
 		status = workouts.StatusPlanned
 	}
-	return workoutDTO{ID: s.ID, ScheduledOn: s.ScheduledOn.UTC().Format("2006-01-02"), Title: s.Title, Notes: s.Notes, WorkoutType: s.WorkoutType, TargetDurationSec: s.TargetDurationSec, TargetDistanceM: s.TargetDistanceM, TargetElevationGainM: s.TargetElevationGainM, TargetIntensity: s.TargetIntensity, Status: status, ActivityID: s.ActivityID}
+	return workoutDTO{ID: s.ID, ScheduledOn: s.ScheduledOn.UTC().Format("2006-01-02"), Title: s.Title, Notes: s.Notes, WorkoutType: s.WorkoutType, TargetDurationSec: s.TargetDurationSec, TargetDistanceM: s.TargetDistanceM, TargetElevationGainM: s.TargetElevationGainM, TargetIntensity: s.TargetIntensity, Status: status, ActivityID: s.ActivityID, RaceID: s.RaceID}
 }
 func workoutAuth(w http.ResponseWriter, r *http.Request) (uuid.UUID, bool) {
 	id := middleware.GetReqID(r.Context())
@@ -148,6 +149,7 @@ func CreateWorkout(s WorkoutStore) http.Handler {
 			TargetDistanceM      *int                  `json:"target_distance_m"`
 			TargetElevationGainM *int                  `json:"target_elevation_gain_m"`
 			TargetIntensity      *workouts.Intensity   `json:"target_intensity"`
+			RaceID               *uuid.UUID            `json:"race_id"`
 		}
 		if err := decodeWorkoutJSON(r, &b); err != nil {
 			writeWorkoutDecodeError(w, r, err)
@@ -162,7 +164,7 @@ func CreateWorkout(s WorkoutStore) http.Handler {
 			workoutProblem(w, r, http.StatusBadRequest, err.Error())
 			return
 		}
-		v := workouts.Session{ScheduledOn: date, Title: *b.Title, WorkoutType: *b.WorkoutType, TargetDurationSec: b.TargetDurationSec, TargetDistanceM: b.TargetDistanceM, TargetElevationGainM: b.TargetElevationGainM, TargetIntensity: b.TargetIntensity, Status: workouts.StatusPlanned}
+		v := workouts.Session{ScheduledOn: date, Title: *b.Title, WorkoutType: *b.WorkoutType, TargetDurationSec: b.TargetDurationSec, TargetDistanceM: b.TargetDistanceM, TargetElevationGainM: b.TargetElevationGainM, TargetIntensity: b.TargetIntensity, Status: workouts.StatusPlanned, RaceID: b.RaceID}
 		if !workoutIntsFitDatabase(v.TargetDurationSec, v.TargetDistanceM, v.TargetElevationGainM) {
 			workoutProblem(w, r, http.StatusUnprocessableEntity, "target values must fit a 32-bit integer")
 			return
@@ -176,7 +178,9 @@ func CreateWorkout(s WorkoutStore) http.Handler {
 		}
 		result, err := s.Create(r.Context(), uid, v)
 		if err != nil {
-			if errors.Is(err, workouts.ErrValidation) {
+			if errors.Is(err, workouts.ErrRaceNotFound) {
+				workoutProblem(w, r, http.StatusNotFound, "race not found")
+			} else if errors.Is(err, workouts.ErrValidation) {
 				workoutProblem(w, r, http.StatusUnprocessableEntity, err.Error())
 			} else {
 				workoutProblem(w, r, http.StatusInternalServerError, "failed to create workout")
@@ -369,6 +373,11 @@ func PatchWorkout(s WorkoutStore) http.Handler {
 					}
 					v.TargetIntensity = &i
 				}
+			case "race_id":
+				if json.Unmarshal(raw, &v.RaceID) != nil {
+					workoutProblem(w, r, http.StatusBadRequest, "race_id must be a UUID or null")
+					return
+				}
 			case "status":
 				if string(raw) == "null" || json.Unmarshal(raw, &v.Status) != nil {
 					workoutProblem(w, r, http.StatusBadRequest, "status must be a string")
@@ -384,6 +393,10 @@ func PatchWorkout(s WorkoutStore) http.Handler {
 			return
 		}
 		result, err := s.Update(r.Context(), uid, id, v)
+		if errors.Is(err, workouts.ErrRaceNotFound) {
+			workoutProblem(w, r, http.StatusNotFound, "race not found")
+			return
+		}
 		if errors.Is(err, workouts.ErrNotFound) {
 			workoutProblem(w, r, http.StatusNotFound, "workout not found")
 			return
