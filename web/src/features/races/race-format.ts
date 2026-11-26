@@ -1,5 +1,6 @@
 export const format = new Intl.NumberFormat('es-ES', { maximumFractionDigits: 1 });
-export const km = (metres: number) => `${format.format(metres / 1000)} km`;
+export const km = (metres: number) =>
+  `${new Intl.NumberFormat('es-ES', { maximumFractionDigits: 3 }).format(metres / 1000)} km`;
 export const metres = (gain: number) => `${format.format(gain)} m`;
 
 export function countdown(date: string, now = new Date()) {
