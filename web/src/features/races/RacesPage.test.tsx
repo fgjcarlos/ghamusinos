@@ -165,6 +165,21 @@ it('shows independent loading, error, retry, and empty states for progress', asy
   expect(attempts).toBe(2);
 });
 
+it('counts one remaining day and week in the singular', async () => {
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async (path: string) => {
+      if (path.endsWith('/progress'))
+        return json({ ...noProgress, days_remaining: 1, weeks_remaining: 1 });
+      if (path.startsWith('/api/v1/gpx?')) return json({ data: [], has_next: false });
+      return json({ ...race, tracks: [], sessions: [] });
+    }),
+  );
+  renderRaces('/carreras/r1');
+  const panel = await screen.findByRole('region', { name: 'Progreso' });
+  expect(await within(panel).findByText('Falta 1 día (1 semana completa).')).toBeInTheDocument();
+});
+
 it('lets a workout choose or clear its race without changing the legacy submission fields', async () => {
   const options = vi.fn(async () => json({ data: [race], has_next: false }));
   vi.stubGlobal('fetch', options);

@@ -83,7 +83,7 @@ async function listAll<T>(
   for (;;) {
     const result = await page(items.length, signal);
     items.push(...result.data);
-    if (!result.has_next || !result.data.length) return items;
+    if (signal.aborted || !result.has_next || !result.data.length) return items;
   }
 }
 
