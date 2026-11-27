@@ -80,6 +80,8 @@ Ver `.env.example`. Las principales:
 | `POSTGRES_USER` | Usuario de la DB (default: `ghamusinos`) |
 | `POSTGRES_PASSWORD` | Contraseña de la DB — **sin valor por defecto, obligatoria** |
 | `POSTGRES_DB` | Nombre de la DB (default: `ghamusinos`) |
+| `REPORTS_SCHEDULE_ENABLED` | Registra el cron de reportes (fan-out semanal en River). `true` por defecto; cualquier otro valor lo apaga |
+| `REPORTS_SCHEDULE_INTERVAL` | Intervalo entre fan-outs de reportes, en formato Go (`1h`, `30m`). Default `1h`, debe ser > 0 con el cron activo |
 
 > En staging/prod genera contraseñas aleatorias: `openssl rand -base64 32`.
 > El puerto 5432 está vinculado a `127.0.0.1` para evitar exposición en redes externas.

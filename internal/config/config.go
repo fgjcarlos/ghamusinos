@@ -73,7 +73,31 @@ type Config struct {
 	// arranque, deja la IA en estado "unavailable" y un aviso por cada
 	// problema encontrado (S7).
 	AI AIConfig
+	// Reports contiene el cron de reportes (fase 2.4, issue #319).
+	Reports ReportsConfig
 }
+
+// ReportsConfig configura el cron de reportes (fase 2.4, issue #319).
+//
+// Variables de entorno:
+//   - REPORTS_SCHEDULE_ENABLED: registra el job periódico de fan-out
+//     ("true" enciende; cualquier otro valor lo apaga). Por defecto true.
+//   - REPORTS_SCHEDULE_INTERVAL: intervalo entre fan-outs, en formato Go
+//     ("1h", "30m"). Por defecto 1h; debe ser > 0 con el cron activo.
+//
+// River v0.51 no tiene expresiones cron, así que la periodicidad es un
+// intervalo fijo.
+type ReportsConfig struct {
+	// ScheduleEnabled registra el job periódico (REPORTS_SCHEDULE_ENABLED).
+	ScheduleEnabled bool
+	// ScheduleInterval es el intervalo entre fan-outs
+	// (REPORTS_SCHEDULE_INTERVAL).
+	ScheduleInterval time.Duration
+}
+
+// DefaultReportScheduleInterval es la periodicidad por defecto del cron de
+// reportes (REPORTS_SCHEDULE_INTERVAL).
+const DefaultReportScheduleInterval = time.Hour
 
 // ─────────────────────────────────────────────────────────────────────────
 // AI config (fase 1.5 · issue #17)
@@ -294,6 +318,25 @@ func Load() (*Config, error) {
 		return nil, err
 	}
 	cfg.Strava = strava
+
+	// El cron de reportes (fase 2.4, #319) está activo por defecto; el
+	// intervalo sólo se valida cuando va a usarse.
+	cfg.Reports = ReportsConfig{
+		ScheduleEnabled:  parseBool(getEnv("REPORTS_SCHEDULE_ENABLED", "true")),
+		ScheduleInterval: DefaultReportScheduleInterval,
+	}
+	if cfg.Reports.ScheduleEnabled {
+		interval, err := getEnvDuration("REPORTS_SCHEDULE_INTERVAL", DefaultReportScheduleInterval)
+		if err != nil {
+			return nil, err
+		}
+		// River rechaza ByPeriod menor a un segundo al encolar; se valida aquí
+		// para que el error salga al arrancar y no en cada fan-out.
+		if interval < time.Second {
+			return nil, fmt.Errorf("config: REPORTS_SCHEDULE_INTERVAL=%s debe ser >= 1s con el cron de reportes activo", interval)
+		}
+		cfg.Reports.ScheduleInterval = interval
+	}
 
 	// La IA es opcional: su configuración nunca puede impedir el
 	// arranque. loadAIConfig no devuelve error; una IA mal configurada

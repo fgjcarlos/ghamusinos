@@ -1151,3 +1151,53 @@ func containsWarning(warnings []string, fragment string) bool {
 	}
 	return false
 }
+
+func TestLoad_ReportSchedule(t *testing.T) {
+	base := func(t *testing.T) {
+		t.Helper()
+		t.Setenv("DATABASE_URL", "postgres://test:test@localhost/test")
+		t.Setenv("ENV", "production")
+		t.Setenv("CLERK_JWKS_URL", "https://clerk.example.com/jwks")
+		t.Setenv("CLERK_ISSUER", "https://clerk.example.com")
+	}
+	cases := []struct {
+		name     string
+		enabled  string
+		interval string
+		want     ReportsConfig
+		wantErr  bool
+	}{
+		{name: "defaults", want: ReportsConfig{ScheduleEnabled: true, ScheduleInterval: time.Hour}},
+		{name: "explicit", enabled: "false", interval: "15m", want: ReportsConfig{ScheduleEnabled: false}},
+		{name: "enabled custom interval", enabled: "true", interval: "15m", want: ReportsConfig{ScheduleEnabled: true, ScheduleInterval: 15 * time.Minute}},
+		// parseBool acepta yes/on/1 como el resto de booleanos del proyecto.
+		{name: "yes enables", enabled: "yes", want: ReportsConfig{ScheduleEnabled: true}},
+		{name: "disabled skips interval validation", enabled: "false", interval: "bogus", want: ReportsConfig{ScheduleEnabled: false}},
+		{name: "zero interval when enabled", enabled: "true", interval: "0s", wantErr: true},
+		// River rechaza ByPeriod < 1s, así que la config también.
+		{name: "sub-second interval when enabled", enabled: "true", interval: "500ms", wantErr: true},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			base(t)
+			t.Setenv("REPORTS_SCHEDULE_ENABLED", tc.enabled)
+			t.Setenv("REPORTS_SCHEDULE_INTERVAL", tc.interval)
+			cfg, err := Load()
+			if tc.wantErr {
+				if err == nil {
+					t.Fatalf("Load() = %+v, want error", cfg.Reports)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("Load() error = %v", err)
+			}
+			if cfg.Reports.ScheduleEnabled != tc.want.ScheduleEnabled {
+				t.Errorf("ScheduleEnabled = %v, want %v", cfg.Reports.ScheduleEnabled, tc.want.ScheduleEnabled)
+			}
+			if tc.want.ScheduleInterval != 0 && cfg.Reports.ScheduleInterval != tc.want.ScheduleInterval {
+				t.Errorf("ScheduleInterval = %v, want %v", cfg.Reports.ScheduleInterval, tc.want.ScheduleInterval)
+			}
+		})
+	}
+}
