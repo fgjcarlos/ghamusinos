@@ -205,6 +205,17 @@ type RaceTrack struct {
 	GpxTrackID pgtype.UUID `json:"gpx_track_id"`
 }
 
+type ReportSnapshot struct {
+	ID          pgtype.UUID        `json:"id"`
+	UserID      pgtype.UUID        `json:"user_id"`
+	Kind        string             `json:"kind"`
+	PeriodStart pgtype.Date        `json:"period_start"`
+	PeriodEnd   pgtype.Date        `json:"period_end"`
+	BlockID     pgtype.UUID        `json:"block_id"`
+	Payload     []byte             `json:"payload"`
+	GeneratedAt pgtype.Timestamptz `json:"generated_at"`
+}
+
 type StravaToken struct {
 	UserID        pgtype.UUID        `json:"user_id"`
 	AccessCipher  string             `json:"access_cipher"`
@@ -227,6 +238,18 @@ type SyncSession struct {
 	Error           pgtype.Text        `json:"error"`
 	StartedAt       pgtype.Timestamptz `json:"started_at"`
 	FinishedAt      pgtype.Timestamptz `json:"finished_at"`
+}
+
+type TrainingBlock struct {
+	ID        pgtype.UUID        `json:"id"`
+	UserID    pgtype.UUID        `json:"user_id"`
+	Name      string             `json:"name"`
+	StartDate pgtype.Date        `json:"start_date"`
+	EndDate   pgtype.Date        `json:"end_date"`
+	RaceID    pgtype.UUID        `json:"race_id"`
+	Notes     string             `json:"notes"`
+	CreatedAt pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt pgtype.Timestamptz `json:"updated_at"`
 }
 
 type TrainingLoadDaily struct {

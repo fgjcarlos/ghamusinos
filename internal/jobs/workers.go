@@ -16,6 +16,7 @@ import (
 	"github.com/fgjcarlos/ghamusinos/internal/ai"
 	"github.com/fgjcarlos/ghamusinos/internal/config"
 	"github.com/fgjcarlos/ghamusinos/internal/db/sqlc"
+	"github.com/fgjcarlos/ghamusinos/internal/reports"
 	"github.com/fgjcarlos/ghamusinos/internal/strava"
 )
 
@@ -169,6 +170,14 @@ func NewRiverWorkers(d Deps, registerStravaWorkers bool) (*river.Workers, error)
 		// Production skips River entirely in this mode.
 		river.AddWorker(workers, &StubWorker{})
 	}
+
+	// Los reportes (fase 2.4, #319) se generan solos. El fan-out lista los
+	// usuarios y encola un generate_report por cada uno; ese segundo worker
+	// genera la semana cerrada (y el mes el día 1) en la zona del usuario.
+	river.AddWorker(workers, NewReportFanoutWorker(
+		queries, d.RiverClient, d.Config.Reports.ScheduleInterval))
+	river.AddWorker(workers, NewGenerateReportWorker(
+		reports.NewStore(queries), queries, nil))
 
 	// El worker de análisis IA (fase 1.5) no depende de Strava: se
 	// registra siempre que haya un analizador configurado, para que la IA

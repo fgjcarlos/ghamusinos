@@ -33,6 +33,9 @@ func NewClient(ctx context.Context, pool *pgxpool.Pool, d Deps, registerStravaWo
 			river.QueueDefault: {MaxWorkers: 10},
 		},
 		Workers: workers,
+		// River v0.51 no tiene cron: el reporte semanal es un fan-out
+		// periódico configurable (fase 2.4, #319).
+		PeriodicJobs: ReportPeriodicJobs(d.Config),
 	})
 	if err != nil {
 		return nil, err

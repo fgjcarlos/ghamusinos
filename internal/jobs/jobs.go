@@ -12,6 +12,11 @@ const (
 	KindRefreshStravaToken  Kind = "refresh_strava_token"
 	KindImportStravaStreams Kind = "import_strava_streams"
 	KindStub                Kind = "stub"
+	// KindReportFanout enqueues a generate_report per user (fase 2.4, #319).
+	KindReportFanout Kind = "report_fanout"
+	// KindGenerateReport generates the closed reports of one user, or exactly
+	// the period its args name when it comes from an on-demand request.
+	KindGenerateReport Kind = "generate_report"
 )
 
 // ImportStravaArgs contains arguments for importing Strava data for a user

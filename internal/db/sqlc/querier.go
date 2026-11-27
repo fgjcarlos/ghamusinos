@@ -16,7 +16,14 @@ type Querier interface {
 	// respuesta validada. Sólo el dueño de la fila (user_id) puede
 	// actualizarla.
 	CompleteAIAnalysis(ctx context.Context, arg CompleteAIAnalysisParams) (AiAnalysis, error)
+	// Two blocks share a day when each one starts on or before the other's end
+	// and ends on or after the other's start. exclude_id is the block being
+	// updated, or a zero UUID when creating.
+	CountOverlappingTrainingBlocks(ctx context.Context, arg CountOverlappingTrainingBlocksParams) (int64, error)
 	CountRaces(ctx context.Context, userID pgtype.UUID) (int64, error)
+	// Total de la misma consulta, para el has_next del sobre paginado.
+	CountReportSnapshots(ctx context.Context, arg CountReportSnapshotsParams) (int64, error)
+	CountTrainingBlocks(ctx context.Context, userID pgtype.UUID) (int64, error)
 	// Crea (o reutiliza) el análisis de un usuario para un objetivo concreto.
 	//
 	// La restricción UNIQUE (user_id, kind, scope) hace que una petición
@@ -41,6 +48,7 @@ type Querier interface {
 	// Crea una nueva sesión de sincronización en estado 'pending'. El caller la
 	// transita a 'running' con UpdateSyncSessionStatus cuando empieza a procesar.
 	CreateSyncSession(ctx context.Context, arg CreateSyncSessionParams) (SyncSession, error)
+	CreateTrainingBlock(ctx context.Context, arg CreateTrainingBlockParams) (TrainingBlock, error)
 	CreateUser(ctx context.Context, arg CreateUserParams) (User, error)
 	DeleteGPXTrack(ctx context.Context, arg DeleteGPXTrackParams) error
 	// Borra una sesion del usuario. Devuelve el numero de filas afectadas: 0
@@ -49,6 +57,7 @@ type Querier interface {
 	DeleteRace(ctx context.Context, arg DeleteRaceParams) (int64, error)
 	// Limpia los tokens del usuario (logout / desvinculación).
 	DeleteStravaTokensByUserID(ctx context.Context, userID pgtype.UUID) error
+	DeleteTrainingBlock(ctx context.Context, arg DeleteTrainingBlockParams) (int64, error)
 	DetachRaceTrack(ctx context.Context, arg DetachRaceTrackParams) (pgtype.UUID, error)
 	// Return the existing row when Strava retries the same natural event key.
 	EnqueueActivityEvent(ctx context.Context, arg EnqueueActivityEventParams) (ActivityEvent, error)
@@ -107,8 +116,12 @@ type Querier interface {
 	// (pgx.ErrNoRows).
 	GetPlannedSession(ctx context.Context, arg GetPlannedSessionParams) (PlannedSession, error)
 	GetRace(ctx context.Context, arg GetRaceParams) (Race, error)
+	// Devuelve un snapshot del usuario. El filtro por user_id es la frontera de
+	// aislamiento: el reporte de otro usuario no existe para esta consulta.
+	GetReportSnapshot(ctx context.Context, arg GetReportSnapshotParams) (ReportSnapshot, error)
 	// Recupera los tokens OAuth de Strava de un usuario (cifrados).
 	GetStravaTokensByUserID(ctx context.Context, userID pgtype.UUID) (StravaToken, error)
+	GetTrainingBlock(ctx context.Context, arg GetTrainingBlockParams) (TrainingBlock, error)
 	GetUserByClerkID(ctx context.Context, clerkUserID string) (User, error)
 	// Carga un usuario por su UUID interno. Usado por el worker
 	// RecalcTrainingLoad para leer ftp / running_threshold_sec_per_km /
@@ -191,8 +204,14 @@ type Querier interface {
 	ListRaceSessions(ctx context.Context, arg ListRaceSessionsParams) ([]ListRaceSessionsRow, error)
 	ListRaceTracks(ctx context.Context, arg ListRaceTracksParams) ([]ListRaceTracksRow, error)
 	ListRaces(ctx context.Context, arg ListRacesParams) ([]Race, error)
+	// Lista paginada del usuario, del periodo mas reciente al mas antiguo. Un kind
+	// vacio lista todos los tipos; from_date y to_date filtran por solape con el
+	// periodo del reporte (el reporte toca la ventana si empieza antes de que
+	// acabe y acaba despues de que empiece).
+	ListReportSnapshots(ctx context.Context, arg ListReportSnapshotsParams) ([]ListReportSnapshotsRow, error)
 	// Lista las sesiones de sincronización del usuario, más recientes primero.
 	ListSyncSessionsByUser(ctx context.Context, arg ListSyncSessionsByUserParams) ([]SyncSession, error)
+	ListTrainingBlocks(ctx context.Context, arg ListTrainingBlocksParams) ([]TrainingBlock, error)
 	// Serie completa desde la primera actividad hasta hoy. Usada por el job
 	// RecalcTrainingLoad cuando no hay `last_recalc_at` registrado.
 	ListTrainingLoadFromFirstActivity(ctx context.Context, userID pgtype.UUID) ([]TrainingLoadDaily, error)
@@ -204,6 +223,9 @@ type Querier interface {
 	// que requieren recálculo. PR2 no la usa; queda cableada para PR3 o un
 	// job cron. Mantenerla aquí evita un nuevo PR cuando se encienda.
 	ListUserIDsForTrainingLoadRecalc(ctx context.Context) ([]pgtype.UUID, error)
+	// Serializes the overlap check per user inside the caller's transaction, so two
+	// concurrent writes cannot both pass it.
+	LockUserTrainingBlocks(ctx context.Context, dollar_1 string) error
 	// Marca un evento como procesado una vez consumido por el job.
 	MarkActivityEventProcessed(ctx context.Context, id pgtype.UUID) error
 	MarkInviteAccepted(ctx context.Context, id pgtype.UUID) error
@@ -238,6 +260,7 @@ type Querier interface {
 	UpdateSyncSessionProgress(ctx context.Context, arg UpdateSyncSessionProgressParams) (SyncSession, error)
 	// Cambia el estado de la sesión. Si falla el job, se guarda el error.
 	UpdateSyncSessionStatus(ctx context.Context, arg UpdateSyncSessionStatusParams) (SyncSession, error)
+	UpdateTrainingBlock(ctx context.Context, arg UpdateTrainingBlockParams) (TrainingBlock, error)
 	UpdateUserInviteStatus(ctx context.Context, arg UpdateUserInviteStatusParams) (User, error)
 	// Actualiza las preferencias de entrenamiento e IA del usuario (fase 1.1).
 	// Las métricas pueden ir a NULL si el usuario no las conoce; timezone y
@@ -257,6 +280,9 @@ type Querier interface {
 	UpsertGPXKmVertical(ctx context.Context, arg UpsertGPXKmVerticalParams) (GpxKmVertical, error)
 	// Idempotente por PK activity_id. Upsert de zonas HR calculadas.
 	UpsertHRZones(ctx context.Context, arg UpsertHRZonesParams) (HrZone, error)
+	// Idempotente por (user_id, kind, period_start): regenerar un periodo sustituye
+	// la fila en vez de duplicarla. La version del schema vive dentro del payload.
+	UpsertReportSnapshot(ctx context.Context, arg UpsertReportSnapshotParams) (ReportSnapshot, error)
 	// Inserta o reemplaza los tokens OAuth cifrados de un usuario.
 	// Strava solo permite un set de tokens activo por usuario; ON CONFLICT cubre
 	// el caso "usuario reconecta" y el refresh que rota access_token.

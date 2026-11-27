@@ -68,6 +68,15 @@ describe('TopBar', () => {
     );
   });
 
+  it('links to reports in the desktop navigation', () => {
+    render(
+      <MemoryRouter>
+        <TopBar lastSync={null} />
+      </MemoryRouter>,
+    );
+    expect(screen.getByRole('link', { name: /Reportes/i })).toHaveAttribute('href', '/reportes');
+  });
+
   it('renders the SyncStatusChip with the provided date', () => {
     const lastSync = new Date('2026-01-15T11:48:00Z');
     const now = new Date('2026-01-15T12:00:00Z');
