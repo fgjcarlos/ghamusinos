@@ -11,6 +11,7 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/fgjcarlos/ghamusinos/internal/auth"
+	"github.com/fgjcarlos/ghamusinos/internal/blocks"
 	"github.com/fgjcarlos/ghamusinos/internal/config"
 	"github.com/fgjcarlos/ghamusinos/internal/db/sqlc"
 	"github.com/fgjcarlos/ghamusinos/internal/frontend"
@@ -61,6 +62,7 @@ type Server struct {
 	gpxHasher        gpx.GPXHasher
 	workoutStore     *workouts.Store
 	raceStore        *races.Store
+	blockStore       *blocks.Store
 	// riverInserter is the River subset needed by POST /dashboard/recalc
 	// (DA-004, issue #16 PR3). Nil-safe: when nil the recalc handler
 	// returns 503 with a clear message instead of panicking (dev stack
@@ -137,6 +139,12 @@ func (s *Server) WithRiverInserter(inserter jobs.RiverJobInserter) *Server {
 // WithRaces wires race goals to the authenticated API.
 func (s *Server) WithRaces(store *races.Store) *Server {
 	s.raceStore = store
+	return s
+}
+
+// WithBlocks wires training blocks to the authenticated API.
+func (s *Server) WithBlocks(store *blocks.Store) *Server {
+	s.blockStore = store
 	return s
 }
 
@@ -232,6 +240,9 @@ func (s *Server) Router() http.Handler {
 			r.Get("/me", handlers.Me(s.queries).ServeHTTP)
 			if s.raceStore != nil {
 				handlers.MountRaces(r, s.raceStore)
+			}
+			if s.blockStore != nil {
+				handlers.MountBlocks(r, s.blockStore)
 			}
 			if s.workoutStore != nil {
 				r.Post("/workouts", handlers.CreateWorkout(s.workoutStore).ServeHTTP)

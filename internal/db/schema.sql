@@ -384,3 +384,18 @@ CREATE INDEX idx_race_tracks_gpx_track_id ON race_tracks (gpx_track_id);
 ALTER TABLE planned_sessions ADD COLUMN race_id UUID
     CONSTRAINT planned_sessions_race_fk REFERENCES races(id) ON DELETE SET NULL;
 CREATE INDEX idx_planned_sessions_race_id ON planned_sessions (race_id);
+
+CREATE TABLE training_blocks (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    name TEXT NOT NULL CHECK (length(btrim(name)) BETWEEN 1 AND 200),
+    start_date DATE NOT NULL,
+    end_date DATE NOT NULL,
+    race_id UUID REFERENCES races(id) ON DELETE SET NULL,
+    notes TEXT NOT NULL DEFAULT '' CHECK (length(notes) <= 2000),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    CONSTRAINT training_blocks_date_range CHECK (end_date >= start_date)
+);
+
+CREATE INDEX idx_training_blocks_user_start ON training_blocks (user_id, start_date, end_date);

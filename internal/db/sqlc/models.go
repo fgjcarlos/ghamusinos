@@ -229,6 +229,18 @@ type SyncSession struct {
 	FinishedAt      pgtype.Timestamptz `json:"finished_at"`
 }
 
+type TrainingBlock struct {
+	ID        pgtype.UUID        `json:"id"`
+	UserID    pgtype.UUID        `json:"user_id"`
+	Name      string             `json:"name"`
+	StartDate pgtype.Date        `json:"start_date"`
+	EndDate   pgtype.Date        `json:"end_date"`
+	RaceID    pgtype.UUID        `json:"race_id"`
+	Notes     string             `json:"notes"`
+	CreatedAt pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt pgtype.Timestamptz `json:"updated_at"`
+}
+
 type TrainingLoadDaily struct {
 	UserID         pgtype.UUID        `json:"user_id"`
 	Day            pgtype.Date        `json:"day"`
