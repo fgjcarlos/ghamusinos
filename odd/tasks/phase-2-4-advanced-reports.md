@@ -180,11 +180,11 @@ Los reportes generados no tienen ni API ni pantalla.
 
 ## Tasks
 
-- [x] T1 · S1–S2 · Training blocks: reversible migration, store, CRUD `/api/v1/blocks` with 409 on overlap · parent · commit 6f1c832; high / independent verifier PASS
-- [x] T2 · S1, S3 · Unified `report_snapshots` model and pure, idempotent report generator · worker · commit 16ba3e6; independent verifier confirmed ownership and block/kind invariant after correction
-- [x] T3 · S1, S4 · Weekly report cron with River PeriodicJobs, fan-out per user and config toggle · worker · commit 7d79172; independent verifier PASS, two advisories fixed
-- [x] T4 · S1, S5 · Reports API: filtered paginated list, detail and on-demand generate · worker · commit eb41bb8; independent verifier PASS without findings
-- [x] T5 · S1–S2, S5 · `/reportes` screen with week/month/block selector, ECharts detail and block management · parent · commit —
+- [x] T1 · S1–S2 · Training blocks: reversible migration, store, CRUD `/api/v1/blocks` with 409 on overlap · parent · commit 6f1c832
+- [x] T2 · S1, S3 · Unified `report_snapshots` model and pure, idempotent report generator · worker · commit 16ba3e6
+- [x] T3 · S1, S4 · Weekly report cron with River PeriodicJobs, fan-out per user and config toggle · worker · commit 7d79172
+- [x] T4 · S1, S5 · Reports API: filtered paginated list, detail and on-demand generate · worker · commit eb41bb8
+- [x] T5 · S1–S2, S5 · `/reportes` screen with week/month/block selector, ECharts detail and block management · worker · commit 53a246c
 
 ## Log
 
