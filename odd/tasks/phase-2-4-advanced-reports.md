@@ -184,7 +184,7 @@ Los reportes generados no tienen ni API ni pantalla.
 - [x] T2 · S1, S3 · Unified `report_snapshots` model and pure, idempotent report generator · worker · commit 16ba3e6; independent verifier confirmed ownership and block/kind invariant after correction
 - [x] T3 · S1, S4 · Weekly report cron with River PeriodicJobs, fan-out per user and config toggle · worker · commit 7d79172; independent verifier PASS, two advisories fixed
 - [x] T4 · S1, S5 · Reports API: filtered paginated list, detail and on-demand generate · worker · commit eb41bb8; independent verifier PASS without findings
-- [ ] T5 · S1–S2, S5 · `/reportes` screen with week/month/block selector, ECharts detail and block management · parent · commit —
+- [x] T5 · S1–S2, S5 · `/reportes` screen with week/month/block selector, ECharts detail and block management · parent · commit —
 
 ## Log
 
@@ -194,4 +194,4 @@ Los reportes generados no tienen ni API ni pantalla.
 - L4: Local verification runs against a throwaway embedded PostgreSQL 16 without TimescaleDB (migration 00007 marked applied only there); the CI Timescale image covers the real extension.
 - L5 (T2): `16ba3e6`; generator tests and PostgreSQL upsert/isolation passed. Independent verification identified a missing block/kind constraint. Both invalid combinations reproduced, then rejected after migration 00020 down/up. Full Go suites, vet and lint passed before the scoped correction; focused integration ran again afterward. Risk: item 2 (user-scoped reports).
 - L6 (T3): `7d79172`.
-- L7 (T4): `eb41bb8`; list, detail and on-demand generation verified. The on-demand job was corrected to write the requested period or block, which the first version did not.
+- L7 (T4): `eb41bb8`; list, detail and on-demand generation verified. The on-demand job was corrected to write the requested period or block, which the first version did not.- L8 (T5): `53a246c`; 530 web tests, typecheck, lint, format:check and build green. The new tests found and fixed two real defects: a failed block delete rendered no message, and the poll bound was off by one. Remaining gaps: the 503 generate message and the poll-arrival branch have no dedicated test.
