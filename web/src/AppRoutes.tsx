@@ -21,6 +21,9 @@ const Calendar = lazy(() =>
     default: CalendarContainer,
   })),
 );
+const Reports = lazy(() =>
+  import('./features/reports/ReportsPage').then(({ ReportsPage }) => ({ default: ReportsPage })),
+);
 
 // Reads the :id URL param and forwards it to the container. Both
 // /rutas/:id and /lab/:id mount this same wrapper so the legacy alias
@@ -50,6 +53,16 @@ export function AppRoutes() {
             <ErrorBoundary message="No se pudo cargar el calendario.">
               <Suspense fallback={<div role="status">Cargando calendario…</div>}>
                 <Calendar />
+              </Suspense>
+            </ErrorBoundary>
+          }
+        />
+        <Route
+          path="/reportes"
+          element={
+            <ErrorBoundary message="No se pudo cargar los reportes.">
+              <Suspense fallback={<div role="status">Cargando reportes…</div>}>
+                <Reports />
               </Suspense>
             </ErrorBoundary>
           }

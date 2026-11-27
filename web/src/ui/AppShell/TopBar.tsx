@@ -77,6 +77,9 @@ export function TopBar({ lastSync, now, avatarInitials = '' }: TopBarProps) {
         <NavLink to="/calendario" icon={CALENDAR_ICON}>
           Calendario
         </NavLink>
+        <NavLink to="/reportes" icon={RENDIMIENTO_ICON}>
+          Reportes
+        </NavLink>
         <span className={styles.placeholder} data-state="placeholder">
           <NavLink to="/rendimiento" icon={RENDIMIENTO_ICON}>
             Rendimiento

@@ -182,8 +182,8 @@ Los reportes generados no tienen ni API ni pantalla.
 
 - [x] T1 · S1–S2 · Training blocks: reversible migration, store, CRUD `/api/v1/blocks` with 409 on overlap · parent · commit 6f1c832; high / independent verifier PASS
 - [x] T2 · S1, S3 · Unified `report_snapshots` model and pure, idempotent report generator · worker · commit 16ba3e6; independent verifier confirmed ownership and block/kind invariant after correction
-- [ ] T3 · S1, S4 · Weekly report cron with River PeriodicJobs, fan-out per user and config toggle · parent · commit —
-- [ ] T4 · S1, S5 · Reports API: filtered paginated list, detail and on-demand generate · parent · commit —
+- [x] T3 · S1, S4 · Weekly report cron with River PeriodicJobs, fan-out per user and config toggle · worker · commit 7d79172; independent verifier PASS, two advisories fixed
+- [x] T4 · S1, S5 · Reports API: filtered paginated list, detail and on-demand generate · worker · commit eb41bb8; independent verifier PASS without findings
 - [ ] T5 · S1–S2, S5 · `/reportes` screen with week/month/block selector, ECharts detail and block management · parent · commit —
 
 ## Log
@@ -193,3 +193,5 @@ Los reportes generados no tienen ni API ni pantalla.
 - L3 (T1): Independent verifier met S1 (T1 subset) and S2. Fixed its advisory: the overlap query comment now says a zero UUID is passed when creating. Open bug #310 makes `internal/jobs` fail in CET; it passes with `TZ=UTC` and is unrelated to this phase.
 - L4: Local verification runs against a throwaway embedded PostgreSQL 16 without TimescaleDB (migration 00007 marked applied only there); the CI Timescale image covers the real extension.
 - L5 (T2): `16ba3e6`; generator tests and PostgreSQL upsert/isolation passed. Independent verification identified a missing block/kind constraint. Both invalid combinations reproduced, then rejected after migration 00020 down/up. Full Go suites, vet and lint passed before the scoped correction; focused integration ran again afterward. Risk: item 2 (user-scoped reports).
+- L6 (T3): `7d79172`.
+- L7 (T4): `eb41bb8`; list, detail and on-demand generation verified. The on-demand job was corrected to write the requested period or block, which the first version did not.
