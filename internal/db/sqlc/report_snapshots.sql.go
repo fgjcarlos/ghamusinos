@@ -11,6 +11,34 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const countReportSnapshots = `-- name: CountReportSnapshots :one
+SELECT count(*) FROM report_snapshots
+WHERE user_id = $1
+    AND ($2::text = '' OR kind = $2::text)
+    AND ($3::date IS NULL OR period_end >= $3::date)
+    AND ($4::date IS NULL OR period_start <= $4::date)
+`
+
+type CountReportSnapshotsParams struct {
+	UserID   pgtype.UUID `json:"user_id"`
+	Kind     string      `json:"kind"`
+	FromDate pgtype.Date `json:"from_date"`
+	ToDate   pgtype.Date `json:"to_date"`
+}
+
+// Total de la misma consulta, para el has_next del sobre paginado.
+func (q *Queries) CountReportSnapshots(ctx context.Context, arg CountReportSnapshotsParams) (int64, error) {
+	row := q.db.QueryRow(ctx, countReportSnapshots,
+		arg.UserID,
+		arg.Kind,
+		arg.FromDate,
+		arg.ToDate,
+	)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const getReportSnapshot = `-- name: GetReportSnapshot :one
 SELECT id, user_id, kind, period_start, period_end, block_id, payload, generated_at FROM report_snapshots WHERE user_id = $1 AND id = $2
 `
@@ -36,6 +64,75 @@ func (q *Queries) GetReportSnapshot(ctx context.Context, arg GetReportSnapshotPa
 		&i.GeneratedAt,
 	)
 	return i, err
+}
+
+const listReportSnapshots = `-- name: ListReportSnapshots :many
+SELECT id, kind, period_start, period_end, block_id, payload, generated_at
+FROM report_snapshots
+WHERE user_id = $1
+    AND ($2::text = '' OR kind = $2::text)
+    AND ($3::date IS NULL OR period_end >= $3::date)
+    AND ($4::date IS NULL OR period_start <= $4::date)
+ORDER BY period_start DESC, id
+LIMIT $6 OFFSET $5
+`
+
+type ListReportSnapshotsParams struct {
+	UserID   pgtype.UUID `json:"user_id"`
+	Kind     string      `json:"kind"`
+	FromDate pgtype.Date `json:"from_date"`
+	ToDate   pgtype.Date `json:"to_date"`
+	Offset   int32       `json:"offset"`
+	Limit    int32       `json:"limit"`
+}
+
+type ListReportSnapshotsRow struct {
+	ID          pgtype.UUID        `json:"id"`
+	Kind        string             `json:"kind"`
+	PeriodStart pgtype.Date        `json:"period_start"`
+	PeriodEnd   pgtype.Date        `json:"period_end"`
+	BlockID     pgtype.UUID        `json:"block_id"`
+	Payload     []byte             `json:"payload"`
+	GeneratedAt pgtype.Timestamptz `json:"generated_at"`
+}
+
+// Lista paginada del usuario, del periodo mas reciente al mas antiguo. Un kind
+// vacio lista todos los tipos; from_date y to_date filtran por solape con el
+// periodo del reporte (el reporte toca la ventana si empieza antes de que
+// acabe y acaba despues de que empiece).
+func (q *Queries) ListReportSnapshots(ctx context.Context, arg ListReportSnapshotsParams) ([]ListReportSnapshotsRow, error) {
+	rows, err := q.db.Query(ctx, listReportSnapshots,
+		arg.UserID,
+		arg.Kind,
+		arg.FromDate,
+		arg.ToDate,
+		arg.Offset,
+		arg.Limit,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListReportSnapshotsRow
+	for rows.Next() {
+		var i ListReportSnapshotsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Kind,
+			&i.PeriodStart,
+			&i.PeriodEnd,
+			&i.BlockID,
+			&i.Payload,
+			&i.GeneratedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const upsertReportSnapshot = `-- name: UpsertReportSnapshot :one

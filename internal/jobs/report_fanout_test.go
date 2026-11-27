@@ -2,6 +2,7 @@ package jobs
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 
@@ -29,8 +30,10 @@ func TestReportPeriodicJobs(t *testing.T) {
 
 // fakeReportGenerator records the periods the per-user job asks for.
 type fakeReportGenerator struct {
-	weeks  []time.Time
-	months []time.Time
+	weeks    []time.Time
+	months   []time.Time
+	blocks   []uuid.UUID
+	blockErr error
 }
 
 func (f *fakeReportGenerator) GenerateWeek(_ context.Context, _ uuid.UUID, week time.Time) (reports.Snapshot, error) {
@@ -41,6 +44,11 @@ func (f *fakeReportGenerator) GenerateWeek(_ context.Context, _ uuid.UUID, week 
 func (f *fakeReportGenerator) GenerateMonth(_ context.Context, _ uuid.UUID, month time.Time) (reports.Snapshot, error) {
 	f.months = append(f.months, month)
 	return reports.Snapshot{}, nil
+}
+
+func (f *fakeReportGenerator) GenerateBlock(_ context.Context, _ uuid.UUID, block uuid.UUID, _ time.Time) (reports.Snapshot, error) {
+	f.blocks = append(f.blocks, block)
+	return reports.Snapshot{}, f.blockErr
 }
 
 type fakePreferences struct{ timezone string }
@@ -110,6 +118,97 @@ func TestGenerateReportWorker_ClosedPeriods(t *testing.T) {
 			}
 		})
 	}
+}
+
+// TestGenerateReportWorker_ExplicitRequest covers S5 (#320): a job enqueued by
+// the on-demand endpoint generates exactly the period it names, not the closed
+// schedule, in the user's zone.
+func TestGenerateReportWorker_ExplicitRequest(t *testing.T) {
+	madrid, err := time.LoadLocation("Europe/Madrid")
+	require.NoError(t, err)
+	gen := &fakeReportGenerator{}
+	// The clock is far from the requested periods: a job that falls back to the
+	// schedule would ask for other dates.
+	worker := NewGenerateReportWorker(gen, fakePreferences{timezone: "Europe/Madrid"},
+		func() time.Time { return time.Date(2026, 6, 1, 12, 0, 0, 0, time.UTC) })
+	user := uuid.New()
+	run := func(args GenerateReportArgs) error {
+		t.Helper()
+		args.UserID = user.String()
+		return worker.Work(context.Background(), &river.Job[GenerateReportArgs]{Args: args})
+	}
+
+	// A past week: any day inside it names it.
+	require.NoError(t, run(GenerateReportArgs{ReportKind: "week", Date: "2026-02-05"}))
+	require.Len(t, gen.weeks, 1)
+	start, end := reports.WeekPeriod(gen.weeks[0], madrid)
+	require.Equal(t, "2026-02-02", start.Format(time.DateOnly))
+	require.Equal(t, "2026-02-08", end.Format(time.DateOnly))
+	require.Empty(t, gen.months)
+	require.Empty(t, gen.blocks)
+
+	// A month.
+	require.NoError(t, run(GenerateReportArgs{ReportKind: "month", Date: "2026-02-17"}))
+	require.Len(t, gen.months, 1)
+	start, end = reports.MonthPeriod(gen.months[0], madrid)
+	require.Equal(t, "2026-02-01", start.Format(time.DateOnly))
+	require.Equal(t, "2026-02-28", end.Format(time.DateOnly))
+	require.Len(t, gen.weeks, 1)
+
+	// A block: exactly that block, through the store's block report.
+	block := uuid.New()
+	require.NoError(t, run(GenerateReportArgs{ReportKind: "block", BlockID: block.String()}))
+	require.Equal(t, []uuid.UUID{block}, gen.blocks)
+	require.Len(t, gen.weeks, 1)
+
+	// The date is a civil date in the user's zone: a Monday stays the Monday of
+	// its own week.
+	require.NoError(t, run(GenerateReportArgs{ReportKind: "week", Date: "2026-02-02"}))
+	start, _ = reports.WeekPeriod(gen.weeks[1], madrid)
+	require.Equal(t, "2026-02-02", start.Format(time.DateOnly))
+
+	// A malformed request is an error, not a fallback to the schedule.
+	require.Error(t, run(GenerateReportArgs{ReportKind: "year", Date: "2026-02-05"}))
+	require.Error(t, run(GenerateReportArgs{ReportKind: "week", Date: "2026-2-5"}))
+	require.Error(t, run(GenerateReportArgs{ReportKind: "block", BlockID: "not-a-uuid"}))
+	require.Len(t, gen.weeks, 2)
+	require.Len(t, gen.months, 1)
+	require.Len(t, gen.blocks, 1)
+
+	// Without a request the scheduled behaviour is unchanged: the closed week.
+	open := &fakeReportGenerator{}
+	scheduled := NewGenerateReportWorker(open, fakePreferences{timezone: "Europe/Madrid"},
+		func() time.Time { return time.Date(2026, 6, 1, 12, 0, 0, 0, time.UTC) })
+	require.NoError(t, scheduled.Work(context.Background(), &river.Job[GenerateReportArgs]{
+		Args: GenerateReportArgs{UserID: user.String()}}))
+	require.Len(t, open.weeks, 1)
+	start, end = reports.WeekPeriod(open.weeks[0], madrid)
+	require.Equal(t, "2026-05-25", start.Format(time.DateOnly))
+	require.Equal(t, "2026-05-31", end.Format(time.DateOnly))
+	require.Empty(t, open.blocks)
+}
+
+// TestGenerateReportWorker_DeletedBlockIsNoOp covers the on-demand block request
+// whose block was deleted between the enqueue and the work: there is nothing
+// left to report on, so the job succeeds instead of retrying forever. Any other
+// failure and any malformed request still fail.
+func TestGenerateReportWorker_DeletedBlockIsNoOp(t *testing.T) {
+	block := uuid.New()
+	gone := &fakeReportGenerator{blockErr: reports.ErrNotFound}
+	worker := NewGenerateReportWorker(gone, fakePreferences{timezone: "UTC"}, nil)
+	require.NoError(t, worker.Work(context.Background(), &river.Job[GenerateReportArgs]{
+		Args: GenerateReportArgs{UserID: uuid.New().String(), ReportKind: "block", BlockID: block.String()}}))
+	require.Equal(t, []uuid.UUID{block}, gone.blocks, "the request still reached the generator")
+
+	broken := &fakeReportGenerator{blockErr: errors.New("boom")}
+	worker = NewGenerateReportWorker(broken, fakePreferences{timezone: "UTC"}, nil)
+	err := worker.Work(context.Background(), &river.Job[GenerateReportArgs]{
+		Args: GenerateReportArgs{UserID: uuid.New().String(), ReportKind: "block", BlockID: block.String()}})
+	require.ErrorContains(t, err, "boom")
+
+	require.Error(t, worker.Work(context.Background(), &river.Job[GenerateReportArgs]{
+		Args: GenerateReportArgs{UserID: uuid.New().String(), ReportKind: "block", BlockID: "not-a-uuid"}}))
+	require.Empty(t, broken.blocks[1:])
 }
 
 // fakeReportUsers lists the users of the fan-out.

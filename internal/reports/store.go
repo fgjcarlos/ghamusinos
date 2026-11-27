@@ -37,6 +37,59 @@ type Record struct {
 	GeneratedAt time.Time  `json:"generated_at"`
 }
 
+// Summary is the compact view of a stored payload that the reports list
+// carries, so the list does not need the whole payload per row.
+type Summary struct {
+	TSS            float64  `json:"tss"`
+	Activities     int      `json:"activities"`
+	DistanceM      float64  `json:"distance_m"`
+	ElevationGainM float64  `json:"elevation_gain_m"`
+	AvgEF          *float64 `json:"avg_ef"`
+	AvgGAPSecPerKm *float64 `json:"avg_gap_sec_per_km"`
+	Adherence      *float64 `json:"adherence"`
+}
+
+// Summary extracts the list view of this payload.
+func (s Snapshot) Summary() Summary {
+	return Summary{TSS: s.Load.TSS, Activities: s.Volume.Activities, DistanceM: s.Volume.DistanceM,
+		ElevationGainM: s.Volume.ElevationGainM, AvgEF: s.Performance.AvgEF,
+		AvgGAPSecPerKm: s.Performance.AvgGAPSecPerKm, Adherence: s.Plan.Adherence}
+}
+
+// Item is one row of the reports list.
+type Item struct {
+	ID          uuid.UUID  `json:"id"`
+	Kind        Kind       `json:"kind"`
+	PeriodStart string     `json:"period_start"`
+	PeriodEnd   string     `json:"period_end"`
+	BlockID     *uuid.UUID `json:"block_id"`
+	GeneratedAt time.Time  `json:"generated_at"`
+	Summary     Summary    `json:"summary"`
+}
+
+// Filter narrows the reports list: an optional kind and an optional window the
+// report must overlap. A zero value leaves that side open.
+type Filter struct {
+	Kind Kind
+	From time.Time
+	To   time.Time
+}
+
+// GenerateInput names the period an on-demand generation asks for: any day
+// inside it for week and month, or the block for block.
+type GenerateInput struct {
+	Kind    Kind   `json:"kind"`
+	Date    string `json:"date"`
+	BlockID string `json:"block_id"`
+}
+
+// Period is the period a generate request names, computed as the generator does.
+type Period struct {
+	Kind        Kind   `json:"kind"`
+	PeriodStart string `json:"period_start"`
+	PeriodEnd   string `json:"period_end"`
+}
+
 // GenerateWeek builds and stores the report of the week that contains week, in
 // the user's time zone.
 func (s *Store) GenerateWeek(ctx context.Context, user uuid.UUID, week time.Time) (Snapshot, error) {
@@ -79,6 +132,71 @@ func (s *Store) GenerateBlock(ctx context.Context, user, blockID uuid.UUID, now 
 		in.Race = &race
 	}
 	return s.generate(ctx, user, loc, in)
+}
+
+// List returns one page of the user's reports, newest period first, and the
+// total matching the same filter.
+func (s *Store) List(ctx context.Context, user uuid.UUID, f Filter, limit, offset int32) ([]Item, int64, error) {
+	from, to := optDay(f.From), optDay(f.To)
+	rows, err := s.q.ListReportSnapshots(ctx, sqlc.ListReportSnapshotsParams{UserID: dbID(user),
+		Kind: string(f.Kind), FromDate: from, ToDate: to, Limit: limit, Offset: offset})
+	if err != nil {
+		return nil, 0, fmt.Errorf("reports: list snapshots: %w", err)
+	}
+	total, err := s.q.CountReportSnapshots(ctx, sqlc.CountReportSnapshotsParams{UserID: dbID(user),
+		Kind: string(f.Kind), FromDate: from, ToDate: to})
+	if err != nil {
+		return nil, 0, fmt.Errorf("reports: count snapshots: %w", err)
+	}
+	data := make([]Item, 0, len(rows))
+	for _, row := range rows {
+		var payload Snapshot
+		if err := json.Unmarshal(row.Payload, &payload); err != nil {
+			return nil, 0, fmt.Errorf("reports: decode payload: %w", err)
+		}
+		data = append(data, Item{ID: uuidOf(row.ID), Kind: Kind(row.Kind),
+			PeriodStart: row.PeriodStart.Time.Format(time.DateOnly), PeriodEnd: row.PeriodEnd.Time.Format(time.DateOnly),
+			BlockID: fromOptID(row.BlockID), GeneratedAt: row.GeneratedAt.Time, Summary: payload.Summary()})
+	}
+	return data, total, nil
+}
+
+// Period resolves the period an on-demand generation names, computed exactly as
+// the generator does. A kind or date that is not valid answers ErrInvalid; a
+// missing or foreign block answers ErrNotFound.
+func (s *Store) Period(ctx context.Context, user uuid.UUID, in GenerateInput) (Period, error) {
+	loc, err := s.location(ctx, user)
+	if err != nil {
+		return Period{}, err
+	}
+	var start, end time.Time
+	switch in.Kind {
+	case KindWeek, KindMonth:
+		// The day is a civil date in the user's zone, so its own week and month
+		// stay the same on both sides of UTC.
+		date, err := time.ParseInLocation(time.DateOnly, in.Date, loc)
+		if err != nil || date.Format(time.DateOnly) != in.Date || date.Year() < 1 {
+			return Period{}, ErrInvalid
+		}
+		if in.Kind == KindWeek {
+			start, end = WeekPeriod(date, loc)
+		} else {
+			start, end = MonthPeriod(date, loc)
+		}
+	case KindBlock:
+		id, err := uuid.Parse(in.BlockID)
+		if err != nil {
+			return Period{}, ErrInvalid
+		}
+		block, err := s.q.GetTrainingBlock(ctx, sqlc.GetTrainingBlockParams{UserID: dbID(user), ID: dbID(id)})
+		if err != nil {
+			return Period{}, mapMissing(err)
+		}
+		start, end = block.StartDate.Time, block.EndDate.Time
+	default:
+		return Period{}, ErrInvalid
+	}
+	return Period{Kind: in.Kind, PeriodStart: start.Format(time.DateOnly), PeriodEnd: end.Format(time.DateOnly)}, nil
 }
 
 // Get returns a snapshot of the user with its stored payload. A missing or
@@ -166,6 +284,14 @@ func mapMissing(err error) error {
 func dbID(id uuid.UUID) pgtype.UUID { return pgtype.UUID{Bytes: id, Valid: true} }
 
 func day(t time.Time) pgtype.Date { return pgtype.Date{Time: t, Valid: true} }
+
+// optDay maps a zero time to a NULL date, which leaves that filter side open.
+func optDay(t time.Time) pgtype.Date {
+	if t.IsZero() {
+		return pgtype.Date{}
+	}
+	return day(t)
+}
 
 func fromOptID(id pgtype.UUID) *uuid.UUID {
 	if !id.Valid {

@@ -24,6 +24,7 @@ import (
 	apphttp "github.com/fgjcarlos/ghamusinos/internal/http"
 	"github.com/fgjcarlos/ghamusinos/internal/jobs"
 	"github.com/fgjcarlos/ghamusinos/internal/races"
+	"github.com/fgjcarlos/ghamusinos/internal/reports"
 	"github.com/fgjcarlos/ghamusinos/internal/strava"
 	"github.com/fgjcarlos/ghamusinos/internal/workouts"
 )
@@ -233,6 +234,7 @@ func buildRouter(cfg *config.Config, pool *pgxpool.Pool, queries sqlc.Querier, s
 	server.WithWorkouts(workouts.NewStore(queries))
 	server.WithRaces(races.NewStore(queries))
 	server.WithBlocks(blocks.NewStore(pool))
+	server.WithReports(reports.NewStore(queries))
 
 	if cfg.Strava != nil {
 		stravaClient, err := strava.NewClient(strava.Config{

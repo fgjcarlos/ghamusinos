@@ -19,6 +19,7 @@ import (
 	"github.com/fgjcarlos/ghamusinos/internal/http/handlers"
 	"github.com/fgjcarlos/ghamusinos/internal/jobs"
 	"github.com/fgjcarlos/ghamusinos/internal/races"
+	"github.com/fgjcarlos/ghamusinos/internal/reports"
 	"github.com/fgjcarlos/ghamusinos/internal/strava"
 	"github.com/fgjcarlos/ghamusinos/internal/terrain"
 	"github.com/fgjcarlos/ghamusinos/internal/weather"
@@ -63,6 +64,7 @@ type Server struct {
 	workoutStore     *workouts.Store
 	raceStore        *races.Store
 	blockStore       *blocks.Store
+	reportStore      *reports.Store
 	// riverInserter is the River subset needed by POST /dashboard/recalc
 	// (DA-004, issue #16 PR3). Nil-safe: when nil the recalc handler
 	// returns 503 with a clear message instead of panicking (dev stack
@@ -145,6 +147,13 @@ func (s *Server) WithRaces(store *races.Store) *Server {
 // WithBlocks wires training blocks to the authenticated API.
 func (s *Server) WithBlocks(store *blocks.Store) *Server {
 	s.blockStore = store
+	return s
+}
+
+// WithReports wires report snapshots to the authenticated API. The generate
+// route also needs WithRiverInserter: without it the POST answers 503.
+func (s *Server) WithReports(store *reports.Store) *Server {
+	s.reportStore = store
 	return s
 }
 
@@ -243,6 +252,9 @@ func (s *Server) Router() http.Handler {
 			}
 			if s.blockStore != nil {
 				handlers.MountBlocks(r, s.blockStore)
+			}
+			if s.reportStore != nil {
+				handlers.MountReports(r, s.reportStore, s.riverInserter)
 			}
 			if s.workoutStore != nil {
 				r.Post("/workouts", handlers.CreateWorkout(s.workoutStore).ServeHTTP)

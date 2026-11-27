@@ -14,7 +14,8 @@ const (
 	KindStub                Kind = "stub"
 	// KindReportFanout enqueues a generate_report per user (fase 2.4, #319).
 	KindReportFanout Kind = "report_fanout"
-	// KindGenerateReport generates the closed reports of one user.
+	// KindGenerateReport generates the closed reports of one user, or exactly
+	// the period its args name when it comes from an on-demand request.
 	KindGenerateReport Kind = "generate_report"
 )
 

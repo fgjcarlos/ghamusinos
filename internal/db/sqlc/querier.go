@@ -21,6 +21,8 @@ type Querier interface {
 	// updated, or a zero UUID when creating.
 	CountOverlappingTrainingBlocks(ctx context.Context, arg CountOverlappingTrainingBlocksParams) (int64, error)
 	CountRaces(ctx context.Context, userID pgtype.UUID) (int64, error)
+	// Total de la misma consulta, para el has_next del sobre paginado.
+	CountReportSnapshots(ctx context.Context, arg CountReportSnapshotsParams) (int64, error)
 	CountTrainingBlocks(ctx context.Context, userID pgtype.UUID) (int64, error)
 	// Crea (o reutiliza) el análisis de un usuario para un objetivo concreto.
 	//
@@ -202,6 +204,11 @@ type Querier interface {
 	ListRaceSessions(ctx context.Context, arg ListRaceSessionsParams) ([]ListRaceSessionsRow, error)
 	ListRaceTracks(ctx context.Context, arg ListRaceTracksParams) ([]ListRaceTracksRow, error)
 	ListRaces(ctx context.Context, arg ListRacesParams) ([]Race, error)
+	// Lista paginada del usuario, del periodo mas reciente al mas antiguo. Un kind
+	// vacio lista todos los tipos; from_date y to_date filtran por solape con el
+	// periodo del reporte (el reporte toca la ventana si empieza antes de que
+	// acabe y acaba despues de que empiece).
+	ListReportSnapshots(ctx context.Context, arg ListReportSnapshotsParams) ([]ListReportSnapshotsRow, error)
 	// Lista las sesiones de sincronización del usuario, más recientes primero.
 	ListSyncSessionsByUser(ctx context.Context, arg ListSyncSessionsByUserParams) ([]SyncSession, error)
 	ListTrainingBlocks(ctx context.Context, arg ListTrainingBlocksParams) ([]TrainingBlock, error)
