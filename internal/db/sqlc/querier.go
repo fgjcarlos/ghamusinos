@@ -114,6 +114,9 @@ type Querier interface {
 	// (pgx.ErrNoRows).
 	GetPlannedSession(ctx context.Context, arg GetPlannedSessionParams) (PlannedSession, error)
 	GetRace(ctx context.Context, arg GetRaceParams) (Race, error)
+	// Devuelve un snapshot del usuario. El filtro por user_id es la frontera de
+	// aislamiento: el reporte de otro usuario no existe para esta consulta.
+	GetReportSnapshot(ctx context.Context, arg GetReportSnapshotParams) (ReportSnapshot, error)
 	// Recupera los tokens OAuth de Strava de un usuario (cifrados).
 	GetStravaTokensByUserID(ctx context.Context, userID pgtype.UUID) (StravaToken, error)
 	GetTrainingBlock(ctx context.Context, arg GetTrainingBlockParams) (TrainingBlock, error)
@@ -270,6 +273,9 @@ type Querier interface {
 	UpsertGPXKmVertical(ctx context.Context, arg UpsertGPXKmVerticalParams) (GpxKmVertical, error)
 	// Idempotente por PK activity_id. Upsert de zonas HR calculadas.
 	UpsertHRZones(ctx context.Context, arg UpsertHRZonesParams) (HrZone, error)
+	// Idempotente por (user_id, kind, period_start): regenerar un periodo sustituye
+	// la fila en vez de duplicarla. La version del schema vive dentro del payload.
+	UpsertReportSnapshot(ctx context.Context, arg UpsertReportSnapshotParams) (ReportSnapshot, error)
 	// Inserta o reemplaza los tokens OAuth cifrados de un usuario.
 	// Strava solo permite un set de tokens activo por usuario; ON CONFLICT cubre
 	// el caso "usuario reconecta" y el refresh que rota access_token.
